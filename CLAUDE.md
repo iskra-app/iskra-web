@@ -22,6 +22,7 @@ pnpm e2e            # Playwright — tests/e2e, три движка × теле�
 PW_ENGINES=chromium pnpm e2e # один движок
 pnpm icons          # перегенерировать public/icons из assets/iskra-spark.svg
 ISKRA_BASE=/iskra-web/ ISKRA_META_CSP=1 pnpm build   # как ночная сборка для GitHub Pages
+ISKRA_BASE=/web/ ISKRA_META_CSP=1 pnpm build         # как сборка main для iskra.swag.moscow/web
 ```
 
 В облачном контейнере Chromium уже стоит, и его версия может не совпасть с Playwright:
@@ -63,7 +64,8 @@ ISKRA_BASE=/iskra-web/ ISKRA_META_CSP=1 pnpm build   # как ночная сб�
   CDN. Новое место, пишущее в `innerHTML` или регистрирующее скрипт, требует политики
   Trusted Types и строки в `security-headers.ts`, иначе упадёт только в сборке — поэтому
   Playwright гоняется против `vite preview`, а не `vite dev`.
-- **Никаких путей от корня** (`/icons/…`, `/sw.js`): ночная сборка живёт в `/iskra-web/`.
+- **Никаких путей от корня** (`/icons/…`, `/sw.js`): ночная сборка живёт в `/iskra-web/`, сборка
+  `main` — в `/web/` на iskra.swag.moscow.
   Свои файлы — через `asset()` из `design/asset.ts` или `import.meta.env.BASE_URL`.
 - **Ничего не логируется.** `no-console` включён; `matrix-js-sdk` получает `quietLogger()`.
 - **Демо-сервер держит `unknown` пустым.** SDK начал спрашивать новое — добавить маршрут в

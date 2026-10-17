@@ -99,3 +99,56 @@ jobs:
         uses: actions/deploy-pages@v4
         with:
           artifact_name: github-pages-${{ github.run_attempt }}
+
+  # Сборка из main — на https://iskra.swag.moscow/web/. У репозитория одни Pages, и они
+  # заняты ночной сборкой, поэтому эта кладётся папкой web/ в репозиторий сайта
+  # (iskra-app/iskra.swag.moscow) по deploy key с правом записи: SITE_DEPLOY_KEY здесь,
+  # открытая половина — в deploy keys того репозитория. Заголовков Pages не дают и там:
+  # CSP тегом, без frame-ancestors и COOP.
+  deploy-web:
+    needs: [check, e2e]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    # Две сборки подряд не должны толкаться в один репозиторий: вторая ждёт первую.
+    concurrency:
+      group: site-web
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v5
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm build
+        env:
+          ISKRA_BASE: /web/
+          ISKRA_META_CSP: '1'
+      - uses: actions/checkout@v5
+        with:
+          repository: iskra-app/iskra.swag.moscow
+          ref: main
+          ssh-key: ${{ secrets.SITE_DEPLOY_KEY }}
+          path: site
+      # web/ заменяется целиком: файлы прошлой сборки с другими хэшами не копятся.
+      # Остальной сайт не трогается.
+      - name: Положить сборку в web/
+        run: |
+          rm -rf site/web
+          cp -R dist site/web
+      - name: Опубликовать
+        working-directory: site
+        run: |
+          git add -A web
+          if git diff --cached --quiet; then
+            echo "web/ не изменился"
+            exit 0
+          fi
+          git -c user.name='github-actions[bot]' \
+              -c user.email='41898282+github-actions[bot]@users.noreply.github.com' \
+              commit -q -m "web: iskra-web ${GITHUB_SHA::7}" \
+              -m "https://github.com/${GITHUB_REPOSITORY}/commit/${GITHUB_SHA}"
+          git push origin HEAD:main
