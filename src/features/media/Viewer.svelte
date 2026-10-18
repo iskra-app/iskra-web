@@ -8,6 +8,10 @@
 
   Оригинал скачивается (и расшифровывается) здесь и живёт ровно пока открыт: листнули или
   закрыли — `revokeObjectURL`. Пока он в пути — видна миниатюра из кэша ленты.
+
+  Соседние фото (по одному с каждой стороны) скачиваются заранее, пока смотрят текущее, —
+  листнули, и следующее уже резкое. Только фото: видео тяжёлое, и качать его, пока его не
+  попросили, — чужой трафик. Ушли дальше чем на шаг — заготовка отпущена; закрыли — все.
 -->
 <script lang="ts" module>
   import type { Attachment } from '../../core/timeline/message';
@@ -66,6 +70,37 @@
     dialog?.showModal();
   });
 
+  /** Оригиналы текущего и соседних — в памяти, пока открыт просмотрщик, и не дальше шага. */
+  // Не состояние: экран её не показывает, только берёт из неё.
+  // eslint-disable-next-line svelte/prefer-svelte-reactivity
+  const originals = new Map<string, Promise<Blob>>();
+
+  function original(entry: ViewerItem): Promise<Blob> {
+    let pending = originals.get(entry.key);
+    if (!pending) {
+      pending = media.blob(entry.attachment.source!, entry.attachment.mimetype);
+      originals.set(entry.key, pending);
+      // Не скачалось — в следующий раз попробовать снова, а не помнить отказ.
+      pending.catch(() => originals.get(entry.key) === pending && originals.delete(entry.key));
+    }
+    return pending;
+  }
+
+  // Соседи — заранее; всё, что дальше шага, отпущено.
+  $effect(() => {
+    const near = [items[index - 1], items[index], items[index + 1]].filter((entry): entry is ViewerItem => !!entry);
+    const keep = new Set(near.map((entry) => entry.key));
+    for (const key of originals.keys()) if (!keep.has(key)) originals.delete(key);
+    for (const entry of near) {
+      if (entry !== items[index] && entry.kind === 'image' && entry.attachment.source) {
+        void media.preview(entry.attachment, 1024);
+        original(entry).catch(() => {});
+      }
+    }
+  });
+
+  $effect(() => () => originals.clear());
+
   // Текущее: миниатюра сразу, оригинал — следом; листнули — прежний оригинал отозван.
   $effect(() => {
     const current = item;
@@ -79,8 +114,7 @@
     view = identity;
     void media.preview(current.attachment, 1024).then((url) => alive && (preview = url));
     if (current.attachment.source) {
-      media
-        .blob(current.attachment.source, current.attachment.mimetype)
+      original(current)
         .then((loaded) => {
           if (!alive) return;
           blob = loaded;
