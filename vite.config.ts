@@ -64,8 +64,8 @@ export default defineConfig({
       includeAssets: ['icons/icon.svg', 'icons/apple-touch-icon-180.png'],
       manifest: {
         id: base,
-        name: 'Iskra',
-        short_name: 'Iskra',
+        name: 'Iskra Web',
+        short_name: 'Iskra Web',
         lang: 'ru',
         start_url: base,
         scope: base,
