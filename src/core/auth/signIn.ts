@@ -38,8 +38,8 @@ type Pending =
     };
 
 /**
- * Куда сервер вернёт человека: корень приложения — с базовым путём сборки (на GitHub Pages
- * это `/iskra-web/`). Параметры стираются в `callback.ts`.
+ * Куда сервер вернёт человека: корень приложения — с базовым путём сборки (в подпапке,
+ * например `/iskra-web/`). Параметры стираются в `callback.ts`.
  */
 export function redirectUri(): string {
   return `${window.location.origin}${import.meta.env.BASE_URL}`;

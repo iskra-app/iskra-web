@@ -21,8 +21,8 @@ pnpm build && pnpm preview   # сборка с боевой CSP и Trusted Types
 pnpm e2e            # Playwright — tests/e2e, три движка × телефон/десктоп
 PW_ENGINES=chromium pnpm e2e # один движок
 pnpm icons          # перегенерировать public/icons из assets/iskra-spark.svg
-ISKRA_BASE=/iskra-web/ ISKRA_META_CSP=1 pnpm build   # как ночная сборка для GitHub Pages
-ISKRA_BASE=/web/ ISKRA_META_CSP=1 pnpm build         # как сборка main для iskra.swag.moscow/web
+ISKRA_META_CSP=1 pnpm build   # как ночная сборка для GitHub Pages (nightly.web.iskra.wtf)
+ISKRA_BASE=/iskra-web/ pnpm build   # сборка в подпапке — проверить, что нет путей от корня
 ```
 
 В облачном контейнере Chromium уже стоит, и его версия может не совпасть с Playwright:
@@ -64,8 +64,8 @@ ISKRA_BASE=/web/ ISKRA_META_CSP=1 pnpm build         # как сборка main 
   CDN. Новое место, пишущее в `innerHTML` или регистрирующее скрипт, требует политики
   Trusted Types и строки в `security-headers.ts`, иначе упадёт только в сборке — поэтому
   Playwright гоняется против `vite preview`, а не `vite dev`.
-- **Никаких путей от корня** (`/icons/…`, `/sw.js`): ночная сборка живёт в `/iskra-web/`, сборка
-  `main` — в `/web/` на iskra.swag.moscow.
+- **Никаких путей от корня** (`/icons/…`, `/sw.js`): сборка может жить в подпапке (`ISKRA_BASE`),
+  как ночная жила в `/iskra-web/`, пока у неё не было своего домена.
   Свои файлы — через `asset()` из `design/asset.ts` или `import.meta.env.BASE_URL`.
 - **Ничего не логируется.** `no-console` включён; `matrix-js-sdk` получает `quietLogger()`.
 - **Демо-сервер держит `unknown` пустым.** SDK начал спрашивать новое — добавить маршрут в

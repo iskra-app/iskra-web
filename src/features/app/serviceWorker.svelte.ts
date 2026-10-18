@@ -9,7 +9,7 @@
  */
 import { Workbox } from 'workbox-window';
 
-/** Скрипт и область SW — от базового пути сборки: на GitHub Pages это `/iskra-web/`. */
+/** Скрипт и область SW — от базового пути сборки: в подпапке, например `/iskra-web/`. */
 const SCOPE = import.meta.env.BASE_URL;
 const SW_URL = `${SCOPE}sw.js`;
 
