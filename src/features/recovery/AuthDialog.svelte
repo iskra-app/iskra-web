@@ -15,7 +15,12 @@
     onapproved: () => void;
     oncancel: () => void;
   }
-  let { request, onpassword, onapproved, oncancel }: Props = $props();
+  let { request: live, onpassword, onapproved, oncancel }: Props = $props();
+  /** Запрос на экране: закрывающееся окно догорает с последним, а не пустым. */
+  let request = $state<Props['request']>(null);
+  $effect(() => {
+    if (live) request = live;
+  });
 
   let dialog: HTMLDialogElement | undefined = $state();
   let password = $state('');
@@ -23,11 +28,11 @@
 
   $effect(() => {
     if (!dialog) return;
-    if (request && !dialog.open) {
+    if (live && !dialog.open) {
       password = '';
       dialog.showModal();
     }
-    if (!request && dialog.open) dialog.close();
+    if (!live && dialog.open) dialog.close();
   });
 
   function submit(event: SubmitEvent) {
@@ -37,11 +42,11 @@
 
   /** Закрыли сами (`Esc`) — это «передумал». Закрыли мы, потому что ответ ушёл, — нет. */
   function onclose() {
-    if (request) oncancel();
+    if (live) oncancel();
   }
 </script>
 
-<dialog bind:this={dialog} aria-labelledby="{id}-title" aria-describedby="{id}-message" {onclose}>
+<dialog bind:this={dialog} data-motion="pop" aria-labelledby="{id}-title" aria-describedby="{id}-message" {onclose}>
   {#if request?.kind === 'password'}
     <form onsubmit={submit}>
       <h2 id="{id}-title">{t('recovery.password.title')}</h2>

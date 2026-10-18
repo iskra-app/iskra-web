@@ -400,6 +400,14 @@
     color: inherit;
     font-size: var(--font-size-caption);
     cursor: pointer;
+    transition:
+      background var(--timing-reaction) var(--ease-out),
+      border-color var(--timing-reaction) var(--ease-out),
+      transform var(--timing-reaction) var(--ease-menu-open);
+  }
+  /* Нажатие — чуть вдавливается и отпружинивает: реакция ставится пальцем, и палец это видит. */
+  .reactions button:active:not(:disabled) {
+    transform: scale(var(--motion-scale-from));
   }
   .reactions button.mine {
     border-color: var(--accent);
@@ -471,6 +479,7 @@
     background: var(--color-glass-opaque);
     box-shadow: 0 var(--space-within-run) var(--space-close) rgb(0 0 0 / 0.12);
     z-index: 1;
+    transition: opacity var(--timing-chrome) var(--ease-out);
   }
   .own .hover-bar {
     inset-inline-start: auto;

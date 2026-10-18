@@ -53,6 +53,10 @@
 
 <style>
   .picker {
+    transform-origin: bottom center;
+    transition:
+      opacity var(--timing-chrome) var(--ease-out),
+      transform var(--timing-menu-open) var(--ease-menu-open);
     max-height: var(--size-mention-list);
     margin: 0 0 var(--space-close);
     padding: var(--space-tight) 0;
@@ -91,5 +95,11 @@
     min-width: 0;
     color: var(--color-text-secondary);
     font-size: var(--font-size-caption);
+  }
+  @starting-style {
+    .picker {
+      opacity: 0;
+      transform: scale(var(--motion-scale-from));
+    }
   }
 </style>

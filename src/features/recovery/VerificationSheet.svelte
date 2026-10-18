@@ -14,12 +14,18 @@
 
   let dialog: HTMLDialogElement | undefined = $state();
   const id = $props.id();
-  const step = $derived(verification.step);
+  const live = $derived(verification.step);
+  /** Шаг на экране: закрывающееся окно догорает с последним, а не пустым. */
+  let step = $state<typeof live>(null);
+
+  $effect(() => {
+    if (live) step = live;
+  });
 
   $effect(() => {
     if (!dialog) return;
-    if (step && !dialog.open) dialog.showModal();
-    if (!step && dialog.open) dialog.close();
+    if (live && !dialog.open) dialog.showModal();
+    if (!live && dialog.open) dialog.close();
   });
 
   /** `Esc` — то же, что «Закрыть»: идущее отменяется. */
@@ -28,7 +34,7 @@
   }
 </script>
 
-<dialog bind:this={dialog} aria-labelledby="{id}-title" aria-describedby="{id}-message" {onclose}>
+<dialog bind:this={dialog} data-motion="pop" aria-labelledby="{id}-title" aria-describedby="{id}-message" {onclose}>
   {#if step?.name === 'asked'}
     <h2 id="{id}-title">{t('verification.signIn.title')}</h2>
     <p class="device">{step.deviceName || t('verification.unnamedDevice')}</p>

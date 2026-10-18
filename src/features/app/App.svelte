@@ -13,6 +13,7 @@
   import VerificationSheet from '../recovery/VerificationSheet.svelte';
   import { preferences } from './preferences.svelte.ts';
   import { wallpaperPhoto } from './wallpaperPhoto.svelte.ts';
+  import { installScreenMotion } from './screenMotion';
 
   let { authCallback }: { authCallback: AuthCallback | null } = $props();
 
@@ -38,7 +39,12 @@
   onMount(() => {
     // Возврат со страницы входа читается один раз.
     void app.boot(authCallback, { onFocusRequested: answerPing });
-    return preferences.persist();
+    const stopMotion = installScreenMotion();
+    const stopPersisting = preferences.persist();
+    return () => {
+      stopMotion();
+      stopPersisting();
+    };
   });
 
   // Выход стёр своё фото на обоях с диска — и из памяти тоже: следующий здесь — другой человек.

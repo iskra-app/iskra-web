@@ -9,12 +9,21 @@ import { formatRoute, parseRoute, type Route } from './route';
  */
 class Router {
   route = $state<Route>({ name: 'home' });
+  /**
+   * Как показать смену маршрута — анимацией экрана, например (`features/app/screenMotion.ts`).
+   * Ядро не знает, какой ширины окно и как оно движется: только даёт сменить маршрут внутри.
+   */
+  transition: ((apply: () => void, from: Route, to: Route) => void) | null = null;
 
   constructor() {
     if (typeof window === 'undefined') return;
     this.route = parseRoute(window.location.hash);
     window.addEventListener('hashchange', () => {
-      this.route = parseRoute(window.location.hash);
+      const from = this.route;
+      const to = parseRoute(window.location.hash);
+      const apply = () => (this.route = to);
+      if (this.transition) this.transition(apply, from, to);
+      else apply();
     });
   }
 

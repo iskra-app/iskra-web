@@ -64,7 +64,7 @@
   }
 </script>
 
-<dialog bind:this={dialog} class="switcher" aria-label={t('quickSwitch.label')} {onclose}>
+<dialog bind:this={dialog} data-motion="pop" class="switcher" aria-label={t('quickSwitch.label')} {onclose}>
   <input
     bind:this={input}
     bind:value={query}

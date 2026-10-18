@@ -170,6 +170,7 @@
     width: 0;
     border-radius: var(--radius-circle);
     background: var(--poll-fill);
+    transition: width var(--timing-reaction) var(--ease-out);
   }
   .fill.empty {
     visibility: hidden;

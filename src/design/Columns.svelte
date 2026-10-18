@@ -14,6 +14,7 @@
 <script lang="ts">
   import type { Snippet } from 'svelte';
   import { viewport } from './viewport.svelte.ts';
+  import { fadeInOut, slideFromEnd } from './motion';
   import { LIST_IDEAL, LIST_MAX, LIST_MIN, clampListWidth as clamp } from './columns';
 
   interface Props {
@@ -128,9 +129,9 @@
   {#if panel && panelOpen}
     {#if panelAsSheet}
       <!-- Скрим — только указатель; с клавиатуры лист закрывает Esc. -->
-      <div class="scrim" aria-hidden="true" onclick={() => onClosePanel?.()}></div>
+      <div class="scrim" aria-hidden="true" onclick={() => onClosePanel?.()} transition:fadeInOut></div>
     {/if}
-    <aside class="panel" class:sheet={panelAsSheet}>
+    <aside class="panel" class:sheet={panelAsSheet} transition:slideFromEnd={{ duration: panelAsSheet ? 300 : 0 }}>
       {@render panel()}
     </aside>
   {/if}

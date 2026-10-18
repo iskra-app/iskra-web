@@ -88,6 +88,27 @@
   --timing-reaction: 250ms;
   --timing-deletion: 300ms;
 
+  /* Движение — `Theme.Timing` нативной Искры. Пружина меню — Telegram'овская, число в число
+     (`menuOpens`: response 0.265, damping 0.775), разложенная в точки для `linear()`: CSS своей
+     пружины не знает. Легко перелетает на 2 % и садится — то, что поднимают, имеет вес. */
+  --timing-menu-open: 420ms;
+  --ease-menu-open: linear(0, 0.069, 0.222, 0.4, 0.569, 0.711, 0.822, 0.903, 0.957, 0.991, 1.01, 1.019, 1.021, 1.02, 1.016, 1.013, 1.009, 1.006, 1.004, 1.002, 1.001, 1);
+  /* Закрытие — без пружины: положенное не бросают (`menuCloses`, 0.2 с ease-in-out). */
+  --timing-menu-close: 200ms;
+  --ease-menu-close: ease-in-out;
+  /* Пункты меню проявляются почти сразу, когда стекло уже почти раскрылось (`menuListShows`, `menuFills`). */
+  --timing-menu-list: 50ms;
+  --delay-menu-fills: 150ms;
+  /* Смена экрана на телефоне — пуш, как в навигации iOS. */
+  --timing-screen: 350ms;
+  --ease-screen: cubic-bezier(0.2, 0.8, 0.2, 1);
+  /* Приход и уход всего остального: плавный выход в покой. */
+  --ease-out: cubic-bezier(0.2, 0, 0, 1);
+  /* Насколько сдвигается появляющееся — меньше сетки: видно движение, а не прыжок. */
+  --motion-rise: 0.5rem; /* 8 */
+  --motion-scale-from: 0.96;
+  --motion-menu-scale-from: 0.8; /* меню растёт из угла заметнее окна */
+
   /* Шрифт — Inter по умолчанию, из своих файлов (`fonts/inter.css`); системный — по выбору
      (`data-font='system'` на <html>). Никаких загружаемых шрифтов с чужих CDN. */
   --font-system: system-ui, -apple-system, 'Segoe UI', Roboto, 'Noto Sans', Ubuntu, Cantarell,

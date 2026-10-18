@@ -39,12 +39,17 @@
   function place() {
     if (!dialog || sheet) return;
     const margin = 8;
-    const { width, height } = dialog.getBoundingClientRect();
+    // Размер без трансформации: в миг открытия меню ещё уменьшено стартом анимации
+    // (`dialog[data-motion]` в `base.css`), и `getBoundingClientRect` занизил бы его.
+    const width = dialog.offsetWidth;
+    const height = dialog.offsetHeight;
     const left = Math.max(margin, Math.min(x, innerWidth - width - margin));
     const top = y + height + margin > innerHeight ? Math.max(margin, y - height) : y;
     // CSSOM, а не атрибут `style`: строгая CSP атрибуты не пускает, свойства — пускает.
     dialog.style.left = `${left}px`;
     dialog.style.top = `${top}px`;
+    // Растёт из угла, у которого открыт: точка левее края меню не бывает, выше — бывает.
+    dialog.style.transformOrigin = `${Math.max(0, x - left)}px ${top < y ? height : 0}px`;
   }
 
   function onkeydown(event: KeyboardEvent) {
@@ -77,7 +82,7 @@
   }
 </script>
 
-<dialog bind:this={dialog} class:sheet aria-label={label} {onclose} {onkeydown} {onclick} {onwheel}>
+<dialog bind:this={dialog} class:sheet data-motion={sheet ? 'sheet' : 'menu'} aria-label={label} {onclose} {onkeydown} {onclick} {onwheel}>
   <div class="menu" role="menu" aria-label={label}>
     {@render children()}
   </div>

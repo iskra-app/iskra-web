@@ -4,6 +4,7 @@
 -->
 <script lang="ts">
   import type { Snippet } from 'svelte';
+  import { whenClosed } from './motion';
 
   interface Props {
     open: boolean;
@@ -15,16 +16,24 @@
 
   let dialog: HTMLDialogElement | undefined = $state();
   const id = $props.id();
+  /** Содержимое на месте, пока окно открыто и пока закрытое догорает (`whenClosed`). */
+  let shown = $state(false);
 
   $effect(() => {
     if (!dialog) return;
-    if (open && !dialog.open) dialog.showModal();
-    if (!open && dialog.open) dialog.close();
+    if (open && !dialog.open) {
+      shown = true;
+      dialog.showModal();
+    }
+    if (!open && dialog.open) {
+      dialog.close();
+      return whenClosed(dialog, () => (shown = false));
+    }
   });
 </script>
 
-<dialog bind:this={dialog} aria-labelledby="{id}-title" {onclose}>
-  {#if open}
+<dialog bind:this={dialog} data-motion="pop" aria-labelledby="{id}-title" {onclose}>
+  {#if open || shown}
     <h2 id="{id}-title">{title}</h2>
     {@render children()}
   {/if}

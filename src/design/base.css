@@ -59,6 +59,111 @@ select {
   }
 }
 
+/*
+ * Окна, меню и листы появляются и уходят (`data-motion` на `<dialog>`). Открытие — пружиной
+ * меню Telegram, закрытие — ровным ease-in-out: положенное не бросают. Чистый CSS, без
+ * скриптов: `@starting-style` даёт точку, откуда открываться, `overlay` и `display` с
+ * `allow-discrete` держат закрывающееся окно в верхнем слое, пока оно не догорит. Где
+ * браузер этого не знает, окно просто появляется и исчезает, как раньше.
+ */
+dialog[data-motion] {
+  transition:
+    opacity var(--timing-menu-close) var(--ease-menu-close),
+    transform var(--timing-menu-close) var(--ease-menu-close),
+    overlay var(--timing-menu-close) allow-discrete,
+    display var(--timing-menu-close) allow-discrete;
+}
+dialog[data-motion][open] {
+  transition-duration: var(--timing-menu-open);
+  transition-timing-function: var(--ease-menu-open);
+}
+dialog[data-motion='pop']:not([open]) {
+  opacity: 0;
+  transform: scale(var(--motion-scale-from));
+}
+/* У точки — растёт из угла, у которого открыт (`transform-origin` ставит `Menu`). */
+dialog[data-motion='menu']:not([open]) {
+  opacity: 0;
+  transform: scale(var(--motion-menu-scale-from));
+}
+/* Лист — выезжает снизу. */
+dialog[data-motion='sheet']:not([open]) {
+  transform: translateY(100%);
+}
+@starting-style {
+  dialog[data-motion='pop'][open] {
+    opacity: 0;
+    transform: scale(var(--motion-scale-from));
+  }
+  dialog[data-motion='menu'][open] {
+    opacity: 0;
+    transform: scale(var(--motion-menu-scale-from));
+  }
+  dialog[data-motion='sheet'][open] {
+    transform: translateY(100%);
+  }
+}
+dialog[data-motion]::backdrop {
+  opacity: 0;
+  transition:
+    opacity var(--timing-menu-close) var(--ease-menu-close),
+    overlay var(--timing-menu-close) allow-discrete,
+    display var(--timing-menu-close) allow-discrete;
+}
+dialog[data-motion][open]::backdrop {
+  opacity: 1;
+}
+@starting-style {
+  dialog[data-motion][open]::backdrop {
+    opacity: 0;
+  }
+}
+
+/*
+ * Смена экрана на телефоне (стек): чат въезжает справа поверх списка, назад — уезжает вправо.
+ * View Transitions запускает роутер (`features/app/screenMotion.ts`), направление — `data-nav`.
+ */
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation-duration: var(--timing-screen);
+  animation-timing-function: var(--ease-screen);
+}
+:root[data-nav='forward']::view-transition-new(root) {
+  animation-name: screen-in-from-end;
+}
+:root[data-nav='forward']::view-transition-old(root) {
+  animation-name: screen-out-to-start;
+}
+:root[data-nav='back']::view-transition-new(root) {
+  animation-name: screen-in-from-start;
+}
+:root[data-nav='back']::view-transition-old(root) {
+  animation-name: screen-out-to-end;
+  z-index: 1;
+}
+@keyframes screen-in-from-end {
+  from {
+    transform: translateX(100%);
+  }
+}
+@keyframes screen-out-to-start {
+  to {
+    transform: translateX(-30%);
+    opacity: 0.6;
+  }
+}
+@keyframes screen-in-from-start {
+  from {
+    transform: translateX(-30%);
+    opacity: 0.6;
+  }
+}
+@keyframes screen-out-to-end {
+  to {
+    transform: translateX(100%);
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,

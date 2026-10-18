@@ -20,7 +20,7 @@
   });
 </script>
 
-<dialog bind:this={dialog} aria-labelledby="{id}-title" {onclose}>
+<dialog bind:this={dialog} data-motion="pop" aria-labelledby="{id}-title" {onclose}>
   <h2 id="{id}-title">{t('hotkeys.title')}</h2>
   <dl>
     {#each rows as hotkey (hotkey.id)}

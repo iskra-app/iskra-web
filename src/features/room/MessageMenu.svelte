@@ -19,7 +19,16 @@
     actions: MessageActions;
     onclose: () => void;
   }
-  let { message, at, sheet, actions, onclose }: Props = $props();
+  let { message: current, at, sheet, actions, onclose }: Props = $props();
+  /**
+   * Последнее, у кого открывали: закрывающееся меню догорает с ним, а не пустым. Синхронно, а не
+   * эффектом: `Menu` меряет себя в миг открытия, и пустое меню не перевернулось бы над точкой.
+   */
+  let last: Message | null = null;
+  const message = $derived.by(() => {
+    if (current) last = current;
+    return current ?? last;
+  });
 
   const text = $derived(message && 'body' in message.kind ? message.kind.body : '');
   /** Опрос, который ещё идёт и уже ушёл: в нём можно отозвать голос, а автору — закрыть. */
@@ -33,7 +42,7 @@
   }
 </script>
 
-<Menu open={!!message} x={at.x} y={at.y} {sheet} label={t('message.menu.more')} {onclose}>
+<Menu open={!!current} x={at.x} y={at.y} {sheet} label={t('message.menu.more')} {onclose}>
   {#if message}
     <div class="reactions" role="group" aria-label={t('message.menu.addReaction')}>
       {#each quickReactions as emoji (emoji)}

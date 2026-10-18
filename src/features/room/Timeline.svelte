@@ -87,6 +87,23 @@
     };
   });
 
+  /**
+   * Пришедшие снизу, пока лента открыта, — поднимаются и проявляются (`Theme.Timing.arrival`).
+   * Подгруженная сверху история — нет: она была всегда, просто её не было видно. Обычный
+   * `Set`, а не реактивный: класс строке ставится один раз, когда она появляется.
+   */
+  // eslint-disable-next-line svelte/prefer-svelte-reactivity
+  const arrived = new Set<string>();
+  let newestKey: string | undefined;
+  $effect.pre(() => {
+    const messages = store.messages;
+    if (newestKey) {
+      const from = messages.findIndex((m) => m.key === newestKey) + 1;
+      if (from > 0) for (const m of messages.slice(from)) arrived.add(m.key);
+    }
+    newestKey = messages.at(-1)?.key;
+  });
+
   // Лента поменяется (подгрузка, новое сообщение) — якорь снимается до перемены DOM.
   $effect.pre(() => {
     void store.items;
@@ -199,7 +216,7 @@
            встаёт под него, и он остаётся на месте, пока всё под ним уезжает. -->
       <!-- Без `content-visibility`: оценочная высота ещё не нарисованных строк у верхнего
            края сдвигала якорь на разницу с настоящей — ровно тот прыжок, который мы ловим. -->
-      <div class="item" data-anchor={item.kind === 'day' ? undefined : item.key}>
+      <div class="item" class:arrived={arrived.has(item.key)} data-anchor={item.kind === 'day' ? undefined : item.key}>
         {#if item.kind === 'day'}
           <p class="day"><span>{dayLabel(item.ts, now, i18n.locale, t('room.today'), t('room.yesterday'))}</span></p>
         {:else if item.kind === 'unread'}
@@ -361,6 +378,15 @@
     stroke-linecap: round;
     stroke-linejoin: round;
   }
+  .item.arrived {
+    animation: arrive var(--timing-arrival) var(--ease-out);
+  }
+  @keyframes arrive {
+    from {
+      opacity: 0;
+      transform: translateY(var(--motion-rise));
+    }
+  }
   .unread {
     /* До краёв ленты, за поля, которые держат пузыри: полоса, остановившаяся там же, где они,
        была бы ещё одной фигурой в их столбце. */
@@ -406,7 +432,22 @@
     color: var(--accent);
     cursor: pointer;
   }
+  .to-bottom {
+    transition:
+      opacity var(--timing-chrome) var(--ease-out),
+      transform var(--timing-chrome) var(--ease-out);
+  }
+  @starting-style {
+    .to-bottom {
+      opacity: 0;
+      transform: scale(var(--motion-menu-scale-from));
+    }
+    .unseen {
+      transform: scale(0);
+    }
+  }
   .unseen {
+    transition: transform var(--timing-reaction) var(--ease-menu-open);
     position: absolute;
     inset-block-start: calc(-1 * var(--size-unread-badge) / 2);
     min-width: var(--size-unread-badge);

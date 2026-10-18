@@ -40,6 +40,9 @@
 
 <style>
   .selection {
+    transition:
+      opacity var(--timing-chrome) var(--ease-out),
+      transform var(--timing-chrome) var(--ease-out);
     display: flex;
     align-items: center;
     gap: var(--space-normal);
@@ -88,5 +91,12 @@
     stroke-width: 2;
     stroke-linecap: round;
     stroke-linejoin: round;
+  }
+  /* На место композера — снизу, как он сам. */
+  @starting-style {
+    .selection {
+      opacity: 0;
+      transform: translateY(var(--motion-rise));
+    }
   }
 </style>

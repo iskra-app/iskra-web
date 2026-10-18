@@ -358,6 +358,16 @@
     margin-block-end: var(--space-close);
     padding-inline-start: var(--space-close);
     color: var(--accent);
+    transition:
+      opacity var(--timing-chrome) var(--ease-out),
+      transform var(--timing-chrome) var(--ease-out);
+  }
+  /* Полоса ответа и правки — выезжает из-под поля, к которому относится. */
+  @starting-style {
+    .context {
+      opacity: 0;
+      transform: translateY(var(--motion-rise));
+    }
   }
   .context > svg,
   .cancel svg {
