@@ -38,6 +38,9 @@ export class RecoveryCancelled extends Error {
 }
 
 const SETUP_TIMEOUT_MS = 30_000;
+/** Сколько ждать своей личности с сервера, прежде чем принять ключи из хранилища, и как часто спрашивать. */
+const IDENTITY_WAIT_MS = 10_000;
+const IDENTITY_POLL_MS = 100;
 
 export class RecoveryStore {
   protection = $state<HistoryProtection>('unknown');
@@ -157,6 +160,13 @@ export class RecoveryStore {
       }
       this.keys.hold(bytes, keyId);
       const crypto = this.crypto;
+      // Закрытые ключи сверяются с публичной личностью аккаунта — без неё Rust-крипто молча
+      // ничего не примет («importCrossSigningKeys failed to import the keys»). Код вводят и
+      // сразу после входа, пока первый `/keys/query` ещё в пути: личность надо дождаться.
+      if (!(await this.ownIdentityKnown())) {
+        this.failure = 'restoreFailed';
+        return false;
+      }
       // Ключи кросс-подписи — из хранилища, и этим же вызовом устройство подписывает себя.
       await crypto.bootstrapCrossSigning({});
       await crypto.loadSessionBackupPrivateKeyFromSecretStorage();
@@ -171,6 +181,23 @@ export class RecoveryStore {
     } finally {
       this.keys.forget();
       this.working = false;
+    }
+  }
+
+  /**
+   * Знает ли устройство публичную личность своего аккаунта — ключи кросс-подписи с сервера.
+   * Не знает — просит скачать и ждёт, недолго: сервер, который за несколько секунд не ответил,
+   * скажет «не получилось», а не повесит экран.
+   */
+  private async ownIdentityKnown(): Promise<boolean> {
+    const crypto = this.crypto;
+    const me = this.client.getSafeUserId();
+    const deadline = Date.now() + IDENTITY_WAIT_MS;
+    for (;;) {
+      if ((await crypto.getCrossSigningStatus()).publicKeysOnDevice) return true;
+      if (Date.now() >= deadline) return false;
+      await crypto.getUserDeviceInfo([me], true).catch(() => undefined);
+      await new Promise((resolve) => setTimeout(resolve, IDENTITY_POLL_MS));
     }
   }
 

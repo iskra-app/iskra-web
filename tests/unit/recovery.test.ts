@@ -20,15 +20,18 @@ async function stop(client: MatrixClient): Promise<void> {
   client.stopClient();
 }
 
-/** Новое устройство: вход паролем, Rust-крипто в памяти, первая синхронизация. */
-async function device(server: DemoHomeserver) {
+/**
+ * Новое устройство: вход паролем, Rust-крипто в памяти, первая синхронизация. `fetch` — чтобы
+ * придержать отдельные ответы сервера и поймать гонку, которую иначе ловит только случай.
+ */
+async function device(server: DemoHomeserver, fetch: typeof globalThis.fetch = server.fetch) {
   const logger = quietLogger();
-  const anonymous = createClient({ baseUrl: server.baseUrl, fetchFn: server.fetch, logger });
+  const anonymous = createClient({ baseUrl: server.baseUrl, fetchFn: fetch, logger });
   const login = await anonymous.loginRequest({ type: 'm.login.password', identifier: { type: 'm.id.user', user: 'alice' }, password: 'password' });
   const keys = new SecretStorageKeyHolder();
   const client = createClient({
     baseUrl: server.baseUrl,
-    fetchFn: server.fetch,
+    fetchFn: fetch,
     logger,
     userId: login.user_id,
     deviceId: login.device_id,
@@ -92,6 +95,24 @@ describe('код восстановления на демо-сервере', () 
     expect(await second.recovery.restore(oldCode)).toBe(false);
     expect(second.recovery.failure).toBe('staleCodeFailed');
     expect(await second.recovery.restore(newCode)).toBe(true);
+  }, 60_000);
+
+  it('код введён сразу после входа, пока своя личность ещё в пути, — всё равно открывает', async () => {
+    const server = new DemoHomeserver();
+    const first = await device(server);
+    await first.recovery.refresh();
+    const code = (await first.recovery.protectHistory())!;
+    await stop(first.client);
+
+    // `/keys/query` второго устройства отвечает не сразу — как медленный сервер сразу после
+    // входа. Закрытые ключи кросс-подписи без публичной личности Rust-крипто молча не примет.
+    const slowKeys: typeof globalThis.fetch = async (input, init) => {
+      if (new Request(input, init).url.endsWith('/keys/query')) await new Promise((resolve) => setTimeout(resolve, 1_500));
+      return server.fetch(input, init);
+    };
+    const second = await device(server, slowKeys);
+    expect(await second.recovery.restore(code)).toBe(true);
+    expect(second.recovery.failure).toBeNull();
   }, 60_000);
 
   it('с чистого листа: сервер спрашивает пароль, после — новая личность и новый код', async () => {
