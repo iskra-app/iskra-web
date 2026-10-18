@@ -32,6 +32,7 @@ import {
 import { sendAttachment, uploadClientFor, type OutgoingFile, type UploadClient } from '../media/upload';
 import { geoUri, type Place } from './location';
 import { markdownContent } from './composerMarkdown';
+import { currentMarker, rememberMovedMarker } from './readMarker';
 import { canSendPoll, pollEndContent, pollStartContent, type PollDraft } from './poll';
 import { mentionsMarkdown, rankCandidates, unlinkMentions, type ComposerMention, type RankedCandidate } from './composerMentions';
 import { mapEvent, type MapperContext } from './mapper';
@@ -123,6 +124,23 @@ export class TimelineStore {
     this.rebuild();
   }
 
+  /**
+   * Где человек остановился в прошлый раз — `m.fully_read`, прочитанный один раз за визит. Как
+   * в Telegram: полоса стоит весь визит и уходит в следующий. Сдвинь её сразу, как дочитали, —
+   * SDK убрал бы её из-под глаз, и лента прыгнула бы на её высоту.
+   */
+  private unreadMarker: string | null | undefined;
+  /** Последнее, до чего дочитали за этот визит: при уходе маркер встанет сюда. */
+  private readToEnd: string | undefined;
+
+  private markerOf(room: Room): string | null {
+    if (this.unreadMarker === undefined) {
+      const marker = room.getAccountData('m.fully_read')?.getContent()['event_id'];
+      this.unreadMarker = currentMarker(this.roomId, typeof marker === 'string' ? marker : null);
+    }
+    return this.unreadMarker;
+  }
+
   private get room(): Room | null {
     return this.client.getRoom(this.roomId);
   }
@@ -193,9 +211,18 @@ export class TimelineStore {
     this.readPinned(room);
     const context = this.context(room);
     const messages: Message[] = [];
+    // Первое сообщение после маркера прочитанного — над ним полоса. Маркер не среди
+    // загруженного — полосы нет.
+    const marker = this.markerOf(room);
+    let passedMarker = false;
+    let unreadFrom: string | undefined;
     for (const event of room.getLiveTimeline().getEvents()) {
       const message = mapEvent(event, context);
-      if (message) messages.push(message);
+      if (message) {
+        messages.push(message);
+        if (passedMarker && !unreadFrom) unreadFrom = message.key;
+      }
+      if (marker && event.getId() === marker) passedMarker = true;
     }
     // Не ушедшие — SDK держит их отдельно от ленты (`pendingEventOrdering: detached`, так
     // создаёт клиент `UserSession`), и они стоят в конце, пока не уйдут или их не уберут.
@@ -206,7 +233,7 @@ export class TimelineStore {
     }
     markRead(room, this.ownUserId, messages);
     this.messages = messages;
-    this.items = layout(messages);
+    this.items = layout(messages, unreadFrom);
     this.readPinnedMessage(room, context);
     if (this.atStart === false && room.getLiveTimeline().getPaginationToken(Direction.Backward) === null) {
       this.atStart = true;
@@ -699,6 +726,7 @@ export class TimelineStore {
       const event = events[i]!;
       const id = event.getId();
       if (!id || id.startsWith('~') || event.status) continue;
+      this.readToEnd = id;
       if (room.hasUserReadEvent(this.ownUserId, id) || this.lastReceiptFor === id) return;
       this.lastReceiptFor = id;
       this.client.sendReadReceipt(event).catch(() => {
@@ -710,6 +738,11 @@ export class TimelineStore {
 
   destroy(): void {
     this.typingStopped();
+    // Уходят, дочитав до конца, — полоса переезжает в конец, к следующему визиту.
+    if (this.readToEnd && this.readToEnd !== this.unreadMarker) {
+      rememberMovedMarker(this.roomId, this.readToEnd);
+      this.client.setRoomReadMarkers(this.roomId, this.readToEnd).catch(() => {});
+    }
     this.destroyed = true;
     this.generation++;
     for (const off of this.detach.splice(0)) off();

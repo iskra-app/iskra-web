@@ -11,6 +11,8 @@ export const RUN_WINDOW_MS = 5 * 60 * 1000;
 
 export type TimelineItem =
   | { kind: 'day'; key: string; ts: number }
+  /** «Непрочитанные сообщения» — где человек остановился в прошлый раз (`m.fully_read`). */
+  | { kind: 'unread'; key: string }
   | { kind: 'message'; key: string; message: Message; firstInRun: boolean; lastInRun: boolean };
 
 function dayOf(ts: number): string {
@@ -45,14 +47,35 @@ function merged(previous: Message, message: Message): Message | undefined {
   return { ...previous, ts: message.ts, kind: { type: 'service', event: { type: a.type, people } as ServiceEvent } };
 }
 
-export function layout(messages: readonly Message[]): TimelineItem[] {
+export const UNREAD_DIVIDER_KEY = 'unread-divider';
+
+/**
+ * Полоса заслужена, только если под ней есть что-то чужое. Маркер SDK стоит за последним
+ * *событием*, которое аккаунт прочёл, и может оказаться над входом в чат, над пустотой или над
+ * своим ответом с другого устройства. «Непрочитанное» над своими словами — это приложение, не
+ * знающее, кто вы (`withUnreadDividerIfEarned` нативной Искры).
+ */
+function earned(messages: readonly Message[], from: number): boolean {
+  return messages.slice(from).some((m) => !m.own && !isService(m));
+}
+
+/**
+ * `unreadFrom` — ключ первого сообщения после маркера прочитанного: над ним встаёт полоса
+ * «Непрочитанные сообщения». Она, как дата, рвёт серию.
+ */
+export function layout(messages: readonly Message[], unreadFrom?: string): TimelineItem[] {
+  const unreadAt = unreadFrom === undefined ? -1 : messages.findIndex((m) => m.key === unreadFrom);
+  const withDivider = unreadAt >= 0 && earned(messages, unreadAt);
   const items: TimelineItem[] = [];
   let previous: Message | undefined;
   let lastMessageItem: Extract<TimelineItem, { kind: 'message' }> | undefined;
   for (const message of messages) {
     // Склеенная строка держит ключ первой: второй вошедший дописывается в строку, которая
     // уже на экране, а не заменяет её другой.
-    const pooled = previous && lastMessageItem && dayOf(previous.ts) === dayOf(message.ts) ? merged(previous, message) : undefined;
+    const pooled =
+      previous && lastMessageItem && dayOf(previous.ts) === dayOf(message.ts) && !(withDivider && message.key === unreadFrom)
+        ? merged(previous, message)
+        : undefined;
     if (pooled && lastMessageItem) {
       lastMessageItem.message = pooled;
       previous = pooled;
@@ -61,7 +84,9 @@ export function layout(messages: readonly Message[]): TimelineItem[] {
     if (!previous || dayOf(previous.ts) !== dayOf(message.ts)) {
       items.push({ kind: 'day', key: `day-${dayOf(message.ts)}`, ts: message.ts });
     }
-    const joined = continues(previous, message);
+    const divided = withDivider && message.key === unreadFrom;
+    if (divided) items.push({ kind: 'unread', key: UNREAD_DIVIDER_KEY });
+    const joined = !divided && continues(previous, message);
     if (lastMessageItem && !joined) lastMessageItem.lastInRun = true;
     lastMessageItem = { kind: 'message', key: message.key, message, firstInRun: !joined, lastInRun: false };
     items.push(lastMessageItem);
@@ -69,4 +94,16 @@ export function layout(messages: readonly Message[]): TimelineItem[] {
   }
   if (lastMessageItem) lastMessageItem.lastInRun = true;
   return items;
+}
+
+/**
+ * Сколько чужих сообщений пришло после `lastKey` — число на кнопке «вниз» (Telegram): лента не
+ * тащит читающего выше вниз, значит, должна сказать. Своё и служебное не считается; `lastKey`
+ * не нашёлся (лента пересобрана целиком) — ничего не пришло.
+ */
+export function arrivedFromOthers(messages: readonly Message[], lastKey: string | undefined): number {
+  if (!lastKey) return 0;
+  const from = messages.findIndex((m) => m.key === lastKey) + 1;
+  if (from === 0) return 0;
+  return messages.slice(from).filter((m) => !m.own && !isService(m)).length;
 }

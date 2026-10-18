@@ -127,9 +127,9 @@ export class ScrollAnchor {
    * догрузилась картинка) до события прокрутки «возвращает» ленту вниз. Сразу, а не плавно:
    * плавная прокрутка — это десятки кадров, в каждый из которых раскладка может её перебить.
    */
-  reveal(element: HTMLElement): void {
+  reveal(element: HTMLElement, at: 'center' | 'top' = 'center'): void {
     this.stick = false;
-    const shift = this.top(element) + element.offsetHeight / 2 - this.container.clientHeight / 2;
+    const shift = at === 'top' ? this.top(element) : this.top(element) + element.offsetHeight / 2 - this.container.clientHeight / 2;
     this.container.scrollTop += shift;
     this.measure();
     // Якорь — само показанное, а не то, что оказалось верхним: раскладка держит на месте его.

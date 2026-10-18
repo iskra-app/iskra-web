@@ -536,7 +536,12 @@ export class DemoHomeserver {
           prev_batch: `t${start}`,
         },
         ephemeral: { events: [...(room.readUpTo ? [receiptEvent(room.readUpTo)] : []), ...othersRead(room.timeline)] },
-        account_data: { events: room.tags ? [{ type: 'm.tag', content: { tags: room.tags } }] : [] },
+        account_data: {
+          events: [
+            ...(room.tags ? [{ type: 'm.tag', content: { tags: room.tags } }] : []),
+            ...(room.fullyRead ? [{ type: 'm.fully_read', content: { event_id: room.fullyRead } }] : []),
+          ],
+        },
         unread_notifications: {
           notification_count: room.unread?.notifications ?? 0,
           highlight_count: room.unread?.highlights ?? 0,
@@ -943,7 +948,14 @@ export class DemoHomeserver {
   }
 
   private readMarkers({ params, body }: DemoRequest): Response {
-    const read = (body as Record<string, unknown> | undefined)?.['m.read'];
+    const markers = body as Record<string, unknown> | undefined;
+    const fullyRead = markers?.['m.fully_read'];
+    const room = this.rooms.get(params[0]!);
+    if (room && typeof fullyRead === 'string') {
+      room.fullyRead = fullyRead;
+      this.enqueue({ kind: 'join', roomId: room.roomId, body: { account_data: { events: [{ type: 'm.fully_read', content: { event_id: fullyRead } }] } } });
+    }
+    const read = markers?.['m.read'];
     if (typeof read === 'string') return this.receipt(params[0]!, read);
     return json(200, {});
   }

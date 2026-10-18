@@ -356,6 +356,7 @@
   "room.typingPair": "{first} and {second} are typing…",
   "room.typingSeveral": "Several people are typing…",
   "room.unpin": "Unpin",
+  "room.unreadMessages": "Unread messages",
   "room.untitled": "Chat",
   "room.yesterday": "Yesterday",
   "roomAction.acceptInviteFailed": "You couldn’t join the chat. The invitation may have been withdrawn.",

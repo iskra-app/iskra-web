@@ -24,6 +24,7 @@ import { vault, type Account, type NewAccount } from '../storage/vault';
 import { SessionLock } from './lock';
 import { wallpaperPhoto } from '../storage/wallpaper';
 import { UserSession, wipeUserData } from './userSession.svelte.ts';
+import { forgetMovedMarkers } from '../timeline/readMarker';
 
 export type Phase =
   | { name: 'loading' }
@@ -203,6 +204,7 @@ export class AppState {
     const session = this.phase.session;
     this.phase = { name: 'loading' };
     await session.signOut();
+    forgetMovedMarkers();
     await vault.remove(session.userId).catch(() => {});
     await wallpaperPhoto.forget();
     this.releaseLock();

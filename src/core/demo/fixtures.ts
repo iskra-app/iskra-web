@@ -55,6 +55,8 @@ export interface DemoRoom {
   unread?: { notifications: number; highlights: number };
   /** До какого события Алиса дочитала — `m.read`. Нет — не читала ничего. */
   readUpTo?: string;
+  /** Где Алиса остановилась в прошлый раз — `m.fully_read`, полоса «Непрочитанные сообщения». */
+  fullyRead?: string;
   /** Теги комнаты: `m.favourite` — закреплённый, `m.lowpriority` — архив. */
   tags?: Record<string, Record<string, unknown>>;
 }
@@ -257,6 +259,7 @@ export function buildDemoWorld(now: number): { rooms: DemoRoom[]; invites: DemoI
         timeline: anyaTimeline,
         unread: { notifications: 2, highlights: 0 },
         readUpTo: `$anya-4`,
+        fullyRead: `$anya-4`,
         tags: { 'm.favourite': { order: 0.5 } },
       },
       {

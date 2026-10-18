@@ -360,6 +360,7 @@
   "room.typingPair": "{first} и {second} печатают…",
   "room.typingSeveral": "Несколько человек печатают…",
   "room.unpin": "Открепить",
+  "room.unreadMessages": "Непрочитанные сообщения",
   "room.untitled": "Чат",
   "room.yesterday": "Вчера",
   "roomAction.acceptInviteFailed": "Не получилось войти в чат. Возможно, приглашение отозвали.",

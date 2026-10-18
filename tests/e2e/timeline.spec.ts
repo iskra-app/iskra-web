@@ -155,3 +155,31 @@ test('в личном чате списка «@» нет', async ({ page }) => {
   await page.getByRole('textbox', { name: 'Сообщение' }).pressSequentially('@а');
   await expect(page.getByRole('listbox', { name: 'Кого упомянуть' })).toHaveCount(0);
 });
+
+test('«Непрочитанные сообщения»: полоса над новым — весь визит; ушли, дочитав, — в следующий раз её нет', async ({ page }) => {
+  const problems = watchForProblems(page);
+  await signInToDemo(page);
+  await openRoom(page, /^Аня/);
+  const log = page.getByRole('log');
+  const divider = log.getByRole('heading', { name: 'Непрочитанные сообщения' });
+  await expect(divider).toBeVisible();
+  // Полоса — между прочитанным и новым.
+  const order = await log.evaluate((element) => {
+    const text = element.textContent ?? '';
+    return [text.indexOf('Поеду! Во сколько?'), text.indexOf('Непрочитанные сообщения'), text.indexOf('В десять у метро')];
+  });
+  expect(order[0]).toBeLessThan(order[1]!);
+  expect(order[1]).toBeLessThan(order[2]!);
+
+  // Дочитали и ушли — маркер переехал в конец; вернулись — полосы нет.
+  await page.getByRole('textbox', { name: 'Сообщение' }).press('Escape');
+  // На телефоне чат занимает весь экран — к списку через «Назад».
+  const back = page.getByRole('button', { name: 'Назад' });
+  if (await back.isVisible()) await back.click();
+  await openRoom(page, /^Выходные/);
+  if (await back.isVisible()) await back.click();
+  await openRoom(page, /^Аня/);
+  await expect(page.getByRole('log')).toContainText('Возьми плед, там ветрено');
+  await expect(page.getByRole('log').getByRole('heading', { name: 'Непрочитанные сообщения' })).toHaveCount(0);
+  expect(problems).toEqual([]);
+});

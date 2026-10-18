@@ -12,8 +12,9 @@
   import { ScrollAnchor } from '../../design/scrollAnchor.svelte.ts';
   import { dayLabel } from '../../design/time';
   import type { TimelineStore } from '../../core/timeline/timelineStore.svelte.ts';
+  import { arrivedFromOthers, UNREAD_DIVIDER_KEY } from '../../core/timeline/layout';
   import type { UserSession } from '../../core/session/userSession.svelte.ts';
-  import { i18n, t } from '../../i18n/index.svelte.ts';
+  import { i18n, plural, t } from '../../i18n/index.svelte.ts';
   import { Photo, pixelsFor } from '../rooms/faces.svelte.ts';
   import type { MessageActions } from './actions';
   import MessageRow from './MessageRow.svelte';
@@ -44,18 +45,25 @@
       onNearTop: () => void store.loadMore(),
     });
     anchor = a;
-    // Открытие: история просится явно, пока содержимого меньше, чем окно.
-    void store.fill(() => a.needsMore());
+    // Открытие: история просится явно, пока содержимого меньше, чем окно. Есть полоса
+    // «Непрочитанные» — чат открывается на ней, как в Telegram: новое под ней, а не последнее
+    // внизу и всё остальное выше, читать в обратную сторону. Всё новое влезает в экран —
+    // лента и так стоит у конца.
+    void store.fill(() => a.needsMore()).then(async () => {
+      await tick();
+      const divider = content?.querySelector<HTMLElement>(`[data-anchor="${UNREAD_DIVIDER_KEY}"]`);
+      if (divider && content && content.scrollHeight > container!.clientHeight) a.reveal(divider, 'top');
+    });
     // Окно выросло после открытия — развернули на весь экран — подгрузка продолжается.
     const grow = new ResizeObserver(() => {
       if (a.needsMore()) void store.fill(() => a.needsMore());
     });
     grow.observe(container!);
-    const tick = setInterval(() => (now = Date.now()), 60_000);
+    const minutes = setInterval(() => (now = Date.now()), 60_000);
     return () => {
       grow.disconnect();
       a.destroy();
-      clearInterval(tick);
+      clearInterval(minutes);
     };
   });
 
@@ -74,6 +82,23 @@
     void store.messages;
     void anchor?.atBottom;
     maybeMarkRead();
+  });
+
+  /**
+   * Сколько чужих сообщений пришло, пока человек был выше по ленте, — число на кнопке «вниз».
+   * Лента его не тащит вниз (он читает), значит, должна сказать. Внизу — обнуляется.
+   */
+  let unseenBelow = $state(0);
+  let lastSeenKey: string | undefined;
+  $effect(() => {
+    const messages = store.messages;
+    const atBottom = anchor?.atBottom ?? true;
+    if (atBottom) {
+      unseenBelow = 0;
+    } else {
+      unseenBelow += arrivedFromOthers(messages, lastSeenKey);
+    }
+    lastSeenKey = messages.at(-1)?.key;
   });
 
   // Объявить новое входящее — только то, что пришло снизу, а не подгруженную историю.
@@ -154,9 +179,12 @@
            встаёт под него, и он остаётся на месте, пока всё под ним уезжает. -->
       <!-- Без `content-visibility`: оценочная высота ещё не нарисованных строк у верхнего
            края сдвигала якорь на разницу с настоящей — ровно тот прыжок, который мы ловим. -->
-      <div class="item" data-anchor={item.kind === 'message' ? item.key : undefined}>
+      <div class="item" data-anchor={item.kind === 'day' ? undefined : item.key}>
         {#if item.kind === 'day'}
           <p class="day"><span>{dayLabel(item.ts, now, i18n.locale, t('room.today'), t('room.yesterday'))}</span></p>
+        {:else if item.kind === 'unread'}
+          <!-- Полоса во всю ширину, а не слово посередине: это не дата, а «начните здесь». -->
+          <h2 class="unread">{t('room.unreadMessages')}</h2>
         {:else}
           <MessageRow
             message={item.message}
@@ -184,8 +212,15 @@
 {/if}
 
 {#if anchor && !anchor.atBottom}
-  <button type="button" class="to-bottom" aria-label={t('room.scrollToBottom')} title={t('room.scrollToBottom')} onclick={() => anchor?.scrollToBottom()}>
+  <button
+    type="button"
+    class="to-bottom"
+    aria-label={unseenBelow > 0 ? `${t('room.scrollToBottom')}, ${plural('roomList.unread', unseenBelow)}` : t('room.scrollToBottom')}
+    title={t('room.scrollToBottom')}
+    onclick={() => anchor?.scrollToBottom()}
+  >
     <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6" /></svg>
+    {#if unseenBelow > 0}<span class="unseen" aria-hidden="true">{new Intl.NumberFormat(i18n.locale).format(unseenBelow)}</span>{/if}
   </button>
 {/if}
 </div>
@@ -242,6 +277,17 @@
     font-size: var(--font-size-caption);
     color: var(--color-text-secondary);
   }
+  .unread {
+    /* До краёв ленты, за поля, которые держат пузыри: полоса, остановившаяся там же, где они,
+       была бы ещё одной фигурой в их столбце. */
+    margin: var(--space-roomy) calc(-1 * var(--timeline-gutter)) var(--space-close);
+    padding: var(--space-tight) 0;
+    background: var(--color-incoming-bubble);
+    color: var(--color-text-secondary);
+    font-size: var(--font-size-caption);
+    font-weight: 500;
+    text-align: center;
+  }
   .loading {
     position: absolute;
     inset-block-start: var(--space-close);
@@ -275,6 +321,20 @@
     background: var(--color-glass-opaque);
     color: var(--accent);
     cursor: pointer;
+  }
+  .unseen {
+    position: absolute;
+    inset-block-start: calc(-1 * var(--size-unread-badge) / 2);
+    min-width: var(--size-unread-badge);
+    height: var(--size-unread-badge);
+    padding: 0 var(--space-tight);
+    border-radius: var(--radius-circle);
+    background: var(--accent);
+    color: var(--on-accent);
+    font-size: var(--font-size-caption);
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+    line-height: var(--size-unread-badge);
   }
   .to-bottom svg {
     width: var(--size-icon);
