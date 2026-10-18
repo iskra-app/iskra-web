@@ -219,6 +219,9 @@ export function buildDemoWorld(now: number): { rooms: DemoRoom[]; invites: DemoI
       },
       // Ссылка простым текстом — для вкладки «Ссылки» в «О чате».
       text(boris, 'Прогноз на субботу: https://example.org/weather — вроде солнце'),
+      // Реакции от других — на пирог Веры и на её голосовое.
+      { type: 'm.reaction', sender: boris, content: { 'm.relates_to': { rel_type: 'm.annotation', event_id: '$weekend-3', key: '👍' } } },
+      { type: 'm.reaction', sender: boris, content: { 'm.relates_to': { rel_type: 'm.annotation', event_id: '$weekend-9', key: '❤️' } } },
       text(vera, 'Алиса, ты с нами?', {
         format: 'org.matrix.custom.html',
         formatted_body: `<a href="https://matrix.to/#/${alice}">Алиса</a>, ты с нами?`,
