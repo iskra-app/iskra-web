@@ -1,16 +1,21 @@
 <!--
-  Первое, что видит человек.
+  Первое, что видит человек, — `SignInView` нативной Искры.
 
-  Как в нативной Искре: спрашиваем не «homeserver URL», а где живёт аккаунт, и держим
-  слова протокола подальше от экрана. Два шага — адрес, потом вход.
+  Спрашиваем не «homeserver URL», а где живёт аккаунт. Поле пустое: matrix.org больше не
+  подставляется сам — это делало выбор за всех, а из России он отвечает не всегда. Под полем —
+  «Далее», «Не знаете, какой сервер выбрать?» и мелкой ссылкой «Что такое Matrix?». Сервер
+  ответил — на том же месте две кнопки, «Войти» и «Создать аккаунт», и строка «Сервер: …» с
+  «Изменить».
 
-  **Один путь внутрь, а не два.** Где сервер умеет OAuth или SSO, это и есть вход, а форма
-  пароля — за тихой фразой для тех, кто знает, что она им нужна. Где не умеет — просто
-  имя, пароль и кнопка.
+  «Войти» на сервере со своей страницей входа сразу уходит на неё. Форма с паролем — только
+  там, где без неё никак, или для того, кто попросил её тихой фразой. В нативной эта фраза
+  появляется, когда браузер закрыли на полпути; здесь страница уходит целиком и с отказом
+  возвращается уже к адресу, поэтому фраза стоит под двумя кнопками.
 -->
 <script lang="ts">
   import { asset } from '../../design/asset';
   import PrimaryButton from '../../design/PrimaryButton.svelte';
+  import PlainButton from '../../design/PlainButton.svelte';
   import QuietButton from '../../design/QuietButton.svelte';
   import TextField from '../../design/TextField.svelte';
   import ProblemPanel from '../../design/ProblemPanel.svelte';
@@ -18,9 +23,11 @@
   import { signInWithPassword, startOAuth, startSso } from '../../core/auth/signIn';
   import { app } from '../../core/session/app.svelte.ts';
   import { t, type TextKey } from '../../i18n/index.svelte.ts';
+  import AboutMatrix from './AboutMatrix.svelte';
+  import ServerPicker from './ServerPicker.svelte';
 
   interface Props {
-    problem?: SignInProblem;
+    problem?: SignInProblem | 'noRegistration';
     ended?: boolean;
   }
   let { problem: initialProblem, ended = false }: Props = $props();
@@ -29,17 +36,27 @@
   let username = $state('');
   let password = $state('');
   let server = $state<ServerInfo | null>(null);
+  /** Форма пароля: сервер другого входа не знает, или о ней попросили. */
   let usingPassword = $state(false);
   let busy = $state(false);
+  let pending = $state<'signIn' | 'createAccount' | null>(null);
+  let pickingServer = $state(false);
+  let readingAboutMatrix = $state(false);
   // Пропы — только начальное значение: дальше экран ведёт их сам.
   // svelte-ignore state_referenced_locally
-  let problem = $state<SignInProblem | undefined>(initialProblem);
+  let problem = $state<Props['problem']>(initialProblem);
   // svelte-ignore state_referenced_locally
   let showEnded = $state(ended);
 
-  const problemKey = (p: SignInProblem): TextKey => `signIn.problem.${p}`;
+  const problemKey = (p: NonNullable<Props['problem']>): TextKey => `signIn.problem.${p}`;
   const redirectWay = $derived(!!server && (!!server.oauth || server.sso));
-  const showPasswordForm = $derived(!!server && server.password && (!redirectWay || usingPassword));
+  /** Имя сервера, как его видно на экране: что ввели, без схемы и косой черты. */
+  const serverName = $derived(
+    address
+      .trim()
+      .replace(/^https?:\/\//i, '')
+      .replace(/\/+$/, ''),
+  );
 
   async function run(task: () => Promise<void>) {
     busy = true;
@@ -51,6 +68,7 @@
       problem = error instanceof SignInError ? error.problem : 'unreachable';
     } finally {
       busy = false;
+      pending = null;
     }
   }
 
@@ -64,15 +82,29 @@
     });
   }
 
-  function continueInBrowser(create = false) {
+  function toBrowser(create: boolean) {
     const s = server;
     if (!s) return;
+    pending = create ? 'createAccount' : 'signIn';
     void run(async () => {
       const url = s.oauth ? await startOAuth(s, { create }) : startSso(s);
       window.location.assign(url);
       // Страница уходит; кнопка остаётся занятой, пока не ушла.
       await new Promise(() => {});
     });
+  }
+
+  function signIn() {
+    if (redirectWay) toBrowser(false);
+    else usingPassword = true;
+  }
+
+  function createAccount() {
+    if (!server?.canRegister) {
+      problem = 'noRegistration';
+      return;
+    }
+    toBrowser(true);
   }
 
   function submitPassword(event: SubmitEvent) {
@@ -86,93 +118,114 @@
     });
   }
 
+  /** С формы — обратно к двум кнопкам: сервер тот же. */
+  function back() {
+    usingPassword = false;
+    problem = undefined;
+    password = '';
+  }
+
+  /** К адресу, чтобы его поменять. Введённое остаётся — его поправят, а не наберут снова. */
   function startOver() {
     server = null;
     usingPassword = false;
     problem = undefined;
+    username = '';
     password = '';
   }
 </script>
 
 <main class="sign-in">
-  <header>
-    <img src={asset('icons/icon.svg')} alt="" width="56" height="56" />
-    <h1>{t('signIn.title')}</h1>
-    <p class="secondary">{t('signIn.tagline')}</p>
-  </header>
-
-  {#if showEnded}
-    <ProblemPanel title={t('session.ended.title')} message={t('session.ended.message')} />
-  {/if}
-
-  {#if !server}
-    <form class="step" onsubmit={findServer}>
-      <h2>{t('signIn.whereIsAccount')}</h2>
-      <p class="secondary">{t('signIn.whereIsAccountHelp')}</p>
+  {#if server && usingPassword}
+    <form class="step" onsubmit={submitPassword}>
+      <div class="back"><QuietButton disabled={busy} onclick={back}>{t('signIn.back')}</QuietButton></div>
+      <h1 class="form-title">{t('signIn.signInTo', { name: serverName })}</h1>
+      <p class="secondary">{t('signIn.passwordHelp')}</p>
+      <TextField bind:value={username} label={t('signIn.username')} showLabel autocomplete="username" autofocus disabled={busy} />
       <TextField
-        bind:value={address}
-        label={t('signIn.addressLabel')}
-        placeholder={t('signIn.addressPlaceholder')}
-        inputmode="url"
-        autocomplete="url"
-        autofocus
+        bind:value={password}
+        label={t('signIn.password')}
+        showLabel
+        type="password"
+        autocomplete="current-password"
         disabled={busy}
-        invalid={!!problem}
+        invalid={problem === 'badCredentials'}
       />
-      <PrimaryButton type="submit" wide {busy} disabled={!address.trim()}>{t('signIn.continue')}</PrimaryButton>
+      <PrimaryButton type="submit" wide {busy} disabled={!username.trim() || !password}>
+        {redirectWay ? t('signIn.signInWithPassword') : t('signIn.signIn')}
+      </PrimaryButton>
+      {#if problem}
+        <ProblemPanel message={t(problemKey(problem))} />
+      {/if}
     </form>
   {:else}
-    <div class="step">
-      {#if redirectWay && !usingPassword}
-        <h2>{t('signIn.readyTitle')}</h2>
-        <p class="secondary">{t('signIn.readyHelp')}</p>
-        <PrimaryButton wide {busy} onclick={() => continueInBrowser()}>{t('signIn.signIn')}</PrimaryButton>
-        {#if server.canRegister}
-          <QuietButton disabled={busy} onclick={() => continueInBrowser(true)}>{t('signIn.createAccount')}</QuietButton>
+    <header>
+      <img src={asset('icons/icon.svg')} alt="" width="56" height="56" />
+      <h1>{t('signIn.title')}</h1>
+      <p class="secondary">{t('signIn.tagline')}</p>
+    </header>
+
+    {#if showEnded}
+      <ProblemPanel title={t('session.ended.title')} message={t('session.ended.message')} />
+    {/if}
+
+    {#if !server}
+      <form class="step" onsubmit={findServer}>
+        <h2>{t('signIn.whereIsAccount')}</h2>
+        <p class="secondary">{t('signIn.whereIsAccountHelp')}</p>
+        <TextField
+          bind:value={address}
+          label={t('signIn.addressLabel')}
+          placeholder={t('signIn.addressPlaceholder')}
+          inputmode="url"
+          autocomplete="url"
+          autofocus
+          disabled={busy}
+          invalid={!!problem}
+        />
+        {#if problem}
+          <ProblemPanel message={t(problemKey(problem))} />
         {/if}
-        {#if server.password}
-          <QuietButton disabled={busy} onclick={() => (usingPassword = true)}>{t('signIn.usePasswordInstead')}</QuietButton>
+        <PrimaryButton type="submit" wide {busy} disabled={!address.trim()}>{t('signIn.next')}</PrimaryButton>
+        <PlainButton disabled={busy} onclick={() => (pickingServer = true)}>{t('signIn.chooseServer')}</PlainButton>
+        <button type="button" class="small-link" onclick={() => (readingAboutMatrix = true)}>{t('signIn.whatIsMatrix')}</button>
+      </form>
+    {:else}
+      <div class="step">
+        {#if problem}
+          <ProblemPanel message={t(problemKey(problem))} />
         {/if}
-      {/if}
-
-      {#if showPasswordForm}
-        <form class="step" onsubmit={submitPassword}>
-          <TextField
-            bind:value={username}
-            label={t('signIn.username')}
-            showLabel
-            autocomplete="username"
-            autofocus
-            disabled={busy}
-          />
-          <TextField
-            bind:value={password}
-            label={t('signIn.password')}
-            showLabel
-            type="password"
-            autocomplete="current-password"
-            disabled={busy}
-            invalid={problem === 'badCredentials'}
-          />
-          <PrimaryButton type="submit" wide {busy} disabled={!username.trim() || !password}>
-            {t('signIn.signInWithPassword')}
-          </PrimaryButton>
-        </form>
-      {/if}
-
-      <QuietButton disabled={busy} onclick={startOver}>{t('signIn.differentAddress')}</QuietButton>
-    </div>
-  {/if}
-
-  {#if problem}
-    <ProblemPanel message={t(problemKey(problem))} />
+        <PrimaryButton wide busy={pending === 'signIn'} disabled={busy} onclick={signIn}>{t('signIn.signIn')}</PrimaryButton>
+        <PlainButton busy={pending === 'createAccount'} disabled={busy} onclick={createAccount}>{t('signIn.createAccount')}</PlainButton>
+        {#if redirectWay && server.password}
+          <button type="button" class="small-link" disabled={busy} onclick={() => (usingPassword = true)}>
+            {t('signIn.usePasswordInstead')}
+          </button>
+        {/if}
+        <p class="server">
+          <span class="secondary">{t('signIn.server', { name: serverName })}</span>
+          <button type="button" class="change" disabled={busy} onclick={startOver}>{t('signIn.changeServer')}</button>
+        </p>
+      </div>
+    {/if}
   {/if}
 </main>
+
+<ServerPicker
+  open={pickingServer}
+  onpick={(picked) => {
+    address = picked;
+    pickingServer = false;
+  }}
+  onclose={() => (pickingServer = false)}
+/>
+<AboutMatrix open={readingAboutMatrix} onclose={() => (readingAboutMatrix = false)} />
 
 <style>
   .sign-in {
     display: flex;
     flex-direction: column;
+    justify-content: center;
     gap: var(--space-generous);
     width: 100%;
     max-width: var(--size-sign-in-column);
@@ -208,8 +261,44 @@
     flex-direction: column;
     gap: var(--space-normal);
   }
+  .back {
+    margin-inline-start: calc(-1 * var(--space-close));
+  }
   .secondary {
     margin: 0;
     color: var(--color-text-secondary);
+  }
+  .small-link,
+  .change {
+    padding: var(--space-tight);
+    border: none;
+    background: transparent;
+    font: inherit;
+    font-size: var(--font-size-caption);
+    cursor: pointer;
+  }
+  .small-link {
+    align-self: center;
+    margin-block-start: var(--space-close);
+    color: var(--color-text-secondary);
+  }
+  .small-link:disabled,
+  .change:disabled {
+    opacity: 0.5;
+    cursor: default;
+  }
+  .server {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    align-items: baseline;
+    gap: var(--space-tight);
+    margin: 0;
+    margin-block-start: var(--space-close);
+    font-size: var(--font-size-caption);
+  }
+  .change {
+    padding: 0;
+    color: var(--accent);
   }
 </style>

@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { enterDemoCredentials, passFirstRun, signInToDemo, signOut, watchForProblems } from './helpers';
+import { enterDemoCredentials, signInToDemo, signOut, watchForProblems } from './helpers';
 
 /**
  * Весь путь восстановления на демо-сервере: аккаунт Алисы переживает выход (он лежит в
@@ -13,7 +13,7 @@ test('новый аккаунт → код → выход → вход новы�
   await expect(page.getByRole('button', { name: 'Старая переписка заблокирована' })).toBeHidden();
 
   await signOut(page);
-  await expect(page.getByRole('heading', { name: 'Добро пожаловать в Iskra' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Где ваш аккаунт?' })).toBeVisible();
 
   await enterDemoCredentials(page);
   await expect(page.getByRole('heading', { name: 'Разблокируйте переписку' })).toBeVisible({ timeout: 30_000 });
@@ -21,7 +21,6 @@ test('новый аккаунт → код → выход → вход новы�
   // Отложил — плашка в списке чатов помнит и ведёт обратно.
   await page.getByRole('button', { name: 'Закрыть' }).click();
   // Вход новый — значит, и первый запуск: привет, цвет, мордочки.
-  await passFirstRun(page);
   const locked = page.getByRole('button', { name: 'Старая переписка заблокирована' });
   await expect(locked).toBeVisible({ timeout: 20_000 });
   await locked.click();
@@ -42,7 +41,7 @@ test('новый аккаунт → код → выход → вход новы�
 test('ни кода, ни другого устройства: пароль — и новый код взамен', async ({ page }) => {
   await signInToDemo(page);
   await signOut(page);
-  await expect(page.getByRole('heading', { name: 'Добро пожаловать в Iskra' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Где ваш аккаунт?' })).toBeVisible();
 
   await enterDemoCredentials(page);
   await page.getByRole('button', { name: 'Нет ни того, ни другого' }).click({ timeout: 30_000 });

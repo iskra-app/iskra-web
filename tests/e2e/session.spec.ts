@@ -7,7 +7,7 @@ test('экран входа под строгой CSP, без ошибок', asy
   const response = await page.request.get('/');
   expect(response.headers()['content-security-policy']).toContain("default-src 'self'");
   await openApp(page);
-  await expect(page.getByRole('heading', { name: 'Добро пожаловать в Iskra' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Где ваш аккаунт?' })).toBeVisible();
   expect(problems).toEqual([]);
 });
 
@@ -44,7 +44,7 @@ test('вход в демо с Rust-крипто под CSP, сессия пер�
 
   await expect.poll(async () => mine(await databases())).toEqual([]);
   await page.reload({ waitUntil: 'domcontentloaded' });
-  await expect(page.getByRole('heading', { name: 'Добро пожаловать в Iskra' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Где ваш аккаунт?' })).toBeVisible();
   // Rust-крипто может ворчать в консоль при удалении своей базы на ходу — это не наша ошибка,
   // а вот нарушения CSP и падения страницы — наши.
   expect(problems.filter((p) => /Content Security Policy|Trusted|Uncaught|TypeError/.test(p))).toEqual([]);

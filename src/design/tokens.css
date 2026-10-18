@@ -146,6 +146,8 @@
   --color-mono-bubble-on-wallpaper: #dedede;
   --color-own-reaction: rgb(0 0 0 / 0.16);
   --color-danger: #ff3b30;
+  /* Предупреждение, а не ошибка: «Из России может быть недоступен» — systemOrange. */
+  --color-warning: #ff9500;
   --color-on-danger: #ffffff;
   /* Значок беззвучного чата — сплошной серый, не полупрозрачность: точка в десять пикселей
      из девяти процентов цвета текста — это пятно. */
@@ -167,6 +169,7 @@
   --color-incoming-bubble: rgb(255 255 255 / 0.08);
   --color-own-reaction: rgb(255 255 255 / 0.16);
   --color-danger: #ff453a;
+  --color-warning: #ff9f0a;
   --color-selected: rgb(255 255 255 / 0.1);
   --color-incoming-bubble-on-wallpaper: #2b2b2b;
   --color-mono-bubble-on-wallpaper: #4d4d4d;
@@ -185,6 +188,7 @@
     --color-incoming-bubble: rgb(255 255 255 / 0.08);
     --color-own-reaction: rgb(255 255 255 / 0.16);
     --color-danger: #ff453a;
+  --color-warning: #ff9f0a;
     --color-selected: rgb(255 255 255 / 0.1);
     --color-incoming-bubble-on-wallpaper: #2b2b2b;
     --color-mono-bubble-on-wallpaper: #4d4d4d;

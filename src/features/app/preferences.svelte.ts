@@ -40,7 +40,6 @@ const keys = {
   faces: 'appearance.faces',
   font: 'appearance.font',
   language: 'language',
-  welcomeSeen: 'onboarding.welcomeSeen',
   layout: 'messages.layout',
   wallpaper: 'appearance.wallpaper',
   wallpaperDimming: 'appearance.wallpaperDimming',
@@ -78,12 +77,6 @@ class Preferences {
   faces = $state<FaceMode>(oneOf(read(keys.faces), faceModes, 'initials'));
   font = $state<Font>(oneOf(read(keys.font), fonts, 'inter'));
   language = $state<LanguageChoice>(oneOf(read(keys.language), ['system', ...locales], 'system'));
-  /**
-   * Слайды «что такое Iskra» уже показаны на этом устройстве. Не настройка аккаунта: кто
-   * вышел, чтобы сменить аккаунт, не забыл, что такое Iskra, — и слайды при выходе остаются
-   * показанными (`Onboarding.welcomeSeenKey` нативной Искры).
-   */
-  welcomeSeen = $state<boolean>(read(keys.welcomeSeen) === '1');
   layout = $state<MessageLayout>(oneOf(read(keys.layout), layouts, 'bubbles'));
   wallpaper = $state<Wallpaper>(oneOf(read(keys.wallpaper), wallpapers, 'none'));
   wallpaperDimming = $state<number>(dimming(read(keys.wallpaperDimming)));
@@ -99,9 +92,6 @@ class Preferences {
       $effect(() => write(keys.layout, this.layout));
       $effect(() => write(keys.wallpaper, this.wallpaper));
       $effect(() => write(keys.wallpaperDimming, String(this.wallpaperDimming)));
-      $effect(() => {
-        if (this.welcomeSeen) write(keys.welcomeSeen, '1');
-      });
       $effect(() => {
         write(keys.language, this.language);
         i18n.locale = this.language === 'system' ? preferredLocale(navigator.languages ?? []) : this.language;

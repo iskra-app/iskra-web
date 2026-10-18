@@ -71,21 +71,20 @@ export function consoleOf(page: Page): string[] {
 export async function signInToDemo(page: Page): Promise<string | null> {
   await enterDemoCredentials(page);
   const code = await passRecoveryStep(page);
-  await passFirstRun(page);
   await expect(page.getByRole('heading', { name: 'Чаты', level: 1 })).toBeVisible({ timeout: 20_000 });
   return code;
 }
 
 /**
  * Ввести адрес аккаунта и отправить. Enter'ом из поля, а не кликом: клик по активной
- * «Продолжить» Firefox в CI изредка терял (и на телефоне, и на десктопе) — ни запроса,
+ * «Далее» Firefox в CI изредка терял (и на телефоне, и на десктопе) — ни запроса,
  * ни ошибки, ни «занято». Enter — такой же путь человека и не зависит от координат кнопки.
  */
 export async function submitAddress(page: Page, address: string): Promise<void> {
   const field = page.getByRole('textbox', { name: 'Адрес аккаунта' });
   await field.fill(address);
   // Кнопка становится активной после ввода — значит, Svelte уже видит адрес.
-  await expect(page.getByRole('button', { name: 'Продолжить' })).toBeEnabled();
+  await expect(page.getByRole('button', { name: 'Далее' })).toBeEnabled();
   await field.press('Enter');
 }
 
@@ -125,7 +124,7 @@ export async function enterDemoCredentials(page: Page): Promise<void> {
   await openApp(page);
   const log = recordConsole(page);
   await submitAddress(page, DEMO_ADDRESS);
-  // Демо умеет и SSO, и пароль: вход по умолчанию — через страницу сервера, пароль — за фразой.
+  // Демо умеет и SSO, и пароль: «Войти» ведёт на страницу сервера, пароль — за фразой под кнопками.
   const passwordDoor = page.getByRole('button', { name: 'У меня только логин и пароль' });
   const problem = page.getByRole('alert');
   try {
@@ -134,7 +133,7 @@ export async function enterDemoCredentials(page: Page): Promise<void> {
     // Логи CI не показывают экран — пусть покажет ошибка.
     const snapshot = await page.locator('body').ariaSnapshot().catch(() => '(нет снимка)');
     throw new Error(
-      `Вход в демо завис после «Продолжить».\nАдрес: ${page.url()}\nНе закончились: ${[...(pending.get(page) ?? [])].join(', ') || '—'}\nЭкран:\n${snapshot}\nКонсоль и переходы:\n${log.slice(-30).join('\n')}`,
+      `Вход в демо завис после «Далее».\nАдрес: ${page.url()}\nНе закончились: ${[...(pending.get(page) ?? [])].join(', ') || '—'}\nЭкран:\n${snapshot}\nКонсоль и переходы:\n${log.slice(-30).join('\n')}`,
       { cause: error },
     );
   }
@@ -157,19 +156,6 @@ async function passRecoveryStep(page: Page): Promise<string | null> {
   return null;
 }
 
-/**
- * Первый запуск после нового входа: привет (проскочить нажатием — он на часах), цвет и
- * мордочки — «Пропустить». Тестам чатов выбор цвета не нужен.
- */
-export async function passFirstRun(page: Page): Promise<void> {
-  const greeting = page.getByRole('heading', { name: /^Привет/ });
-  await expect(greeting).toBeVisible({ timeout: 30_000 });
-  await greeting.click();
-  await page.getByRole('button', { name: 'Пропустить' }).click();
-  await expect(page.getByRole('heading', { name: 'Кому рисовать мордочки' })).toBeVisible();
-  await page.getByRole('button', { name: 'Пропустить' }).click();
-}
-
 /** Экран «Сохраните код»: забрать код, поставить галочку, «Я сохранил код». */
 export async function saveRecoveryCode(page: Page): Promise<string> {
   const code = (await page.getByTestId('recovery-code').innerText()).trim();
@@ -190,5 +176,5 @@ export async function signOut(page: Page): Promise<void> {
   const dialog = page.getByRole('dialog', { name: 'Выйти из Iskra?' });
   await expect(dialog).toBeVisible();
   await dialog.getByRole('button', { name: 'Выйти' }).click();
-  await expect(page.getByRole('heading', { name: 'Добро пожаловать в Iskra' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Где ваш аккаунт?' })).toBeVisible();
 }
