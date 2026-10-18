@@ -6,6 +6,7 @@
  * приложение от этого не должно ломаться — только забыть настройку.
  */
 import { clampListWidth, LIST_IDEAL } from '../../design/columns';
+import { RECENT_LIMIT } from '../room/emojiCatalog';
 import { i18n, locales, preferredLocale, type Locale } from '../../i18n/index.svelte.ts';
 
 export const accents = ['blue', 'red', 'orange', 'yellow', 'green', 'cyan', 'violet', 'mono'] as const;
@@ -40,6 +41,7 @@ const keys = {
   faces: 'appearance.faces',
   font: 'appearance.font',
   language: 'language',
+  recentEmoji: 'reactions.recent',
   layout: 'messages.layout',
   wallpaper: 'appearance.wallpaper',
   wallpaperDimming: 'appearance.wallpaperDimming',
@@ -70,6 +72,11 @@ function dimming(value: string | null): number {
   return Number.isFinite(n) ? Math.min(MAX_DIMMING, Math.max(0, n)) : DEFAULT_DIMMING;
 }
 
+/** Через пробел, как у нативной; мусор и лишнее — отброшены. */
+function recentList(value: string | null): string[] {
+  return (value ?? '').split(' ').filter((e) => e && e.length <= 32).slice(0, RECENT_LIMIT);
+}
+
 class Preferences {
   accent = $state<Accent>(oneOf(read(keys.accent), accents, 'blue'));
   appearance = $state<Appearance>(oneOf(read(keys.appearance), ['system', 'light', 'dark'], 'system'));
@@ -80,6 +87,8 @@ class Preferences {
   layout = $state<MessageLayout>(oneOf(read(keys.layout), layouts, 'bubbles'));
   wallpaper = $state<Wallpaper>(oneOf(read(keys.wallpaper), wallpapers, 'none'));
   wallpaperDimming = $state<number>(dimming(read(keys.wallpaperDimming)));
+  /** Недавние реакции — наверху панели «Больше эмодзи» (`RecentEmoji` нативной, тот же ключ). */
+  recentEmoji = $state.raw<string[]>(recentList(read(keys.recentEmoji)));
 
   /** Пишет в хранилище и отражает на `<html>` всё, что изменилось. */
   persist(): () => void {
@@ -92,6 +101,7 @@ class Preferences {
       $effect(() => write(keys.layout, this.layout));
       $effect(() => write(keys.wallpaper, this.wallpaper));
       $effect(() => write(keys.wallpaperDimming, String(this.wallpaperDimming)));
+      $effect(() => write(keys.recentEmoji, this.recentEmoji.join(' ')));
       $effect(() => {
         write(keys.language, this.language);
         i18n.locale = this.language === 'system' ? preferredLocale(navigator.languages ?? []) : this.language;

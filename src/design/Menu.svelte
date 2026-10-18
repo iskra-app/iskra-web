@@ -33,6 +33,15 @@
     if (!open && dialog.open) dialog.close();
   });
 
+  // Содержимое поменяло размер (ряд реакций раскрылся в панель эмодзи) — заново уложить в окно.
+  $effect(() => {
+    if (!dialog || sheet) return;
+    const target = dialog;
+    const observer = new ResizeObserver(() => target.open && place());
+    observer.observe(target);
+    return () => observer.disconnect();
+  });
+
   const items = () => [...(dialog?.querySelectorAll<HTMLElement>('[role^="menuitem"]:not(:disabled)') ?? [])];
 
   /** У точки, но целиком в окне: не влезает справа — левее, снизу — выше точки. */

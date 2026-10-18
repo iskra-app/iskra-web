@@ -171,10 +171,10 @@ test('голосовое в ленте: волна и длительность �
   await openChat(page);
   const bubble = voices(page).first();
   await expect(bubble).toContainText('0:04');
-  // Реакции от другого — Борису понравились пирог и голосовое.
+  // Реакции от другого — Борису понравились фото озера и голосовое.
   const reactions = page.getByRole('log').getByRole('list', { name: 'Реакции' });
   await expect(reactions.filter({ hasText: '❤️' })).toHaveCount(1);
-  await expect(reactions.filter({ hasText: '👍' })).toHaveCount(1);
+  await expect(reactions.filter({ hasText: '🔥' })).toHaveCount(1);
   await expect(bubble.locator('canvas')).toBeVisible();
 
   await bubble.getByRole('button', { name: 'Слушать' }).click();

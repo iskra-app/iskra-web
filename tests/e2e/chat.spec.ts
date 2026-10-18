@@ -383,3 +383,29 @@ test('«Переслать»: текст и файл в другой чат — 
   await expect(bubble(page, 'Смотри, что у нас')).not.toContainText('Пересланное сообщение');
   expect(problems).toEqual([]);
 });
+
+test('«Больше эмодзи»: панель с разделами, реакция из неё — и она в «Недавних»', async ({ page }) => {
+  const problems = watchForProblems(page);
+  await signInToDemo(page);
+  await openRoom(page, /^Выходные/);
+  let menu = await menuOf(page, 'Я — пирог');
+  await menu.getByRole('menuitem', { name: 'Больше эмодзи' }).click();
+  // Колёсико листает панель, а не закрывает меню.
+  await menu.getByRole('menuitemcheckbox', { name: 'Реакция 😀' }).hover();
+  await page.mouse.wheel(0, 400);
+  await expect(menu).toBeVisible();
+  await menu.getByRole('button', { name: 'Еда и напитки' }).click();
+  await menu.getByRole('menuitemcheckbox', { name: 'Реакция 🍕' }).click();
+  await expect(menu).toBeHidden();
+  await expect(page.getByRole('list', { name: 'Реакции' }).getByRole('button', { name: '🍕 1' })).toBeVisible({ timeout: 10_000 });
+
+  menu = await menuOf(page, 'Я — пирог');
+  await menu.getByRole('menuitem', { name: 'Больше эмодзи' }).click();
+  // Своя — подсвечена и снимается; в недавних — первой.
+  const recent = menu.getByRole('heading', { name: 'Недавние' });
+  await expect(recent).toBeVisible();
+  await expect(menu.getByRole('menuitemcheckbox', { name: 'Убрать свою реакцию' }).first()).toHaveText('🍕');
+  await page.keyboard.press('Escape');
+  await expect(menu).toBeHidden();
+  expect(problems).toEqual([]);
+});

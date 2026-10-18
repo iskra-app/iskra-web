@@ -76,6 +76,11 @@
   --forward-columns: 4; /* лица по четыре в ряд, как лист Telegram */
   --size-mention-row: 3.5rem; /* 56 — лицо и по 8 сверху и снизу */
   --size-mention-list: 16.25rem; /* 260 — четыре с половиной строки «@»: половина говорит, что есть ещё */
+  --size-reaction-cell: 2.75rem; /* 44 — Theme.Size.reactionCell: эмодзи в панели */
+  --size-emoji-panel: 16.75rem; /* 268 — Theme.Size.emojiPanel: высота панели «Больше эмодзи» */
+  --size-emoji-panel-width: 22.5rem; /* 360 — Theme.Size.emojiPanelWidth: полторы ширины меню */
+  --size-emoji-header: 1.75rem; /* 28 — Theme.Size.emojiHeader: заголовок раздела */
+  --emoji-recent-columns: 6; /* недавние — по шесть, под ряд быстрых реакций */
   --size-video-note: 12.5rem; /* 200 — «кружочек» */
   --size-attachment-tile: 4.5rem; /* 72 — вложение в лотке над полем */
   --size-wallpaper-tile-width: 3.5rem; /* 56 — плитка обоев: вытянута, как экран */

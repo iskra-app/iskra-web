@@ -1,14 +1,19 @@
 <!--
   Меню сообщения — одно на ленту: правый щелчок, «ещё» по наведению, долгое нажатие.
-  Сверху — шесть быстрых реакций, под ними действия, внизу — когда отправлено.
+  Сверху — шесть быстрых реакций и «+» — за ним все остальные (`EmojiPanel`): меню
+  раскрывается в панель на том же месте. Под реакциями — действия, внизу — когда отправлено.
 -->
 <script lang="ts">
+  import { tick } from 'svelte';
   import Menu from '../../design/Menu.svelte';
   import { clock } from '../../design/time';
   import type { Message } from '../../core/timeline/message';
   import { i18n, t } from '../../i18n/index.svelte.ts';
   import type { MessageActions } from './actions';
   import { quickReactions } from './reactions';
+  import EmojiPanel from './EmojiPanel.svelte';
+  import { addRecent } from './emojiCatalog';
+  import { preferences } from '../app/preferences.svelte.ts';
   import { isSelectable } from '../../core/timeline/selection';
   import { canForward } from '../../core/timeline/forward';
 
@@ -34,6 +39,19 @@
   /** Опрос, который ещё идёт и уже ушёл: в нём можно отозвать голос, а автору — закрыть. */
   const openPoll = $derived(message?.kind.type === 'poll' && !message.kind.poll.ended && !!message.eventId ? message.kind.poll : null);
 
+  /** Открыта панель всех эмодзи вместо действий. Закрыли меню — в следующий раз снова ряд. */
+  let picking = $state(false);
+  $effect(() => {
+    if (!current) picking = false;
+  });
+  const mine = $derived(new Set(message?.reactions.filter((r) => r.mine).map((r) => r.key) ?? []));
+
+  /** Реакция — и в недавние, откуда бы её ни поставили, как в нативной. */
+  function react(emoji: string) {
+    preferences.recentEmoji = addRecent(emoji, preferences.recentEmoji);
+    run((m) => actions.react(m, emoji));
+  }
+
   /** Пункт делает своё и закрывает меню — до действия: фокус вернётся туда, где был. */
   function run(action: (m: Message) => void) {
     const target = message;
@@ -43,7 +61,9 @@
 </script>
 
 <Menu open={!!current} x={at.x} y={at.y} {sheet} label={t('message.menu.more')} {onclose}>
-  {#if message}
+  {#if message && picking}
+    <EmojiPanel {mine} recent={preferences.recentEmoji} onpick={react} />
+  {:else if message}
     <div class="reactions" role="group" aria-label={t('message.menu.addReaction')}>
       {#each quickReactions as emoji (emoji)}
         {@const mine = message.reactions.some((r) => r.key === emoji && r.mine)}
@@ -53,9 +73,24 @@
           aria-checked={mine}
           class:mine
           aria-label={mine ? t('message.menu.removeReaction') : t('message.menu.react', { emoji })}
-          onclick={() => run((m) => actions.react(m, emoji))}>{emoji}</button
+          onclick={() => react(emoji)}>{emoji}</button
         >
       {/each}
+      <button
+        type="button"
+        role="menuitem"
+        class="more"
+        aria-label={t('reactions.more')}
+        title={t('reactions.more')}
+        onclick={async () => {
+          picking = true;
+          // Фокус — в панель: её первая кнопка появится кадром позже.
+          await tick();
+          document.querySelector<HTMLElement>('.panel .cell')?.focus();
+        }}
+      >
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14" /></svg>
+      </button>
     </div>
     {#if actions.canReply}
       <button type="button" role="menuitem" onclick={() => run(actions.reply)}>{t('message.menu.reply')}</button>
@@ -115,6 +150,17 @@
     padding: 0;
     border-radius: var(--radius-circle);
     font-size: var(--font-size-title);
+  }
+  .reactions .more {
+    color: var(--color-text-secondary);
+  }
+  .more svg {
+    width: var(--size-icon);
+    height: var(--size-icon);
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 2;
+    stroke-linecap: round;
   }
   .reactions button.mine {
     background: var(--color-own-reaction);
