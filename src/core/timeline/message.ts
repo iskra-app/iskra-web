@@ -1,4 +1,5 @@
 import type { Place } from './location';
+import type { ForwardOrigin } from './forward';
 
 /**
  * Сообщение — так, как его видит лента. Свой тип, а не `MatrixEvent` (см. план,
@@ -117,6 +118,8 @@ export interface Message {
   delivery: Delivery;
   edited: boolean;
   replyTo?: ReplyPreview;
+  /** Пересланное — `m.forwarded` в содержимом (см. `forward.ts`). */
+  forwarded?: ForwardOrigin;
   reactions: Reaction[];
   pinned: boolean;
   /** Своё, ушедшее — и кто-то из собеседников уже прочитал (по квитанциям чтения). */

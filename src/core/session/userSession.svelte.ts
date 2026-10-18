@@ -22,12 +22,14 @@ import {
 } from 'matrix-js-sdk';
 import { fetchFor } from '../auth/server';
 import { MediaLoader } from '../media/media';
-import { uploadClientFor } from '../media/upload';
+import { sendAttachment, uploadClientFor, type OutgoingFile } from '../media/upload';
 import { ThumbnailCache } from '../media/thumbnails';
 import { RoomListStore } from '../rooms/roomListStore.svelte.ts';
 import { RoomDetailsStore } from '../rooms/roomDetails.svelte.ts';
 import { createDirect, createGroup } from '../rooms/create';
 import { TimelineStore } from '../timeline/timelineStore.svelte.ts';
+import { canForward, forwardContent } from '../timeline/forward';
+import type { Message } from '../timeline/message';
 import { RecoveryStore } from '../encryption/recovery.svelte.ts';
 import { SecretStorageKeyHolder } from '../encryption/secretStorageKey';
 import { VerificationStore } from '../encryption/verification.svelte.ts';
@@ -117,6 +119,52 @@ export class UserSession {
   /** Лента комнаты. Живёт, пока открыт чат: тот, кто открыл, её и `destroy()`. */
   timeline(roomId: string): TimelineStore {
     return new TimelineStore(this.client, roomId, uploadClientFor(this.client, this.account.method === 'demo' ? fetchFor(true) : undefined));
+  }
+
+  /**
+   * Переслать сообщения в чаты — по порядку ленты, в каждый чат по очереди; комментарий —
+   * следом, своим сообщением (порядок Telegram: сначала что передают, потом что о нём сказать).
+   *
+   * Слова уходят с пометкой `m.forwarded` (`forward.ts`). Фото, видео и файлы — байтами заново,
+   * через шифрующую загрузку, а не копией адреса: `mxc://` из чужого чата получателям не открыть
+   * своими ключами, а зашифрованное в открытый чат ушло бы без шифра. `false` — что-то не ушло.
+   */
+  async forward(messages: readonly Message[], roomIds: readonly string[], comment = ''): Promise<boolean> {
+    const uploader = uploadClientFor(this.client, this.account.method === 'demo' ? fetchFor(true) : undefined);
+    let allSent = true;
+    const words = comment.trim();
+    for (const roomId of roomIds) {
+      for (const message of messages.filter(canForward)) {
+        try {
+          const content = forwardContent(message);
+          if (content) {
+            await this.client.sendMessage(roomId, content as never);
+            continue;
+          }
+          const kind = message.kind;
+          if (kind.type !== 'image' && kind.type !== 'video' && kind.type !== 'file') continue;
+          const { attachment } = kind;
+          const blob = await this.media.blob(attachment.source!, attachment.mimetype);
+          const file: OutgoingFile = {
+            blob,
+            name: attachment.name,
+            mimetype: attachment.mimetype ?? (blob.type || 'application/octet-stream'),
+            kind: kind.type,
+            ...(attachment.width ? { width: attachment.width } : {}),
+            ...(attachment.height ? { height: attachment.height } : {}),
+            ...(attachment.duration ? { duration: attachment.duration } : {}),
+          };
+          // Подпись — своими словами, без HTML: в нём могут быть упомянуты те, кого в том чате нет.
+          await sendAttachment(uploader, roomId, file, attachment.caption ? { caption: attachment.caption } : {});
+        } catch {
+          allSent = false;
+        }
+      }
+      if (words) {
+        await this.client.sendMessage(roomId, { msgtype: 'm.text', body: words } as never).catch(() => (allSent = false));
+      }
+    }
+    return allSent;
   }
 
   private uploadLimitValue: Promise<number | undefined> | undefined;

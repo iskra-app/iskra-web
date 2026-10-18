@@ -110,6 +110,12 @@
         <!-- Кто говорит — скринридеру, в начале каждого сообщения (`spokenLabel` нативной Искры):
              в личном чате и у своих имени на экране нет, а в группе оно есть только над серией. -->
         <span class="visually-hidden">{message.own ? t('message.spoken.you') : message.senderName}: </span>
+        {#if message.forwarded}
+          <!-- Пересланное говорит, что оно пересланное, — и от кого, только если пометка называет. -->
+          <span class="forwarded">
+            {message.forwarded.name ? t('message.forwardedFrom', { name: message.forwarded.name }) : t('message.forwarded')}
+          </span>
+        {/if}
         {#if message.replyTo}
           <span class="quote">
             {#if message.replyTo.senderName}<strong>{message.replyTo.senderName}</strong>{/if}
@@ -208,6 +214,13 @@
 {/if}
 
 <style>
+  .forwarded {
+    display: block;
+    margin-block-end: var(--space-tight);
+    font-size: var(--font-size-caption);
+    font-style: italic;
+    opacity: 0.8;
+  }
   .service {
     margin: var(--space-close) auto;
     max-width: 80%;

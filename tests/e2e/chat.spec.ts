@@ -349,3 +349,37 @@ test('«Выбрать»: несколько сообщений — скопир
   await expect(page.getByRole('toolbar')).toHaveCount(0);
   expect(problems).toEqual([]);
 });
+
+test('«Переслать»: текст и файл в другой чат — с пометкой; из выбора — несколько и с комментарием', async ({ page }) => {
+  const problems = watchForProblems(page);
+  await signInToDemo(page);
+  await openRoom(page, /^Выходные/);
+
+  await (await menuOf(page, 'Алиса, ты с нами?')).getByRole('menuitem', { name: 'Переслать' }).click();
+  let dialog = page.getByRole('dialog', { name: 'Переслать в…' });
+  const send = dialog.getByRole('button', { name: 'Отправить' });
+  await expect(send).toBeDisabled();
+  await dialog.getByRole('textbox', { name: 'Поиск чата' }).fill('ан');
+  await dialog.getByRole('checkbox', { name: /Аня/ }).click();
+  await send.click();
+  await expect(dialog).toBeHidden();
+
+  // Из выбора: файл и прогноз, с комментарием.
+  await (await menuOf(page, 'Что взять.txt')).getByRole('menuitem', { name: 'Выбрать' }).click();
+  await page.getByRole('checkbox', { name: /Прогноз на субботу/ }).click();
+  await page.getByRole('button', { name: 'Переслать' }).click();
+  dialog = page.getByRole('dialog', { name: 'Переслать в…' });
+  await dialog.getByRole('checkbox', { name: /Аня/ }).click();
+  await dialog.getByRole('textbox', { name: 'Добавить комментарий…' }).fill('Смотри, что у нас');
+  await dialog.getByRole('button', { name: 'Отправить' }).click();
+  await expect(dialog).toBeHidden();
+  await expect(page.getByRole('toolbar')).toHaveCount(0);
+
+  await openRoom(page, /^Аня/);
+  const log = page.getByRole('log');
+  await expect(bubble(page, 'Алиса, ты с нами?')).toContainText('Пересланное сообщение', { timeout: 10_000 });
+  await expect(log.getByText('Что взять.txt')).toBeVisible({ timeout: 15_000 });
+  await expect(bubble(page, 'Прогноз на субботу')).toContainText('Пересланное сообщение');
+  await expect(bubble(page, 'Смотри, что у нас')).not.toContainText('Пересланное сообщение');
+  expect(problems).toEqual([]);
+});

@@ -10,6 +10,7 @@
   import type { MessageActions } from './actions';
   import { quickReactions } from './reactions';
   import { isSelectable } from '../../core/timeline/selection';
+  import { canForward } from '../../core/timeline/forward';
 
   interface Props {
     message: Message | null;
@@ -72,6 +73,9 @@
       {:else}
         <button type="button" role="menuitem" onclick={() => run(actions.pin)}>{t('message.menu.pin')}</button>
       {/if}
+    {/if}
+    {#if canForward(message)}
+      <button type="button" role="menuitem" onclick={() => run(actions.forward)}>{t('message.menu.forward')}</button>
     {/if}
     {#if isSelectable(message)}
       <!-- Несколько сразу: скопировать одним куском, удалить пачку ошибок. -->

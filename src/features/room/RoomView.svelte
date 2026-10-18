@@ -21,6 +21,8 @@
   import Composer from './Composer.svelte';
   import PollComposer from './PollComposer.svelte';
   import SelectionBar from './SelectionBar.svelte';
+  import ForwardDialog from './ForwardDialog.svelte';
+  import { canForward } from '../../core/timeline/forward';
   import { inTimelineOrder, selectionTranscript } from '../../core/timeline/selection';
   import { SvelteSet } from 'svelte/reactivity';
   import MessageMenu from './MessageMenu.svelte';
@@ -64,6 +66,15 @@
   /** Выбранные сообщения — ключи, пока выбирают; `null` почти всегда. См. `selection.ts`. */
   let selection = $state<SvelteSet<string> | null>(null);
   let deletingSelection = $state(false);
+  /** Что пересылают — одно из меню или выбранные; `null` — окно закрыто. */
+  let forwarding = $state<Message[] | null>(null);
+
+  async function forwardTo(roomIds: string[], comment: string) {
+    const messages = forwarding ?? [];
+    forwarding = null;
+    selection = null;
+    if (!(await session.forward(messages, roomIds, comment))) notice = t('message.forward.failed');
+  }
   const chosen = $derived(selection && store ? inTimelineOrder(store.messages, selection) : []);
   const transcript = $derived(
     selectionTranscript(chosen, (ts) => new Intl.DateTimeFormat(i18n.locale, { dateStyle: 'short', timeStyle: 'short' }).format(ts)),
@@ -308,6 +319,7 @@
     vote: (message, ids) => store?.vote(message, ids),
     endPoll: (message) => (endingPoll = message),
     select: (message) => (selection = new SvelteSet([message.key])),
+    forward: (message) => (forwarding = [message]),
     pin: (message) => store?.pin(message),
     unpin: (message) => store?.unpin(message),
     remove: (message) => (deleting = message),
@@ -407,6 +419,8 @@
     <SelectionBar
       count={selection.size}
       canCopy={transcript !== null}
+      canForward={chosen.length > 0 && chosen.every(canForward)}
+      onforward={() => (forwarding = chosen)}
       canDelete={chosen.length > 0 && chosen.every((m) => m.canDelete)}
       oncancel={() => (selection = null)}
       oncopy={copySelection}
@@ -468,6 +482,8 @@
     selection = null;
   }}
 />
+
+<ForwardDialog open={!!forwarding} {session} onsend={(ids, comment) => void forwardTo(ids, comment)} onclose={() => (forwarding = null)} />
 
 <PollComposer
   open={creatingPoll}

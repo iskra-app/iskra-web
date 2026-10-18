@@ -10,6 +10,7 @@ import { EventStatus, EventType, MsgType, type MatrixEvent } from 'matrix-js-sdk
 import { isVideoNote } from '../rooms/preview';
 import { parseGeoUri } from './location';
 import { firstLineOf } from './words';
+import { forwardOriginOf } from './forward';
 import type { Attachment, Delivery, EncryptedFileKey, MediaSource, Message, MessageKind, Poll, Reaction, ReplyPreview, SendFailure, ServiceEvent } from './message';
 
 export interface MapperContext {
@@ -48,6 +49,8 @@ export function mapEvent(event: MatrixEvent, context: MapperContext): Message | 
   const own = senderId === context.ownUserId;
   const delivery = deliveryOf(event);
   const live = kind.type !== 'deleted' && kind.type !== 'service';
+  // Пометка — в исходном содержимом: правка пересланного её не повторяет.
+  const forwarded = live ? forwardOriginOf(event.getOriginalContent()) : undefined;
   return {
     key: context.keyOf(event),
     ...(eventId ? { eventId } : {}),
@@ -60,6 +63,7 @@ export function mapEvent(event: MatrixEvent, context: MapperContext): Message | 
     delivery,
     edited: !!event.replacingEvent() && !event.isRedacted(),
     ...(replyTo ? { replyTo } : {}),
+    ...(forwarded ? { forwarded } : {}),
     reactions: eventId && live ? context.reactionsOf(eventId) : [],
     pinned: !!eventId && live && context.isPinned(eventId),
     canEdit: own && !!eventId && delivery.state === 'sent' && (kind.type === 'text' || kind.type === 'emote' || kind.type === 'notice'),

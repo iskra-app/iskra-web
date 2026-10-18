@@ -64,6 +64,8 @@
   --size-sticker: 10rem; /* 160 */
   --size-poll: 16.5rem; /* 264 — Theme.Size.poll: ширина постоянная, полосы — сравнение */
   --size-poll-bar: 0.25rem; /* 4 — Theme.Size.pollBar */
+  --size-forward-grid: 20rem; /* 320 — три ряда лиц «Переслать в…», дальше прокрутка */
+  --forward-columns: 4; /* лица по четыре в ряд, как лист Telegram */
   --size-mention-row: 3.5rem; /* 56 — лицо и по 8 сверху и снизу */
   --size-mention-list: 16.25rem; /* 260 — четыре с половиной строки «@»: половина говорит, что есть ещё */
   --size-video-note: 12.5rem; /* 200 — «кружочек» */

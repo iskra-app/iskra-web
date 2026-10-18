@@ -11,6 +11,8 @@ export interface MessageActions {
   edit(message: Message): void;
   react(message: Message, key: string): void;
   vote(message: Message, answerIds: string[]): void;
+  /** «Переслать в…» с этим сообщением. */
+  forward(message: Message): void;
   /** «Выбрать»: режим выбора нескольких, с этим уже отмеченным. */
   select(message: Message): void;
   /** Спросить «завершить опрос?» — и завершить. */

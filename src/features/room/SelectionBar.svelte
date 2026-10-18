@@ -12,12 +12,14 @@
   interface Props {
     count: number;
     canCopy: boolean;
+    canForward: boolean;
     canDelete: boolean;
     oncancel: () => void;
     oncopy: () => void;
+    onforward: () => void;
     ondelete: () => void;
   }
-  let { count, canCopy, canDelete, oncancel, oncopy, ondelete }: Props = $props();
+  let { count, canCopy, canForward, canDelete, oncancel, oncopy, onforward, ondelete }: Props = $props();
 </script>
 
 <div class="selection glass" role="toolbar" aria-label={plural('message.selection.count', count)}>
@@ -26,6 +28,9 @@
   <span class="actions">
     <button type="button" aria-label={t('message.menu.copy')} title={t('message.menu.copy')} disabled={!canCopy || count === 0} onclick={oncopy}>
       <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="9" width="11" height="11" rx="2" /><path d="M5 15V5a2 2 0 0 1 2-2h8" /></svg>
+    </button>
+    <button type="button" aria-label={t('message.menu.forward')} title={t('message.menu.forward')} disabled={!canForward || count === 0} onclick={onforward}>
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14 5l7 7-7 7M21 12H9a6 6 0 0 0-6 6v1" /></svg>
     </button>
     <button type="button" class="danger" aria-label={t('message.menu.delete')} title={t('message.menu.delete')} disabled={!canDelete || count === 0} onclick={ondelete}>
       <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13" /></svg>
