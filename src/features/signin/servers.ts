@@ -17,8 +17,8 @@ export interface PublicServer {
   warning?: TextKey;
 }
 
-/** Куда отправить того, кто хочет свой сервер. */
-export const OWN_SERVER_GUIDE = 'https://matrix.org/ecosystem/servers/';
+/** Куда отправить того, кто хочет свой сервер: наша инструкция на iskra.wtf, как в нативной Искре. */
+export const OWN_SERVER_GUIDE = 'https://iskra.wtf/server.html';
 
 /**
  * Русский среди языков браузера или Россия в регионе. matrix.org из России может не
