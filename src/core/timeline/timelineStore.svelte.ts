@@ -31,6 +31,8 @@ import {
 } from 'matrix-js-sdk';
 import { sendAttachment, uploadClientFor, type OutgoingFile, type UploadClient } from '../media/upload';
 import { geoUri, type Place } from './location';
+import { markdownContent } from './composerMarkdown';
+import { mentionsMarkdown, rankCandidates, unlinkMentions, type ComposerMention, type RankedCandidate } from './composerMentions';
 import { mapEvent, type MapperContext } from './mapper';
 import { layout, type TimelineItem } from './layout';
 import type { Message, Reaction } from './message';
@@ -368,16 +370,24 @@ export class TimelineStore {
    * Текст уходит; local echo появляется в ленте сразу, статус — в `delivery`. С `replyTo` —
    * ответ: связь `m.in_reply_to` и упоминание автора, без цитаты-подпорки в теле (её
    * отменила спецификация, а цитату рисует получатель).
+   *
+   * Markdown — как в мессенджерах (`composerMarkdown.ts`); `mentions` — выбранные из списка
+   * «@» (`composerMentions.ts`): ссылками в тексте и в `m.mentions`.
    */
-  send(text: string, replyTo?: Message): void {
-    const body = text.trim();
-    if (!body) return;
+  send(text: string, replyTo?: Message, mentions: ComposerMention[] = []): void {
+    const trimmed = text.trim();
+    if (!trimmed) return;
     this.typingStopped();
-    const content: Record<string, unknown> = { msgtype: 'm.text', body };
+    const { content: words, userIds } = textContent(trimmed, mentions);
+    const content: Record<string, unknown> = { msgtype: 'm.text', ...words };
     if (replyTo?.eventId) {
       content['m.relates_to'] = { 'm.in_reply_to': { event_id: replyTo.eventId } };
-      content['m.mentions'] = replyTo.own ? {} : { user_ids: [replyTo.senderId] };
+      if (!replyTo.own && !userIds.includes(replyTo.senderId)) userIds.push(replyTo.senderId);
+      content['m.mentions'] = {};
     }
+    // Набор `m.mentions` — только у сообщения, которое кого-то зовёт: само его присутствие
+    // выключает у получателя старые правила «моё имя в тексте».
+    if (userIds.length) content['m.mentions'] = { user_ids: userIds };
     // Промис не ждём: неудача видна в самом сообщении («Не отправлено»), а не исключением.
     this.client.sendMessage(this.roomId, content as never).catch(() => this.schedule());
     this.schedule();
@@ -469,22 +479,52 @@ export class TimelineStore {
     this.uploads = this.uploads.map((u) => (u.id === id ? { ...u, ...patch } : u));
   }
 
-  /** Правка своего: новое тело в `m.new_content`, старое — со звёздочкой для старых клиентов. */
-  edit(message: Message, text: string): void {
-    const body = text.trim();
-    if (!body || !message.canEdit || !message.eventId) return;
+  /**
+   * Правка своего: новое тело в `m.new_content`, старое — со звёздочкой для старых клиентов.
+   * Зовёт правка только тех, кого в исходном сообщении ещё не звали: остальные его уже видели.
+   */
+  edit(message: Message, text: string, mentions: ComposerMention[] = []): void {
+    const trimmed = text.trim();
+    if (!trimmed || !message.canEdit || !message.eventId) return;
     const kind = message.kind;
     if (kind.type !== 'text' && kind.type !== 'emote' && kind.type !== 'notice') return;
     this.typingStopped();
-    if (body === kind.body) return;
+    const { content: words, userIds } = textContent(trimmed, mentions);
+    if (words.body === kind.body) return;
     const msgtype = kind.type === 'emote' ? 'm.emote' : kind.type === 'notice' ? 'm.notice' : 'm.text';
+    const before = unlinkMentions(kind.body).mentions.map((m) => m.userId);
+    const fresh = userIds.filter((id) => !before.includes(id));
     const content = {
       msgtype,
-      body: `* ${body}`,
-      'm.new_content': { msgtype, body },
+      body: `* ${words.body}`,
+      ...(words.formatted_body ? { format: words.format, formatted_body: `* ${words.formatted_body}` } : {}),
+      'm.new_content': { msgtype, ...words, ...(userIds.length ? { 'm.mentions': { user_ids: userIds } } : {}) },
+      ...(fresh.length ? { 'm.mentions': { user_ids: fresh } } : {}),
       'm.relates_to': { rel_type: 'm.replace', event_id: message.eventId },
     };
     this.act('editFailed', () => this.client.sendMessage(this.roomId, content as never));
+  }
+
+  /**
+   * Кого можно позвать через «@»: все вошедшие, кроме себя; кто писал последним — выше (тот,
+   * кому отвечают, почти всегда наверху), дальше — в порядке комнаты.
+   */
+  mentionCandidates(): RankedCandidate[] {
+    const room = this.room;
+    if (!room) return [];
+    const people = room
+      .getJoinedMembers()
+      .filter((m) => m.userId !== this.ownUserId)
+      .map((m) => ({
+        id: m.userId,
+        name: m.name || m.userId,
+        ...(m.getMxcAvatarUrl() ? { avatarUrl: m.getMxcAvatarUrl()! } : {}),
+        disambiguate: m.disambiguate,
+      }));
+    return rankCandidates(
+      people,
+      this.messages.map((m) => m.senderId),
+    );
   }
 
   /** Реакция: своя такая уже стоит — снять, нет — поставить. */
@@ -700,4 +740,10 @@ function markRead(room: Room, ownUserId: string, messages: Message[]): void {
     }
     if (read) message.read = true;
   }
+}
+
+/** Текст и упоминания — в содержимое события: Markdown с ссылками `matrix.to` и кого звать. */
+function textContent(text: string, mentions: ComposerMention[]) {
+  const { markdown, userIds } = mentionsMarkdown(text, mentions);
+  return { content: markdownContent(markdown), userIds };
 }

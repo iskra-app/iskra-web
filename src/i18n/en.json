@@ -314,6 +314,7 @@
     "one": "{count} member",
     "other": "{count} members"
   },
+  "room.mentionSuggestions": "People to mention",
   "room.moderator": "Moderator",
   "room.noRoomSelectedMessage": "Choose a conversation to start reading.",
   "room.noRoomSelectedTitle": "Pick a chat",

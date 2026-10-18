@@ -27,6 +27,9 @@
   import { distance } from './distance';
   import type { Place } from '../../core/timeline/location';
   import { preferences } from '../app/preferences.svelte.ts';
+  import { unlinkMentions, type ComposerMention } from '../../core/timeline/composerMentions';
+  import { Photo, pixelsFor } from '../rooms/faces.svelte.ts';
+  import type { MentionRow } from './MentionPicker.svelte';
 
   interface Props {
     session: UserSession;
@@ -47,6 +50,9 @@
   let context = $state<ComposerContext>(null);
   /** Черновик, отложенный на время правки: правка — не черновик. */
   let stashed = '';
+  /** Кто стоит за `@Имя` в черновике — см. `composerMentions.ts`. */
+  let mentions = $state<ComposerMention[]>([]);
+  let stashedMentions: ComposerMention[] = [];
   let menu = $state<{ message: Message; at: { x: number; y: number }; sheet: boolean } | null>(null);
   let deleting = $state<Message | null>(null);
   let blocking = $state<Message | null>(null);
@@ -90,6 +96,8 @@
     text = '';
     context = null;
     stashed = '';
+    mentions = [];
+    stashedMentions = [];
     attachments = [];
     notice = '';
     let loaded = false;
@@ -135,13 +143,17 @@
       store.sendFiles(attachments, value, context?.kind === 'reply' ? context.message : undefined);
       attachments = [];
       text = '';
+      mentions = [];
     } else if (context?.kind === 'edit') {
-      store.edit(context.message, value);
+      store.edit(context.message, value, mentions);
       text = stashed;
       stashed = '';
+      mentions = stashedMentions;
+      stashedMentions = [];
     } else {
-      store.send(value, context?.kind === 'reply' ? context.message : undefined);
+      store.send(value, context?.kind === 'reply' ? context.message : undefined, mentions);
       text = '';
+      mentions = [];
     }
     context = null;
     clearTimeout(saveTimer);
@@ -150,17 +162,41 @@
 
   function edit(message: Message) {
     if (!message.canEdit || !('body' in message.kind)) return;
-    if (context?.kind !== 'edit') stashed = text;
+    if (context?.kind !== 'edit') {
+      stashed = text;
+      stashedMentions = mentions;
+    }
     context = { kind: 'edit', message };
-    text = message.kind.body;
+    // В теле своего — Markdown, каким оно ушло: упоминания — снова `@Имя` с записью рядом.
+    ({ text, mentions } = unlinkMentions(message.kind.body));
   }
 
   function cancelContext() {
     if (context?.kind === 'edit') {
       text = stashed;
       stashed = '';
+      mentions = stashedMentions;
+      stashedMentions = [];
     }
     context = null;
+  }
+
+  // ————— «@» —————
+
+  /** Звать через «@» — в группе. В личном чате звать некого, кроме того, кто и так слушает. */
+  const mentionCandidates = $derived(room?.kind === 'direct' ? undefined : () => store?.mentionCandidates() ?? []);
+  // Кэш фото на время жизни чата.
+  // eslint-disable-next-line svelte/prefer-svelte-reactivity
+  const photos = new Map<string, Photo>();
+  function mentionPhoto(member: MentionRow): string | undefined {
+    const url = member.avatarUrl;
+    if (!url) return undefined;
+    let photo = photos.get(url);
+    if (!photo) {
+      photo = new Photo(session, url, pixelsFor(2.5));
+      photos.set(url, photo);
+    }
+    return photo.url;
   }
 
   // ————— Вложения —————
@@ -338,6 +374,9 @@
   <Composer
     bind:this={composer}
     bind:text
+    bind:mentions
+    {mentionCandidates}
+    {mentionPhoto}
     {context}
     disabled={!canSend}
     {onsend}

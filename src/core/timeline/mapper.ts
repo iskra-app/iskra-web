@@ -9,6 +9,7 @@
 import { EventStatus, EventType, MsgType, type MatrixEvent } from 'matrix-js-sdk';
 import { isVideoNote } from '../rooms/preview';
 import { parseGeoUri } from './location';
+import { firstLineOf } from './words';
 import type { Attachment, Delivery, EncryptedFileKey, MediaSource, Message, MessageKind, Poll, Reaction, ReplyPreview, SendFailure, ServiceEvent } from './message';
 
 export interface MapperContext {
@@ -100,7 +101,7 @@ function messageKind(event: MatrixEvent): MessageKind {
   const body = typeof content['body'] === 'string' ? content['body'] : '';
   const isReply = !!content['m.relates_to']?.['m.in_reply_to'];
   const text = isReply ? stripReplyFallback(body) : body;
-  const html = content['format'] === HTML_FORMAT && typeof content['formatted_body'] === 'string' ? content['formatted_body'] : undefined;
+  const html = htmlOf(content);
   const withHtml = html ? { html } : {};
   switch (content['msgtype']) {
     case MsgType.Text:
@@ -289,7 +290,7 @@ function replyOf(event: MatrixEvent, context: MapperContext): ReplyPreview | und
   return {
     eventId,
     ...(sender ? { senderName: context.nameOf(sender) } : {}),
-    ...(original.isRedacted() ? {} : { text: stripReplyFallback(body).split('\n')[0] }),
+    ...(original.isRedacted() ? {} : { text: firstLineOf(stripReplyFallback(body), htmlOf(content)) }),
   };
 }
 
@@ -324,4 +325,9 @@ export function stripReplyFallback(body: string): string {
   if (i === 0) return body;
   if (lines[i] === '') i++;
   return lines.slice(i).join('\n');
+}
+
+/** `formatted_body`, если он HTML. */
+function htmlOf(content: Record<string, unknown>): string | undefined {
+  return content['format'] === HTML_FORMAT && typeof content['formatted_body'] === 'string' ? content['formatted_body'] : undefined;
 }

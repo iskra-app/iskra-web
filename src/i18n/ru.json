@@ -322,6 +322,7 @@
     "many": "{count} участников",
     "other": "{count} участника"
   },
+  "room.mentionSuggestions": "Кого упомянуть",
   "room.moderator": "Модератор",
   "room.noRoomSelectedMessage": "Выберите разговор, чтобы начать читать.",
   "room.noRoomSelectedTitle": "Выберите чат",

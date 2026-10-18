@@ -11,6 +11,7 @@
  * могут, а создатель комнаты версии 12 выше любого числа (`Infinity`).
  */
 import { Direction, EventType, MatrixEvent, RoomEvent, RoomMemberEvent, RoomStateEvent, type MatrixClient, type Room } from 'matrix-js-sdk';
+import { firstLineOf } from '../timeline/words';
 import type { LocalNameSource } from './localNames.svelte.ts';
 import { alertsRules, roomAlerts, type RoomAlerts } from './pushRules';
 
@@ -213,11 +214,13 @@ export class RoomDetailsStore {
       if (event === undefined && !this.fetched.has(eventId)) void this.fetchPinned(eventId);
       if (!event) return { eventId, text: '', unavailable: this.fetched.get(eventId) === null };
       const sender = event.getSender();
-      const body = event.isRedacted() ? '' : event.getContent()['body'];
+      const content = event.isRedacted() ? {} : event.getContent();
+      const body = content['body'];
+      const html = content['format'] === 'org.matrix.custom.html' && typeof content['formatted_body'] === 'string' ? content['formatted_body'] : undefined;
       return {
         eventId,
         ...(sender ? { senderName: room.getMember(sender)?.name || sender } : {}),
-        text: typeof body === 'string' ? (body.split('\n')[0] ?? '') : '',
+        text: typeof body === 'string' ? firstLineOf(body, html) : '',
         unavailable: event.isRedacted(),
       };
     });

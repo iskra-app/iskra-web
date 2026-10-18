@@ -3,6 +3,7 @@
   сообщению (подгружая историю, если надо); «Открепить» — тем, у кого есть право.
 -->
 <script lang="ts">
+  import { firstLineOf } from '../../core/timeline/words';
   import type { Message } from '../../core/timeline/message';
   import { t } from '../../i18n/index.svelte.ts';
   import { attachmentLabel } from './text';
@@ -18,7 +19,7 @@
   const text = $derived.by(() => {
     const kind = message?.kind;
     if (!kind) return t('reply.unavailable');
-    if ('body' in kind) return kind.body.split('\n')[0] ?? '';
+    if ('body' in kind) return firstLineOf(kind.body, 'html' in kind ? kind.html : undefined);
     if (kind.type === 'poll') return kind.poll.question;
     if (kind.type === 'deleted') return t('message.deleted');
     return attachmentLabel(kind);

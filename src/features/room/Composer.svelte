@@ -12,11 +12,15 @@
   «Стекло» — навигационный слой: полупрозрачность и размытие, где браузер их тянет.
 -->
 <script lang="ts">
+  import { tick } from 'svelte';
   import Menu from '../../design/Menu.svelte';
   import { viewport } from '../../design/viewport.svelte.ts';
   import { t } from '../../i18n/index.svelte.ts';
   import type { OutgoingFile } from '../../core/media/upload';
   import AttachmentTray from '../media/AttachmentTray.svelte';
+  import { insertMention, mentionMatches, mentionQuery, type ComposerMention } from '../../core/timeline/composerMentions';
+  import MentionPicker, { type MentionRow } from './MentionPicker.svelte';
+  import { firstLineOf } from '../../core/timeline/words';
   import type { ComposerContext } from './actions';
   import { attachmentLabel } from './text';
 
@@ -36,6 +40,14 @@
     onremoveattachment?: (index: number) => void;
     /** «Геопозиция» в меню скрепки. */
     onlocation?: () => void;
+    /**
+     * Выбранные из списка «@» — рядом с черновиком: в поле простые слова, а это говорит, какой
+     * `@Кай` какой. Держит `RoomView`, как и сам черновик.
+     */
+    mentions?: ComposerMention[];
+    /** Кого можно позвать. Нет — списка нет: личный чат, звать там некого. */
+    mentionCandidates?: () => MentionRow[];
+    mentionPhoto?: (member: MentionRow) => string | undefined;
     disabled?: boolean;
   }
   let {
@@ -49,8 +61,73 @@
     onfiles,
     onremoveattachment,
     onlocation,
+    mentions = $bindable([]),
+    mentionCandidates,
+    mentionPhoto = () => undefined,
     disabled = false,
   }: Props = $props();
+
+  // ————— «@» —————
+
+  /** Где курсор — по нему ищется «@…», который сейчас набирают. */
+  let cursor = $state<number | null>(null);
+  /** Список закрыли `Esc` — до следующего набранного символа. */
+  let dismissed = $state(false);
+  let active = $state(0);
+  /** Люди комнаты — спрошены при первом «@» и запомнены. */
+  let candidates = $state.raw<MentionRow[] | null>(null);
+  const pickerId = $props.id();
+
+  const query = $derived(mentionCandidates && cursor !== null && !dismissed ? mentionQuery(text, cursor) : null);
+  $effect(() => {
+    if (query && !candidates && mentionCandidates) candidates = mentionCandidates();
+  });
+  const matches = $derived(query && candidates ? mentionMatches(query.text, candidates) : []);
+  $effect(() => {
+    void query?.text;
+    active = 0;
+  });
+
+  function trackCursor() {
+    cursor = field && field.selectionStart === field.selectionEnd ? field.selectionStart : null;
+  }
+
+  /** Выбрали имя: в черновик вместо набранного, курсор — за ним. */
+  function pick(member: MentionRow) {
+    if (!query) return;
+    const inserted = insertMention(member, query, text);
+    text = inserted.text;
+    mentions = [...mentions, inserted.mention];
+    oninput?.(text);
+    const target = field;
+    if (!target) return;
+    target.focus();
+    // Сразу, как Svelte положил новый текст в поле: кадром позже следующая буква успела бы
+    // встать в конец, а курсор потом прыгнул бы ей за спину.
+    void tick().then(() => {
+      target.setSelectionRange(inserted.cursor, inserted.cursor);
+      trackCursor();
+    });
+  }
+
+  /** Клавиши списка. `true` — клавиша его. */
+  function mentionKey(event: KeyboardEvent): boolean {
+    if (!matches.length) return false;
+    if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+      const step = event.key === 'ArrowDown' ? 1 : -1;
+      active = (active + step + matches.length) % matches.length;
+      return true;
+    }
+    if ((event.key === 'Enter' && !event.shiftKey) || event.key === 'Tab') {
+      pick(matches[active]!);
+      return true;
+    }
+    if (event.key === 'Escape') {
+      dismissed = true;
+      return true;
+    }
+    return false;
+  }
 
   /** Меню скрепки — как «+» нативной Искры: фото, файл, место. */
   let attachMenu = $state<{ x: number; y: number } | null>(null);
@@ -79,7 +156,7 @@
   const quote = $derived.by(() => {
     const kind = context?.message.kind;
     if (!kind) return '';
-    if ('body' in kind) return kind.body.split('\n')[0] ?? '';
+    if ('body' in kind) return firstLineOf(kind.body, 'html' in kind ? kind.html : undefined);
     if (kind.type === 'poll') return kind.poll.question;
     return attachmentLabel(kind);
   });
@@ -117,6 +194,11 @@
 
   function onkeydown(event: KeyboardEvent) {
     if (event.isComposing) return;
+    if (mentionKey(event)) {
+      event.preventDefault();
+      event.stopPropagation();
+      return;
+    }
     if (event.key === 'Escape' && context) {
       // Своё `Esc` — убрать полосу; до «закрыть верхнее» уровня приложения не доходит.
       event.preventDefault();
@@ -184,6 +266,9 @@
 {#if attachments.length && onremoveattachment}
   <AttachmentTray files={attachments} onremove={onremoveattachment} />
 {/if}
+{#if matches.length}
+  <MentionPicker id={pickerId} members={matches} {active} photoOf={mentionPhoto} onpick={pick} />
+{/if}
 <form
   class="row"
   onsubmit={(event) => {
@@ -207,7 +292,18 @@
     {disabled}
     {onkeydown}
     {onpaste}
-    oninput={() => oninput?.(text)}
+    aria-autocomplete={mentionCandidates ? 'list' : undefined}
+    aria-controls={matches.length ? pickerId : undefined}
+    aria-activedescendant={matches.length ? `${pickerId}-${active}` : undefined}
+    oninput={() => {
+      dismissed = false;
+      trackCursor();
+      oninput?.(text);
+    }}
+    onkeyup={trackCursor}
+    onclick={trackCursor}
+    onselect={trackCursor}
+    onblur={() => (cursor = null)}
   ></textarea>
   <button type="submit" class="send" disabled={empty || disabled} aria-label={t('room.send')} title={t('room.send')}>
     <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 19V5M5 12l7-7 7 7" /></svg>

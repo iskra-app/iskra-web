@@ -6,6 +6,7 @@
  * протокола.
  */
 import { EventType, MsgType, type MatrixEvent } from 'matrix-js-sdk';
+import { wordsOf } from '../timeline/words';
 import type { Preview } from './types';
 
 const POLL_TYPES = new Set(['m.poll.start', 'org.matrix.msc3381.poll.start']);
@@ -38,13 +39,19 @@ export function previewOf(event: MatrixEvent): Preview | undefined {
     filename?: unknown;
     info?: unknown;
     'org.matrix.msc3245.voice'?: unknown;
+    format?: unknown;
+    formatted_body?: unknown;
   }>();
   const body = typeof content.body === 'string' ? content.body : '';
   switch (content.msgtype) {
     case MsgType.Text:
     case MsgType.Notice:
     case MsgType.Emote:
-      return body ? { kind: 'text', text: body } : undefined;
+    {
+      // Слова, а не Markdown со звёздочками: см. `words.ts`.
+      const html = content.format === 'org.matrix.custom.html' && typeof content.formatted_body === 'string' ? content.formatted_body : undefined;
+      return body ? { kind: 'text', text: wordsOf(body, html) } : undefined;
+    }
     case MsgType.Image: {
       // Подпись — если `body` не просто имя файла (MSC2530: `filename` рядом с `body`).
       const caption = typeof content.filename === 'string' && content.filename !== body ? body : undefined;

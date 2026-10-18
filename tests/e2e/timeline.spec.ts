@@ -115,3 +115,43 @@ test('ширина окна меняется — место чтения ост�
     }, before.key))
     .toBeCloseTo(before.offset, 0);
 });
+
+test('«@» в группе: список над полем, выбор — ссылкой на человека; Markdown — как в мессенджерах', async ({ page }) => {
+  const problems = watchForProblems(page);
+  await signInToDemo(page);
+  await openRoom(page, /^Выходные/);
+  const field = page.getByRole('textbox', { name: 'Сообщение' });
+  await field.pressSequentially('Привет, @ве');
+  const list = page.getByRole('listbox', { name: 'Кого упомянуть' });
+  await expect(list.getByRole('option')).toHaveCount(1);
+  await expect(list.getByRole('option', { name: 'Вера' })).toHaveAttribute('aria-selected', 'true');
+  await field.press('Enter');
+  await expect(list).toBeHidden();
+  await expect(field).toHaveValue('Привет, @Вера ');
+  await field.pressSequentially('это *важно*');
+  await expect(field).toHaveValue('Привет, @Вера это *важно*');
+  // Кнопкой: на телефоне Enter переносит строку.
+  await page.getByRole('button', { name: 'Отправить' }).click();
+
+  const log = page.getByRole('log');
+  // Упоминание — имя, а не ссылка на чужой сайт; одна звёздочка — жирный, без значков.
+  await expect(log.locator('.mention', { hasText: '@Вера' })).toBeVisible();
+  await expect(log.locator('strong', { hasText: 'важно' })).toBeVisible();
+  await expect(log).not.toContainText('*важно*');
+
+  // `Esc` закрывает список, следующий символ открывает снова.
+  await field.pressSequentially('@');
+  await expect(list).toBeVisible();
+  await field.press('Escape');
+  await expect(list).toBeHidden();
+  await field.pressSequentially('б');
+  await expect(list.getByRole('option', { name: 'Борис' })).toBeVisible();
+  expect(problems).toEqual([]);
+});
+
+test('в личном чате списка «@» нет', async ({ page }) => {
+  await signInToDemo(page);
+  await openRoom(page, /^Аня/);
+  await page.getByRole('textbox', { name: 'Сообщение' }).pressSequentially('@а');
+  await expect(page.getByRole('listbox', { name: 'Кого упомянуть' })).toHaveCount(0);
+});
