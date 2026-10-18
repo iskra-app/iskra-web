@@ -172,14 +172,18 @@ test('«О чате»: вкладки «Что внутри» — фото, фа
   await openRoom(page, /^Выходные/);
   const panel = await openPanel(page);
   const tabs = panel.getByRole('tablist', { name: 'Что внутри' });
-  // Голосовых и кружков в «Выходных» нет — и вкладок для них нет.
-  await expect(tabs.getByRole('tab')).toHaveText(['Участники', 'Фото и видео', 'Файлы', 'Ссылки']);
+  // Кружков в «Выходных» нет — и вкладки для них нет.
+  await expect(tabs.getByRole('tab')).toHaveText(['Участники', 'Фото и видео', 'Голосовые', 'Файлы', 'Ссылки']);
   await expect(tabs.getByRole('tab', { name: 'Участники' })).toHaveAttribute('aria-selected', 'true');
 
   await tabs.getByRole('tab', { name: 'Фото и видео' }).click();
   const grid = panel.getByRole('tabpanel');
   await expect(grid.getByRole('button', { name: 'Фото' })).toHaveCount(2);
-  // Стрелки ходят по вкладкам.
+  // Стрелки ходят по вкладкам. Голосовое — тем же пузырём, что в ленте.
+  await page.keyboard.press('ArrowRight');
+  await expect(tabs.getByRole('tab', { name: 'Голосовые' })).toBeFocused();
+  await expect(panel.getByRole('tabpanel').getByRole('button', { name: 'Слушать' })).toBeVisible();
+  await expect(panel.getByRole('tabpanel')).toContainText('0:04');
   await page.keyboard.press('ArrowRight');
   await expect(tabs.getByRole('tab', { name: 'Файлы' })).toBeFocused();
   await expect(panel.getByRole('tabpanel')).toContainText('Что взять.txt');

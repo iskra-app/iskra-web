@@ -57,6 +57,8 @@
   --size-menu-width: 15rem; /* 240 */
   --size-recording-dot: 0.625rem; /* 10 — точка, а не сетка */
   --size-waveform: 1.5rem; /* 24 — Theme.Size.waveform: высота волны голосового */
+  --size-voice-waveform: 10rem; /* 160 — сорок столбиков волны в пузыре голосового */
+  --size-voice-button: 1.75rem; /* 28 — Theme.Size.voiceButton: «▶» в пузыре; нажимается на 44 */
   --size-icon: 1.25rem; /* 20 — значок рядом с текстом */
   --size-icon-button: 1.5rem; /* 24 — значок в кнопке-иконке */
   --size-sign-in-mark: 3.5rem; /* 56 — Theme.Size.signInMark */

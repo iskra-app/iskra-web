@@ -3,6 +3,7 @@
  * файлов), загруженное — живёт в памяти, пока открыта вкладка.
  */
 import { DEMO_SERVER } from './fixtures';
+import { voiceWav } from './voice';
 
 export interface DemoMedia {
   bytes: Uint8Array;
@@ -36,6 +37,7 @@ export function demoMediaLibrary(): Map<string, DemoMedia> {
   return new Map([
     ['lake', { bytes: encode(lake()), type: 'image/svg+xml' }],
     ['forest', { bytes: encode(forest()), type: 'image/svg+xml' }],
+    ['voice', { bytes: voiceWav(), type: 'audio/wav' }],
     ['list', { bytes: encode('Что взять на пикник\n\n— плед\n— термос\n— мангал и угли\n— пирог (Вера)\n'), type: 'text/plain' }],
   ]);
 }

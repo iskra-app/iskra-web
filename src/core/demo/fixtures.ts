@@ -5,6 +5,7 @@
  * реакциями, группа с опросом, беззвучный чат, приглашение и длинная комната для
  * подгрузки истории. Время — от «сейчас», чтобы «вчера» было вчера.
  */
+import { demoVoice } from './voice';
 
 export const DEMO_SERVER = 'demo.iskra.invalid';
 export const DEMO_BASE_URL = `https://${DEMO_SERVER}`;
@@ -151,6 +152,7 @@ export function buildDemoWorld(now: number): { rooms: DemoRoom[]; invites: DemoI
   );
 
   const weekend = demoRooms.weekend;
+  const voice = demoVoice();
   const weekendTimeline = stamp(
     weekend,
     [
@@ -201,6 +203,19 @@ export function buildDemoWorld(now: number): { rooms: DemoRoom[]; invites: DemoI
         type: 'm.room.message',
         sender: boris,
         content: { msgtype: 'm.file', body: 'Что взять.txt', url: `mxc://${DEMO_SERVER}/list`, info: { mimetype: 'text/plain', size: 96 } },
+      },
+      // Голосовое — как шлёт нативная Искра: `m.audio` с волной и меткой голосового.
+      {
+        type: 'm.room.message',
+        sender: vera,
+        content: {
+          msgtype: 'm.audio',
+          body: 'Голосовое сообщение',
+          url: `mxc://${DEMO_SERVER}/voice`,
+          info: { mimetype: 'audio/wav', duration: voice.duration, size: voice.size },
+          'org.matrix.msc1767.audio': { duration: voice.duration, waveform: voice.waveform },
+          'org.matrix.msc3245.voice': {},
+        },
       },
       // Ссылка простым текстом — для вкладки «Ссылки» в «О чате».
       text(boris, 'Прогноз на субботу: https://example.org/weather — вроде солнце'),

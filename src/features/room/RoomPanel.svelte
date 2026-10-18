@@ -25,6 +25,7 @@
   import type { TimelineStore } from '../../core/timeline/timelineStore.svelte.ts';
   import { roomTimestamp } from '../../design/time';
   import FileCard from '../media/FileCard.svelte';
+  import VoiceMessage from '../media/VoiceMessage.svelte';
   import MediaTile from '../media/MediaTile.svelte';
   import Viewer, { type ViewerItem } from '../media/Viewer.svelte';
   import { availableTabs, roomContents, type ContentItem, type ContentTab } from './contents';
@@ -308,7 +309,11 @@
             <ul class="list">
               {#each contents[tab] as item (item.key)}
                 <li class="file">
-                  <FileCard kind={item.kind === 'file' ? 'file' : item.kind === 'voice' ? 'voice' : 'audio'} attachment={item.attachment} media={session.media} />
+                  {#if item.kind === 'voice'}
+                    <VoiceMessage attachment={item.attachment} media={session.media} />
+                  {:else}
+                    <FileCard kind={item.kind === 'file' ? 'file' : 'audio'} attachment={item.attachment} media={session.media} />
+                  {/if}
                   <span class="line">{item.senderName} · {when(item.ts)}</span>
                 </li>
               {/each}

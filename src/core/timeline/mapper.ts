@@ -121,7 +121,9 @@ function messageKind(event: MatrixEvent): MessageKind {
       return { type: isVideoNote(content as { info?: unknown }) ? 'videoNote' : 'video', attachment };
     }
     case MsgType.Audio:
-      return { type: content['org.matrix.msc3245.voice'] !== undefined ? 'voice' : 'audio', attachment: attachmentOf(content) };
+      return content['org.matrix.msc3245.voice'] !== undefined
+        ? { type: 'voice', attachment: voiceOf(content) }
+        : { type: 'audio', attachment: attachmentOf(content) };
     case MsgType.File:
       return { type: 'file', attachment: attachmentOf(content) };
     case MsgType.Location: {
@@ -133,6 +135,28 @@ function messageKind(event: MatrixEvent): MessageKind {
       // Неизвестный msgtype с телом — по спецификации показывается как текст.
       return body ? { type: 'text', body: text } : { type: 'unsupported' };
   }
+}
+
+/** Волна в событии — целые 0…1024 (`WAVEFORM_SCALE`), как шлют нативная Искра и Element. */
+const WAVEFORM_SCALE = 1024;
+/** Больше точек не бывает в честном событии; чужое на миллион — не рисовать. */
+const WAVEFORM_MAX = 1024;
+
+/**
+ * Голосовое: вложение плюс волна и длительность из `org.matrix.msc1767.audio`. Волна —
+ * отправителя: получатель звук ещё не скачал и нарисовать её сам не может. Кривые точки
+ * (не числа, меньше нуля, больше шкалы) — нулём или потолком, а не поводом не показать ничего.
+ */
+function voiceOf(content: Record<string, unknown>): Attachment {
+  const attachment = attachmentOf(content);
+  const audio = content['org.matrix.msc1767.audio'];
+  if (!audio || typeof audio !== 'object') return attachment;
+  const { waveform, duration } = audio as Record<string, unknown>;
+  if (Array.isArray(waveform) && waveform.length && waveform.length <= WAVEFORM_MAX) {
+    attachment.waveform = waveform.map((v) => (typeof v === 'number' && Number.isFinite(v) ? Math.min(1, Math.max(0, v / WAVEFORM_SCALE)) : 0));
+  }
+  if (attachment.duration === undefined && typeof duration === 'number' && Number.isFinite(duration) && duration >= 0) attachment.duration = duration;
+  return attachment;
 }
 
 function attachmentOf(content: Record<string, unknown>): Attachment {

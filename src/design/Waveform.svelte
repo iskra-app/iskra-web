@@ -3,7 +3,10 @@
 
   `live` — то, что микрофон слышит сейчас: последние столбики у правого края, старые уезжают
   влево. Так полоса выглядит живым индикатором, а не графиком, который заполнился и встал.
-  `fit` — вся запись по ширине; сыгранная часть (`progress`) — полным цветом, остальное бледнее.
+  `fit` — вся запись по ширине; сыгранная часть (`progress`) — полным цветом, остальное бледнее:
+  волна заодно и полоса прогресса, без лишнего места и подписи. `count` — сколько столбиков
+  (в пузыре — сорок, как в нативной: сто двадцать столбиков в пузыре — штрихкод), иначе — сколько
+  влезет.
 
   Канвас, а не ряд элементов: у него нет своей минимальной ширины, и в строке с часами и
   «Отменой» он берёт то, что осталось, — сколько столбиков влезло, столько и рисует.
@@ -14,14 +17,16 @@
     mode?: 'live' | 'fit';
     /** 0…1 — сколько сыграно (`fit`). */
     progress?: number;
+    /** Столбиков в `fit` — поровну по ширине. Нет — сколько влезет. */
+    count?: number;
   }
-  let { samples, mode = 'live', progress = 1 }: Props = $props();
+  let { samples, mode = 'live', progress = 1, count }: Props = $props();
 
   /** Столбик и промежуток, CSS px — `Theme.Size.waveformBar` нативной. */
   const BAR = 2;
   const GAP = 2;
   const MIN_BAR = 3;
-  const UNPLAYED_ALPHA = 0.4;
+  const UNPLAYED_ALPHA = 0.35;
 
   let canvas: HTMLCanvasElement | undefined = $state();
   let width = $state(0);
@@ -61,10 +66,11 @@
     context.clearRect(0, 0, width, height);
     context.fillStyle = getComputedStyle(canvas).color;
 
-    const step = BAR + GAP;
-    const fitting = Math.max(0, Math.floor((width + GAP) / step));
-    const bars = mode === 'live' ? samples.slice(-fitting) : fitted(fitting);
-    const played = mode === 'fit' ? Math.round(progress * bars.length) : bars.length;
+    const fitting = Math.max(0, Math.floor((width + GAP) / (BAR + GAP)));
+    const bars = mode === 'live' ? samples.slice(-fitting) : fitted(count ?? fitting);
+    // Заданное число столбиков — поровну по всей ширине; иначе — вплотную, с шагом столбика.
+    const step = mode === 'fit' && count ? (width + GAP) / Math.max(1, count) : BAR + GAP;
+    const played = mode === 'fit' ? Math.ceil(progress * bars.length) : bars.length;
     bars.forEach((sample, index) => {
       // `live` — от правого края: новый звук стоит на месте, старый уезжает влево.
       const x = mode === 'live' ? width - (bars.length - index) * step + GAP : index * step;

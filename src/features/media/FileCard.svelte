@@ -1,7 +1,7 @@
 <!--
   Файл или звук в ленте: имя, размер, «Сохранить». Звук — «Слушать»: байты скачиваются
   (и расшифровываются) по нажатию, а не заранее — голосовые и музыку не качают, пока не
-  попросили. Голосовые как у нативной Искры — этап 10.
+  попросили. Голосовые — своим пузырём, `VoiceMessage`.
 -->
 <script lang="ts">
   import { MediaError, type MediaLoader } from '../../core/media/media';
@@ -10,7 +10,7 @@
   import { fileSize, saveBlob } from './files';
 
   interface Props {
-    kind: 'file' | 'audio' | 'voice';
+    kind: 'file' | 'audio';
     attachment: Attachment;
     media: MediaLoader;
   }

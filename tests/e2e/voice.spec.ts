@@ -53,6 +53,9 @@ async function fakeMicrophone(page: Page) {
   });
 }
 
+/** Голосовые в ленте — пузыри с «Слушать». */
+const voices = (page: Page) => page.getByRole('log').getByRole('article').filter({ has: page.getByRole('button', { name: /^(Слушать|Пауза)$/ }) });
+
 async function openChat(page: Page) {
   const back = page.getByRole('button', { name: 'Назад' });
   if (await back.isVisible()) await back.click();
@@ -80,9 +83,9 @@ test('голосовое: нажатие — запись без рук, «От�
   await page.getByRole('button', { name: 'Отправить', exact: true }).click();
   await expect(strip).toBeHidden();
 
-  const bubble = page.getByRole('log').getByRole('article').filter({ hasText: 'Голосовое сообщение.m4a' });
-  await expect(bubble).toBeVisible();
-  await expect(bubble.getByRole('button', { name: 'Слушать' })).toBeVisible();
+  // Своё голосовое — пузырём с «▶» и длительностью, рядом с голосовым Веры из демо.
+  await expect(voices(page)).toHaveCount(2);
+  await expect(voices(page).last()).toContainText(/0:0\d/);
   // Черновик не потерялся под полосой записи — поле вернулось пустым, как было.
   await expect(composer).toHaveValue('');
   expect(problems).toEqual([]);
@@ -142,5 +145,27 @@ test('голосовое: удержание — отпустил и отпра�
   await expect(strip).toContainText('0:01', { timeout: 5000 });
   await page.mouse.up();
   await expect(strip).toBeHidden();
-  await expect(page.getByRole('log').getByRole('article').filter({ hasText: 'Голосовое сообщение.m4a' })).toBeVisible();
+  await expect(voices(page)).toHaveCount(2);
+});
+
+test('голосовое в ленте: волна и длительность из события, «▶» — играет, пауза — встаёт', async ({ page }) => {
+  const problems = watchForProblems(page);
+  await signInToDemo(page);
+  await openChat(page);
+  const bubble = voices(page).first();
+  await expect(bubble).toContainText('0:04');
+  await expect(bubble.locator('canvas')).toBeVisible();
+
+  await bubble.getByRole('button', { name: 'Слушать' }).click();
+  const pause = bubble.getByRole('button', { name: 'Пауза' });
+  await expect(pause).toBeVisible();
+  await pause.click();
+  await expect(bubble.getByRole('button', { name: 'Слушать' })).toBeVisible();
+  // Дослушали — снова «Слушать», с начала.
+  await bubble.getByRole('button', { name: 'Слушать' }).click();
+  await expect(pause).toBeVisible();
+  await expect(bubble.getByRole('button', { name: 'Слушать' })).toBeVisible({ timeout: 8000 });
+  await expect(bubble.getByRole('alert')).toHaveCount(0);
+  if (process.env['VOICE_SHOT']) await bubble.screenshot({ path: process.env['VOICE_SHOT'] });
+  expect(problems).toEqual([]);
 });

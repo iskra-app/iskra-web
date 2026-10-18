@@ -37,6 +37,8 @@ export interface Attachment {
   /** Нет — вложение без байтов (битое событие): показать можно только подпись. */
   source?: MediaSource;
   thumbnail?: { source: MediaSource; width?: number; height?: number; mimetype?: string };
+  /** Голосовое: волна отправителя, 0…1 (`org.matrix.msc1767.audio`). Пусто — не прислали. */
+  waveform?: number[];
 }
 
 /**

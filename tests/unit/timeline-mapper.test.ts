@@ -53,6 +53,14 @@ describe('TimelineMapper', () => {
     expect(note?.kind.type).toBe('videoNote');
     const voice = map({ type: 'm.room.message', content: { msgtype: 'm.audio', body: 'a', 'org.matrix.msc3245.voice': {} } });
     expect(voice?.kind.type).toBe('voice');
+    // Волна — отправителя, 0…1024 → 0…1; кривые точки — нулём или потолком; длительность — и из MSC1767.
+    const spoken = map({
+      type: 'm.room.message',
+      content: { msgtype: 'm.audio', body: 'a', 'org.matrix.msc3245.voice': {}, 'org.matrix.msc1767.audio': { duration: 4000, waveform: [0, 512, 1024, 4000, -3, 'x'] } },
+    });
+    expect(spoken?.kind).toMatchObject({ type: 'voice', attachment: { duration: 4000, waveform: [0, 0.5, 1, 1, 0, 0] } });
+    const flat = map({ type: 'm.room.message', content: { msgtype: 'm.audio', body: 'a', 'org.matrix.msc3245.voice': {}, 'org.matrix.msc1767.audio': { waveform: 'нет' } } });
+    expect(flat?.kind.type === 'voice' && flat.kind.attachment.waveform).toBeFalsy();
     // Ключ без хэша — не ключ: расшифровать, не проверив SHA-256, нельзя.
     const broken = map({ type: 'm.room.message', content: { msgtype: 'm.file', body: 'doc.pdf', file: { url: 'mxc://x/2' } } });
     expect(broken?.kind).toEqual({ type: 'file', attachment: { name: 'doc.pdf' } });

@@ -29,6 +29,7 @@
   import PollView from './PollView.svelte';
   import LocationCard from './LocationCard.svelte';
   import FileCard from '../media/FileCard.svelte';
+  import VoiceMessage from '../media/VoiceMessage.svelte';
   import MediaPreview from '../media/MediaPreview.svelte';
   import type { MediaLoader } from '../../core/media/media';
   import { doubleTapReaction } from './reactions';
@@ -142,7 +143,10 @@
           {:else if kind.type === 'image' || kind.type === 'video' || kind.type === 'videoNote' || kind.type === 'sticker'}
             <MediaPreview kind={kind.type} attachment={kind.attachment} {media} onopen={() => actions.openMedia(message)} />
             {#if kind.attachment.caption}<span class="caption text"><LinkedText text={kind.attachment.caption} /></span>{/if}
-          {:else if kind.type === 'file' || kind.type === 'audio' || kind.type === 'voice'}
+          {:else if kind.type === 'voice'}
+            <VoiceMessage attachment={kind.attachment} {media} />
+            {#if kind.attachment.caption}<span class="caption text"><LinkedText text={kind.attachment.caption} /></span>{/if}
+          {:else if kind.type === 'file' || kind.type === 'audio'}
             <FileCard kind={kind.type} attachment={kind.attachment} {media} />
             {#if kind.attachment.caption}<span class="caption text"><LinkedText text={kind.attachment.caption} /></span>{/if}
           {:else if kind.type === 'location'}

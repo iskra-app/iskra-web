@@ -186,7 +186,8 @@
     // Иначе нажатие уведёт фокус и начнёт выделение текста под пальцем.
     event.preventDefault();
     voiceButton?.setPointerCapture(event.pointerId);
-    press = { x: event.clientX, y: event.clientY, at: performance.now(), id: event.pointerId };
+    // Время самого ввода, а не обработчика: занятый кадр не должен делать нажатие удержанием.
+    press = { x: event.clientX, y: event.clientY, at: event.timeStamp, id: event.pointerId };
     void startRecording();
   }
 
@@ -201,7 +202,7 @@
 
   function voiceUp(event: PointerEvent) {
     if (!press || event.pointerId !== press.id) return;
-    const release = releaseOf(performance.now() - press.at);
+    const release = releaseOf(event.timeStamp - press.at);
     press = null;
     swallowClick = true;
     if (release === 'send') void sendVoice();
