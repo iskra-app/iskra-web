@@ -40,6 +40,8 @@
 - [x] Адрес на History API: `#/room/!id:server`, ничего кроме ID
 - [x] CI: lint, typecheck, Vitest, сборка, Playwright в трёх движках × два вьюпорта
 - [ ] Боевой адрес `web.iskra.wtf` и хостинг со своими заголовками — нужен с этапа 2 из-за OIDC
+      Решено: российский VPS с Caddy, заголовки из `security-headers.ts` (`headers.caddy`),
+      деплой `main` из CI по SSH — `deploy/`. Осталось поднять сервер и завести DNS
 - [x] Ночная сборка на GitHub Pages — каждый зелёный пуш в `dev`, на `nightly.web.iskra.wtf`. Pages
       заголовков не дают: CSP — тегом `<meta>` (без `frame-ancestors` и COOP), так что это
       «попробовать», а не боевой адрес. Все свои пути — от `import.meta.env.BASE_URL`

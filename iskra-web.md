@@ -678,6 +678,12 @@ iskra-web/
 Любая статика с управляемыми заголовками (CSP нужна заголовком, не `<meta>`). Домен —
 `web.iskra.wtf`; нужен с этапа 1 из-за OIDC.
 
+Боевая версия — российский VPS с Caddy (`deploy/`), каждый зелёный пуш в `main`. Не Netlify,
+Vercel или Cloudflare Pages: из России их адреса блокируют или режут до 16 КБ на соединение
+(Cloudflare — с июня 2025), а Rust-крипто в WASM весит несколько мегабайт. Заголовки Caddy
+берёт из `security-headers.ts` — сборка кладёт их в `headers.caddy`. Ночная сборка из `dev`
+остаётся на GitHub Pages, с CSP тегом.
+
 ## Лицензии
 
 - `matrix-js-sdk`, `matrix-encrypt-attachment` — Apache-2.0.

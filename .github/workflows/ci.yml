@@ -99,3 +99,66 @@ jobs:
         uses: actions/deploy-pages@v4
         with:
           artifact_name: github-pages-${{ github.run_attempt }}
+
+  # Боевой адрес https://web.iskra.wtf/ — каждый зелёный пуш в main, на российский VPS с Caddy
+  # (зарубежные хостинги статики из России блокируют или режут). Заголовки — настоящие, из
+  # security-headers.ts: сборка кладёт их в headers.caddy, Caddyfile — в deploy/.
+  # Каждая сборка — своя папка releases/<коммит>; current переключается одной ссылкой, и если
+  # Caddy не принял новые заголовки, ссылка возвращается на прежнюю. Как поднять сервер —
+  # deploy/README.md. Пока он не поднят (нет переменной DEPLOY_HOST), job пропускается.
+  deploy:
+    needs: [check, e2e]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main' && vars.DEPLOY_HOST != ''
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    concurrency:
+      group: production
+      cancel-in-progress: false
+    environment:
+      name: production
+      url: https://web.iskra.wtf/
+    env:
+      TARGET: ${{ vars.DEPLOY_USER }}@${{ vars.DEPLOY_HOST }}
+      RELEASE: ${{ github.sha }}
+    steps:
+      - uses: actions/checkout@v5
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm build
+      # Заголовки — рядом с сайтом, а не в нём; _headers Caddy не нужен.
+      - name: Папка релиза
+        run: |
+          mkdir release
+          mv dist/headers.caddy release/
+          rm dist/_headers
+          mv dist release/site
+      - name: Ключ SSH
+        env:
+          SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          KNOWN_HOSTS: ${{ vars.DEPLOY_KNOWN_HOSTS }}
+        run: |
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$SSH_KEY" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          printf '%s\n' "$KNOWN_HOSTS" > ~/.ssh/known_hosts
+      - name: Загрузка
+        run: rsync -rlt --delete release/ "$TARGET:/srv/iskra-web/releases/$RELEASE/"
+      - name: Переключение
+        run: |
+          ssh "$TARGET" RELEASE="$RELEASE" sh -s <<'SCRIPT'
+          set -eu
+          cd /srv/iskra-web
+          prev=$(readlink current || true)
+          ln -sfn "releases/$RELEASE" current.new && mv -Tf current.new current
+          if ! caddy reload --config /etc/caddy/Caddyfile --adapter caddyfile; then
+            if [ -n "$prev" ]; then ln -sfn "$prev" current.new && mv -Tf current.new current; fi
+            exit 1
+          fi
+          # Пять последних релизов — на откат руками.
+          ls -1t releases | tail -n +6 | while read -r old; do rm -rf "releases/$old"; done
+          SCRIPT

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { headersFile, securityHeaders } from '../../security-headers';
+import { caddyHeaders, headersFile, securityHeaders } from '../../security-headers';
 
 describe('CSP — главная граница', () => {
   const csp = securityHeaders(false)['Content-Security-Policy']!;
@@ -29,5 +29,13 @@ describe('CSP — главная граница', () => {
 
   it('_headers несёт ту же политику', () => {
     expect(headersFile()).toContain(`Content-Security-Policy: ${csp}`);
+  });
+
+  it('Caddy несёт ту же политику и все заголовки', () => {
+    const caddy = caddyHeaders();
+    expect(caddy).toContain(`\tContent-Security-Policy "${csp}"\n`);
+    for (const name of Object.keys(securityHeaders(false))) expect(caddy).toContain(`\t${name} "`);
+    // Двойная кавычка внутри значения закрыла бы строку Caddy раньше времени.
+    for (const value of Object.values(securityHeaders(false))) expect(value).not.toContain('"');
   });
 });
