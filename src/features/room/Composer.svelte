@@ -9,6 +9,10 @@
   последнее своё сообщение. Текст и полосу держит `RoomView` (черновик, «печатает»);
   композер только показывает и сообщает.
 
+  Пустое поле — на месте «Отправить» микрофон (`recordGesture.ts`); пока идёт запись, на месте
+  поля — полоса записи. Кнопка та же самая, пока палец её держит: убрать её из-под пальца —
+  значит потерять отпускание. Браузер не пишет AAC — микрофона нет (см. `media/voice.ts`).
+
   «Стекло» — навигационный слой: полупрозрачность и размытие, где браузер их тянет.
 -->
 <script lang="ts">
@@ -23,6 +27,9 @@
   import { firstLineOf } from '../../core/timeline/words';
   import type { ComposerContext } from './actions';
   import { attachmentLabel } from './text';
+  import { VoiceRecorder, type Recording } from '../media/voiceRecorder.svelte.ts';
+  import RecordingStrip from './RecordingStrip.svelte';
+  import { moveOf, releaseOf } from './recordGesture';
 
   interface Props {
     text: string;
@@ -50,6 +57,10 @@
     /** Кого можно позвать. Нет — списка нет: личный чат, звать там некого. */
     mentionCandidates?: () => MentionRow[];
     mentionPhoto?: (member: MentionRow) => string | undefined;
+    /** Записали голосовое. Нет — микрофона нет. */
+    onvoice?: (recording: Recording) => void;
+    /** Микрофон не дали или он не включился. */
+    onvoiceproblem?: (problem: 'denied' | 'unavailable') => void;
     disabled?: boolean;
   }
   let {
@@ -67,6 +78,8 @@
     mentions = $bindable([]),
     mentionCandidates,
     mentionPhoto = () => undefined,
+    onvoice,
+    onvoiceproblem,
     disabled = false,
   }: Props = $props();
 
@@ -132,6 +145,96 @@
     return false;
   }
 
+  // ————— Голосовое —————
+
+  const recorder = new VoiceRecorder();
+  const canRecord = VoiceRecorder.supported();
+  /** Нажатие на микрофон, пока палец (или мышь) его держит. */
+  let press = $state<{ x: number; y: number; at: number; id: number } | null>(null);
+  /** Клик следом за отпусканием — уже обработан жестом. */
+  let swallowClick = false;
+  let voiceButton: HTMLButtonElement | undefined = $state();
+
+  const recording = $derived(recorder.active);
+
+  async function startRecording() {
+    await recorder.start();
+    if (recorder.state === 'denied' || recorder.state === 'unavailable') {
+      onvoiceproblem?.(recorder.state);
+      recorder.dismiss();
+      press = null;
+    }
+  }
+
+  async function sendVoice() {
+    const done = await recorder.finish();
+    if (done) onvoice?.(done);
+    voiceButton?.focus();
+  }
+
+  /** Выбросить запись — «Отмена», свайп в сторону, `Esc`, уход из чата. */
+  export function cancelRecording() {
+    press = null;
+    recorder.cancel();
+  }
+
+  $effect(() => () => recorder.cancel());
+
+  function voiceDown(event: PointerEvent) {
+    swallowClick = false;
+    if (recording || event.button !== 0 || !event.isPrimary) return;
+    // Иначе нажатие уведёт фокус и начнёт выделение текста под пальцем.
+    event.preventDefault();
+    voiceButton?.setPointerCapture(event.pointerId);
+    press = { x: event.clientX, y: event.clientY, at: performance.now(), id: event.pointerId };
+    void startRecording();
+  }
+
+  function voiceMove(event: PointerEvent) {
+    if (!press || event.pointerId !== press.id) return;
+    const move = moveOf(event.clientX - press.x, event.clientY - press.y);
+    if (move === 'hold') return;
+    swallowClick = true;
+    if (move === 'cancel') cancelRecording();
+    else press = null; // без рук
+  }
+
+  function voiceUp(event: PointerEvent) {
+    if (!press || event.pointerId !== press.id) return;
+    const release = releaseOf(performance.now() - press.at);
+    press = null;
+    swallowClick = true;
+    if (release === 'send') void sendVoice();
+  }
+
+  /** Браузер забрал касание себе (прокрутка, системный жест) — записи никто не держит. */
+  function voiceLost(event: PointerEvent) {
+    if (press && event.pointerId === press.id) cancelRecording();
+  }
+
+  function voiceClick(event: MouseEvent) {
+    // С клавиатуры (`detail === 0`) — всегда клик: Enter начинает без рук, Enter отправляет.
+    if (swallowClick && event.detail !== 0) {
+      swallowClick = false;
+      return;
+    }
+    if (recording) void sendVoice();
+    else void startRecording();
+  }
+
+  async function stopRecording() {
+    await recorder.stop();
+    voiceButton?.focus();
+  }
+
+  function recordingKey(event: KeyboardEvent) {
+    if (event.key !== 'Escape' || !recording) return;
+    event.preventDefault();
+    event.stopPropagation();
+    cancelRecording();
+    void tick().then(() => voiceButton?.focus());
+  }
+
   /** Меню скрепки — как «+» нативной Искры: фото, файл, место. */
   let attachMenu = $state<{ x: number; y: number } | null>(null);
 
@@ -154,6 +257,8 @@
   const empty = $derived(text.trim() === '' && attachments.length === 0);
   /** При правке вложений не бывает: меняется только текст. */
   const canAttach = $derived(!!onfiles && context?.kind !== 'edit' && !disabled);
+  /** Микрофон на месте «Отправить»: поле пустое, вложений нет, это не правка. */
+  const voiceMode = $derived(!!onvoice && canRecord && (recording || (empty && context?.kind !== 'edit' && !disabled)));
 
   /** Одна строка о том, на что отвечаем или что правим. */
   const quote = $derived.by(() => {
@@ -248,7 +353,8 @@
   }
 </script>
 
-<div class="composer glass">
+<!-- svelte-ignore a11y_no_static_element_interactions -->
+<div class="composer glass" onkeydown={recordingKey}>
 {#if context}
   <div class="context">
     <svg viewBox="0 0 24 24" aria-hidden="true">
@@ -279,6 +385,12 @@
     send();
   }}
 >
+  {#if recording}
+    <RecordingStrip {recorder} oncancel={() => {
+      cancelRecording();
+      void tick().then(() => voiceButton?.focus());
+    }} />
+  {:else}
   {#if onfiles}
     <button type="button" class="attach" disabled={!canAttach} aria-label={t('room.attach')} title={t('room.attach')} aria-haspopup="menu" onclick={openAttachMenu}>
       <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 11l-8.5 8.5a5 5 0 0 1-7-7L13 4a3.5 3.5 0 0 1 5 5l-8.5 8.5a2 2 0 0 1-3-3L14 7" /></svg>
@@ -308,9 +420,44 @@
     onselect={trackCursor}
     onblur={() => (cursor = null)}
   ></textarea>
-  <button type="submit" class="send" disabled={empty || disabled} aria-label={t('room.send')} title={t('room.send')}>
-    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 19V5M5 12l7-7 7 7" /></svg>
-  </button>
+  {/if}
+  {#if recorder.state === 'recording' && !press}
+    <button type="button" class="stop" aria-label={t('voice.stop')} title={t('voice.stop')} onclick={stopRecording}>
+      <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="7" y="7" width="10" height="10" rx="2" /></svg>
+    </button>
+  {/if}
+  {#if voiceMode}
+    <span class="voice-slot">
+      {#if press && recording}
+        <span class="lock" aria-hidden="true">
+          <svg viewBox="0 0 24 24"><path d="M8 11V8a4 4 0 0 1 8 0v3M6 11h12v9H6z" /></svg>
+          <svg viewBox="0 0 24 24"><path d="M6 15l6-6 6 6" /></svg>
+        </span>
+      {/if}
+      <button
+        bind:this={voiceButton}
+        type="button"
+        class="send voice"
+        class:held={!!press}
+        aria-label={recording ? t('recording.send') : t('voice.record')}
+        title={recording ? t('recording.send') : t('voice.record')}
+        onpointerdown={voiceDown}
+        onpointermove={voiceMove}
+        onpointerup={voiceUp}
+        onpointercancel={voiceLost}
+        onclick={voiceClick}
+        oncontextmenu={(event) => event.preventDefault()}
+      >
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+          {#if recording && !press}<path d="M12 19V5M5 12l7-7 7 7" />{:else}<path d="M12 3a3 3 0 0 0-3 3v6a3 3 0 0 0 6 0V6a3 3 0 0 0-3-3zM5 11a7 7 0 0 0 14 0M12 18v3" />{/if}
+        </svg>
+      </button>
+    </span>
+  {:else}
+    <button type="submit" class="send" disabled={empty || disabled} aria-label={t('room.send')} title={t('room.send')}>
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 19V5M5 12l7-7 7 7" /></svg>
+    </button>
+  {/if}
 </form>
 
 <Menu open={!!attachMenu} x={attachMenu?.x ?? 0} y={attachMenu?.y ?? 0} sheet={!viewport.finePointer} label={t('room.attach')} onclose={() => (attachMenu = null)}>
@@ -478,6 +625,71 @@
     background: var(--accent);
     color: var(--on-accent);
     cursor: pointer;
+  }
+  .voice-slot {
+    position: relative;
+    flex: none;
+  }
+  /* Палец не должен прокручивать ленту, выделять текст или звать меню, пока держит запись. */
+  .voice {
+    touch-action: none;
+    -webkit-user-select: none;
+    user-select: none;
+    -webkit-touch-callout: none;
+    transition: transform var(--timing-chrome) var(--ease-out);
+  }
+  .voice.held {
+    transform: scale(var(--motion-held-scale));
+  }
+  /* Замок над пальцем: вверх — без рук. Подсказка там, где палец, а не в конце полосы. */
+  .lock {
+    position: absolute;
+    inset-inline: 0;
+    bottom: calc(100% + var(--space-normal));
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: var(--space-tight);
+    padding-block: var(--space-close);
+    border-radius: var(--radius-circle);
+    background: var(--color-surface);
+    color: var(--color-text-secondary);
+    box-shadow: 0 0 0 var(--border-hairline) var(--color-separator);
+    transition:
+      opacity var(--timing-chrome) var(--ease-out),
+      transform var(--timing-chrome) var(--ease-out);
+  }
+  @starting-style {
+    .lock {
+      opacity: 0;
+      transform: translateY(var(--motion-rise));
+    }
+  }
+  .lock svg {
+    width: var(--size-icon);
+    height: var(--size-icon);
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 2;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+  }
+  .stop {
+    display: grid;
+    place-items: center;
+    flex: none;
+    width: var(--size-navigation-bar);
+    height: var(--size-navigation-bar);
+    border: none;
+    border-radius: var(--radius-circle);
+    background: transparent;
+    color: var(--color-danger);
+    cursor: pointer;
+  }
+  .stop svg {
+    width: var(--size-icon);
+    height: var(--size-icon);
+    fill: currentColor;
   }
   .send:disabled {
     opacity: 0.4;

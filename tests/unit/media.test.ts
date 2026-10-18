@@ -73,6 +73,34 @@ describe('отправка вложения', () => {
   });
 });
 
+describe('голосовое', () => {
+  it('уходит `m.audio` с волной 0…1024 и меткой голосового — как у нативной Искры', async () => {
+    const { client, sent } = fakeClient(true);
+    const voice: OutgoingFile = {
+      blob: new Blob([new Uint8Array([1, 2, 3])], { type: 'audio/mp4' }),
+      name: 'voice.m4a',
+      mimetype: 'audio/mp4',
+      kind: 'audio',
+      duration: 4200.4,
+      voice: { waveform: [0, 0.5, 1, 1.7, -1] },
+    };
+    await sendAttachment(client, '!r:hs', voice);
+    expect(sent[0]).toMatchObject({
+      msgtype: 'm.audio',
+      info: { mimetype: 'audio/mp4', duration: 4200 },
+      'org.matrix.msc1767.audio': { duration: 4200, waveform: [0, 512, 1024, 1024, 0] },
+      'org.matrix.msc3245.voice': {},
+    });
+  });
+
+  it('обычный звук — без меток голосового', async () => {
+    const { client, sent } = fakeClient(false);
+    await sendAttachment(client, '!r:hs', { blob: new Blob([new Uint8Array([1])]), name: 'song.mp3', mimetype: 'audio/mpeg', kind: 'audio' });
+    expect(sent[0]!['org.matrix.msc3245.voice']).toBeUndefined();
+    expect(sent[0]!['org.matrix.msc1767.audio']).toBeUndefined();
+  });
+});
+
 describe('скачивание вложения', () => {
   it('зашифрованное — расшифровывается с проверкой хэша; подмена — ошибка, а не картинка', async () => {
     const { client, uploads, sent } = fakeClient(true);

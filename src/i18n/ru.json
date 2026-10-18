@@ -145,6 +145,7 @@
   "message.media.loadFailed": "Видео не загрузилось",
   "message.media.next": "Следующее",
   "message.media.openFullScreen": "Открыть",
+  "message.media.pause": "Пауза",
   "message.media.photo": "Фото",
   "message.media.play": "Слушать",
   "message.media.position": "{index} из {count}",
@@ -243,6 +244,8 @@
   "quickSwitch.empty": "Ничего не нашлось",
   "quickSwitch.label": "Перейти к чату",
   "quickSwitch.placeholder": "Название чата",
+  "recording.cancel": "Отмена",
+  "recording.send": "Отправить",
   "recovery.approve.cancel": "Я передумал",
   "recovery.approve.confirm": "Стереть старую переписку навсегда",
   "recovery.approve.message": "Сброс нужно подтвердить на странице сервера. Если вы это сделали — продолжайте, и старая переписка будет потеряна навсегда. Если передумали — ничего не произойдёт.",
@@ -580,5 +583,11 @@
   "verification.title": "Подтверждение",
   "verification.unnamedDevice": "Устройство без имени",
   "verification.waiting.message": "Приложение на другом устройстве должно быть открыто прямо сейчас — иначе запрос до него не дойдёт.",
-  "verification.waiting.title": "Загляните на другое устройство"
+  "verification.waiting.title": "Загляните на другое устройство",
+  "voice.failed": "Микрофон не включился. Проверьте, что он подключён и не занят другим приложением.",
+  "voice.locked": "Записывается без рук",
+  "voice.needsMicrophone": "Разрешите доступ к микрофону, чтобы записывать голосовые",
+  "voice.record": "Записать голосовое",
+  "voice.recording": "Запись голосового",
+  "voice.stop": "Остановить запись"
 }

@@ -56,6 +56,7 @@
   --size-sign-in-column: 26.25rem; /* 420 */
   --size-menu-width: 15rem; /* 240 */
   --size-recording-dot: 0.625rem; /* 10 — точка, а не сетка */
+  --size-waveform: 1.5rem; /* 24 — Theme.Size.waveform: высота волны голосового */
   --size-icon: 1.25rem; /* 20 — значок рядом с текстом */
   --size-icon-button: 1.5rem; /* 24 — значок в кнопке-иконке */
   --size-sign-in-mark: 3.5rem; /* 56 — Theme.Size.signInMark */
@@ -87,6 +88,7 @@
   --timing-arrival: 320ms; /* Theme.Timing.arrival */
   --timing-reaction: 250ms;
   --timing-deletion: 300ms;
+  --timing-recording-pulse: 600ms; /* точка записи дышит — как RecordingStrip нативной */
 
   /* Движение — `Theme.Timing` нативной Искры. Пружина меню — Telegram'овская, число в число
      (`menuOpens`: response 0.265, damping 0.775), разложенная в точки для `linear()`: CSS своей
@@ -107,6 +109,7 @@
   /* Насколько сдвигается появляющееся — меньше сетки: видно движение, а не прыжок. */
   --motion-rise: 0.5rem; /* 8 */
   --motion-scale-from: 0.96;
+  --motion-held-scale: 1.2; /* кнопка записи под пальцем — видно, что держит */
   --motion-menu-scale-from: 0.8; /* меню растёт из угла заметнее окна */
 
   /* Шрифт — Inter по умолчанию, из своих файлов (`fonts/inter.css`); системный — по выбору

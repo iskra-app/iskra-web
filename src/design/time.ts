@@ -40,3 +40,9 @@ export function dayLabel(ts: number, now: number, locale: string, today: string,
 export function clock(ts: number, locale: string): string {
   return new Intl.DateTimeFormat(locale, { hour: '2-digit', minute: '2-digit' }).format(new Date(ts));
 }
+
+/** Длительность записи: «0:07», «4:32» — минуты и секунды, как `.minuteSecond` нативной. */
+export function duration(ms: number): string {
+  const seconds = Math.max(0, Math.floor(ms / 1000));
+  return `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')}`;
+}

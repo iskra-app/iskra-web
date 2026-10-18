@@ -27,7 +27,15 @@ export interface OutgoingFile {
   /** мс */
   duration?: number;
   thumbnail?: { blob: Blob; width: number; height: number; mimetype: string };
+  /**
+   * Голосовое, а не музыка: волна (0…1), снятая при записи. Уходит `m.audio` с метками
+   * MSC1767/MSC3245 — как у нативной Искры и Element.
+   */
+  voice?: { waveform: number[] };
 }
+
+/** Волна в событии — целые 0…1024, как шлёт нативная Искра (`TimelineMapper.waveformScale`). */
+export const WAVEFORM_SCALE = 1024;
 
 export interface UploadClient {
   isEncrypted(roomId: string): Promise<boolean>;
@@ -76,6 +84,13 @@ export async function sendAttachment(client: UploadClient, roomId: string, file:
     info,
     ...(encrypted ? { file: main.file } : { url: main.url }),
   };
+  if (file.voice) {
+    content['org.matrix.msc1767.audio'] = {
+      ...(file.duration !== undefined ? { duration: Math.round(file.duration) } : {}),
+      waveform: file.voice.waveform.map((level) => Math.round(Math.min(1, Math.max(0, level)) * WAVEFORM_SCALE)),
+    };
+    content['org.matrix.msc3245.voice'] = {};
+  }
   if (options.replyTo) {
     content['m.relates_to'] = { 'm.in_reply_to': { event_id: options.replyTo.eventId } };
     content['m.mentions'] = options.replyTo.own ? {} : { user_ids: [options.replyTo.senderId] };

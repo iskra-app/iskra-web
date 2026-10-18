@@ -145,6 +145,7 @@
   "message.media.loadFailed": "The video would not load",
   "message.media.next": "Next",
   "message.media.openFullScreen": "Open",
+  "message.media.pause": "Pause",
   "message.media.photo": "Photo",
   "message.media.play": "Play",
   "message.media.position": "{index} of {count}",
@@ -239,6 +240,8 @@
   "quickSwitch.empty": "Nothing found",
   "quickSwitch.label": "Go to chat",
   "quickSwitch.placeholder": "Chat name",
+  "recording.cancel": "Cancel",
+  "recording.send": "Send",
   "recovery.approve.cancel": "I changed my mind",
   "recovery.approve.confirm": "Erase old messages for good",
   "recovery.approve.message": "The reset has to be approved on your server’s page. If you did that, carry on — and your old messages are gone for good. If you changed your mind, nothing happens.",
@@ -568,5 +571,11 @@
   "verification.title": "Verification",
   "verification.unnamedDevice": "An unnamed device",
   "verification.waiting.message": "The app on your other device has to be open right now, or the request will not reach it.",
-  "verification.waiting.title": "Look at your other device"
+  "verification.waiting.title": "Look at your other device",
+  "voice.failed": "The microphone didn't start. Check that it's connected and not in use by another app.",
+  "voice.locked": "Recording hands-free",
+  "voice.needsMicrophone": "Allow access to the microphone to record voice messages",
+  "voice.record": "Record a voice message",
+  "voice.recording": "Recording a voice message",
+  "voice.stop": "Stop recording"
 }

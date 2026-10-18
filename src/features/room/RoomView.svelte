@@ -12,6 +12,7 @@
   import type { OutgoingFile } from '../../core/media/upload';
   import { fileSize } from '../media/files';
   import { prepareFile } from '../media/prepare';
+  import type { Recording } from '../media/voiceRecorder.svelte.ts';
   import Viewer, { type ViewerItem } from '../media/Viewer.svelte';
   import type { Message } from '../../core/timeline/message';
   import type { UserSession } from '../../core/session/userSession.svelte.ts';
@@ -143,6 +144,7 @@
       if (store === created && text === '' && draft) text = draft;
     });
     return () => {
+      composer?.cancelRecording();
       clearTimeout(saveTimer);
       if (loaded) void session.saveDraft(id, draftText());
       created.destroy();
@@ -194,6 +196,30 @@
     context = null;
     clearTimeout(saveTimer);
     void session.saveDraft(roomId, text);
+  }
+
+  /**
+   * Голосовое — тем же путём, что вложения (`sendFiles` → `core/media/upload.ts`): в
+   * зашифрованной комнате оно шифруется, как фото. Имя — для клиентов, которые голосовых не
+   * понимают: им покажут файл «Голосовое сообщение.m4a», а не случайные буквы.
+   */
+  function onvoice(recording: Recording) {
+    if (!store) return;
+    store.sendFiles(
+      [
+        {
+          blob: recording.blob,
+          name: `${t('preview.voice')}.m4a`,
+          mimetype: recording.mimetype,
+          kind: 'audio',
+          duration: recording.duration,
+          voice: { waveform: recording.waveform },
+        },
+      ],
+      undefined,
+      context?.kind === 'reply' ? context.message : undefined,
+    );
+    if (context?.kind === 'reply') context = null;
   }
 
   function edit(message: Message) {
@@ -444,6 +470,8 @@
     onremoveattachment={(index) => (attachments = attachments.filter((_, i) => i !== index))}
     onlocation={locate}
     onpoll={room?.kind === 'direct' ? undefined : () => (creatingPoll = true)}
+    {onvoice}
+    onvoiceproblem={(problem) => (notice = problem === 'denied' ? t('voice.needsMicrophone') : t('voice.failed'))}
   />
   {/if}
 </div>
