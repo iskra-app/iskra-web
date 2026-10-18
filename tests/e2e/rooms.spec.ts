@@ -12,7 +12,7 @@ test('список чатов из демо: имена, превью, знач�
   await expect(weekend).toHaveAccessibleName(/3 непрочитанных, 1 упоминание вас/);
   await expect(page.getByRole('link', { name: /^Аня, Защищённый чат, Закреплённый чат/ })).toBeVisible();
   // Приглашение, личный чат, упоминание; беззвучный «Дом 14» не в счёт.
-  await expect(page).toHaveTitle('(3) Iskra');
+  await expect(page).toHaveTitle('(3) Iskra Web');
   expect(problems).toEqual([]);
 });
 
@@ -55,7 +55,7 @@ test('приглашение: «Войти» — и это обычный чат
   await expect(invite).toContainText('Борис приглашает вас');
   await invite.getByRole('button', { name: 'Войти' }).click();
   await expect(page.getByRole('link', { name: /^Книжный клуб/ })).toBeVisible({ timeout: 10_000 });
-  await expect(page).toHaveTitle('(2) Iskra');
+  await expect(page).toHaveTitle('(2) Iskra Web');
 });
 
 test('Ctrl/⌘ K — быстрый переход по названию', async ({ page }, info) => {
