@@ -11,7 +11,7 @@ import { i18n, locales, preferredLocale, type Locale } from '../../i18n/index.sv
 export const accents = ['blue', 'red', 'orange', 'yellow', 'green', 'cyan', 'violet', 'mono'] as const;
 export type Accent = (typeof accents)[number];
 export type Appearance = 'system' | 'light' | 'dark';
-/** Лица без фото — `FaceMode` нативной Искры; по умолчанию существа, как там. */
+/** Лица без фото — `FaceMode` нативной Искры; по умолчанию инициалы, как там (`blobatarByDefault`). */
 export const faceModes = ['creatures', 'initials', 'creaturesAlways'] as const;
 export type FaceMode = (typeof faceModes)[number];
 /** Шрифт: Inter из своих файлов (по умолчанию) или системный. */
@@ -75,7 +75,7 @@ class Preferences {
   accent = $state<Accent>(oneOf(read(keys.accent), accents, 'blue'));
   appearance = $state<Appearance>(oneOf(read(keys.appearance), ['system', 'light', 'dark'], 'system'));
   listWidth = $state<number>(clampListWidth(Number(read(keys.listWidth) ?? LIST_IDEAL)));
-  faces = $state<FaceMode>(oneOf(read(keys.faces), faceModes, 'creatures'));
+  faces = $state<FaceMode>(oneOf(read(keys.faces), faceModes, 'initials'));
   font = $state<Font>(oneOf(read(keys.font), fonts, 'inter'));
   language = $state<LanguageChoice>(oneOf(read(keys.language), ['system', ...locales], 'system'));
   /**

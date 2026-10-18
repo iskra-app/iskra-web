@@ -99,6 +99,8 @@
     );
   });
   const accountPage = $derived(session.accountPage());
+  /** Сайт — как `AboutView` нативной Искры: адрес показывается как есть, не переводится. */
+  const website = { href: 'https://iskra.wtf', label: 'iskra.wtf' };
 
   // ————— Заблокированные —————
 
@@ -345,6 +347,10 @@
       <dd>{build}</dd>
     </dl>
     <PlainButton onclick={() => void copyBuild()}>{copied ? t('about.copied') : t('about.copy')}</PlainButton>
+    <dl>
+      <dt>{t('about.website')}</dt>
+      <dd><a class="link" href={website.href} target="_blank" rel="noopener noreferrer">{website.label}</a></dd>
+    </dl>
     <h3>{t('about.builtOn')}</h3>
     <dl>
       <dt>{t('about.sdkWeb')}</dt>
