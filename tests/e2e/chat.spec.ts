@@ -299,3 +299,53 @@ test('отметки — рядом с пузырём: «глаз» у само�
   const mine = log.locator('.row').filter({ hasText: 'Беру термос' });
   await expect(mine.getByRole('img', { name: 'Отправлено' })).toBeVisible({ timeout: 10_000 });
 });
+
+test('«Выбрать»: несколько сообщений — скопировать стенограммой, удалить пачкой; Esc — выйти', async ({ page, context }, info) => {
+  const problems = watchForProblems(page);
+  if (info.project.name.startsWith('chromium')) await context.grantPermissions(['clipboard-read', 'clipboard-write']);
+  await signInToDemo(page);
+  await openRoom(page, /^Выходные/);
+  const field = page.getByRole('textbox', { name: 'Сообщение' });
+  for (const text of ['Первое лишнее', 'Второе лишнее']) {
+    await field.fill(text);
+    await page.getByRole('button', { name: 'Отправить' }).click();
+    await expect(bubble(page, text)).toHaveCount(1);
+  }
+  await expect(page.getByRole('img', { name: 'Отправляется' })).toHaveCount(0, { timeout: 10_000 });
+
+  await (await menuOf(page, 'Первое лишнее')).getByRole('menuitem', { name: 'Выбрать' }).click();
+  const bar = page.getByRole('toolbar', { name: 'Выбрано: 1' });
+  await expect(bar).toBeVisible();
+  // Композера на время выбора нет — на его месте панель.
+  await expect(field).toHaveCount(0);
+  await page.getByRole('checkbox', { name: /Второе лишнее/ }).click();
+  await expect(page.getByRole('toolbar', { name: 'Выбрано: 2' })).toBeVisible();
+  await expect(page.getByRole('checkbox', { name: /Второе лишнее/ })).toHaveAttribute('aria-checked', 'true');
+
+  if (info.project.name.startsWith('chromium')) {
+    await page.getByRole('button', { name: 'Скопировать' }).click();
+    const copied = await page.evaluate(() => navigator.clipboard.readText());
+    expect(copied).toContain('Первое лишнее');
+    expect(copied).toContain('\n\n');
+    await expect(page.getByRole('textbox', { name: 'Сообщение' })).toBeVisible();
+    await (await menuOf(page, 'Первое лишнее')).getByRole('menuitem', { name: 'Выбрать' }).click();
+    await page.getByRole('checkbox', { name: /Второе лишнее/ }).click();
+  }
+
+  // Чужое среди выбранного — удалять нельзя: удаление не промолчит о пропущенном.
+  await page.getByRole('checkbox', { name: /Алиса, ты с нами/ }).click();
+  await expect(page.getByRole('button', { name: 'Удалить' })).toBeDisabled();
+  await page.getByRole('checkbox', { name: /Алиса, ты с нами/ }).click();
+
+  await page.getByRole('button', { name: 'Удалить' }).click();
+  const dialog = page.getByRole('dialog', { name: 'Удалить выбранные сообщения?' });
+  await dialog.getByRole('button', { name: 'Удалить' }).click();
+  await expect(bubble(page, 'Первое лишнее')).toHaveCount(0, { timeout: 10_000 });
+  await expect(bubble(page, 'Второе лишнее')).toHaveCount(0);
+  await expect(page.getByRole('textbox', { name: 'Сообщение' })).toBeVisible();
+
+  await (await menuOf(page, 'Алиса, ты с нами?')).getByRole('menuitem', { name: 'Выбрать' }).click();
+  await page.keyboard.press('Escape');
+  await expect(page.getByRole('toolbar')).toHaveCount(0);
+  expect(problems).toEqual([]);
+});

@@ -164,9 +164,17 @@
   "message.menu.react": "React with {emoji}",
   "message.menu.removeReaction": "Remove your reaction",
   "message.menu.reply": "Reply",
+  "message.menu.select": "Select",
   "message.menu.sentAt": "Sent {time}",
   "message.menu.unpin": "Unpin",
   "message.reactions": "Reactions",
+  "message.selection.cancel": "Cancel",
+  "message.selection.count": {
+    "one": "Selected: {count}",
+    "other": "Selected: {count}"
+  },
+  "message.selection.deleteMessage": "They’ll disappear for everyone in the chat. You won’t be able to bring them back.",
+  "message.selection.deleteTitle": "Delete the selected messages?",
   "message.spoken.you": "You",
   "message.unreadable": "This message was sent before you joined, so it can’t be shown.",
   "message.unsupported": "Iskra can’t show this message yet.",

@@ -9,6 +9,7 @@
   import { i18n, t } from '../../i18n/index.svelte.ts';
   import type { MessageActions } from './actions';
   import { quickReactions } from './reactions';
+  import { isSelectable } from '../../core/timeline/selection';
 
   interface Props {
     message: Message | null;
@@ -71,6 +72,10 @@
       {:else}
         <button type="button" role="menuitem" onclick={() => run(actions.pin)}>{t('message.menu.pin')}</button>
       {/if}
+    {/if}
+    {#if isSelectable(message)}
+      <!-- Несколько сразу: скопировать одним куском, удалить пачку ошибок. -->
+      <button type="button" role="menuitem" onclick={() => run(actions.select)}>{t('message.menu.select')}</button>
     {/if}
     {#if message.canDelete}
       <button type="button" role="menuitem" class="danger" onclick={() => run(actions.remove)}>{t('message.menu.delete')}</button>

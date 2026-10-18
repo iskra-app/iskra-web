@@ -13,6 +13,10 @@
   import { dayLabel } from '../../design/time';
   import type { TimelineStore } from '../../core/timeline/timelineStore.svelte.ts';
   import { arrivedFromOthers, UNREAD_DIVIDER_KEY } from '../../core/timeline/layout';
+  import type { Message } from '../../core/timeline/message';
+  import { isSelectable } from '../../core/timeline/selection';
+  import { firstLineOf } from '../../core/timeline/words';
+  import { attachmentLabel } from './text';
   import type { UserSession } from '../../core/session/userSession.svelte.ts';
   import { i18n, plural, t } from '../../i18n/index.svelte.ts';
   import { Photo, pixelsFor } from '../rooms/faces.svelte.ts';
@@ -25,8 +29,24 @@
     session: UserSession;
     showSenders: boolean;
     actions: MessageActions;
+    /** Режим выбора: ключи отмеченных. `null` — обычная лента. */
+    selection?: ReadonlySet<string> | null;
+    ontoggle?: (message: Message) => void;
   }
-  let { store, session, showSenders, actions }: Props = $props();
+  let { store, session, showSenders, actions, selection = null, ontoggle }: Props = $props();
+
+  /** Имя строки-галочки: содержимое под ней `inert` и скринридеру не видно. */
+  function spoken(message: Message): string {
+    const kind = message.kind;
+    const words = 'body' in kind ? firstLineOf(kind.body, 'html' in kind ? kind.html : undefined) : attachmentLabel(kind);
+    return `${message.own ? t('message.spoken.you') : message.senderName}: ${words}`;
+  }
+
+  function toggleByKey(event: KeyboardEvent, message: Message) {
+    if (event.key !== ' ' && event.key !== 'Enter') return;
+    event.preventDefault();
+    ontoggle?.(message);
+  }
 
   let container: HTMLElement | undefined = $state();
   let content: HTMLElement | undefined = $state();
@@ -185,6 +205,34 @@
         {:else if item.kind === 'unread'}
           <!-- Полоса во всю ширину, а не слово посередине: это не дата, а «начните здесь». -->
           <h2 class="unread">{t('room.unreadMessages')}</h2>
+        {:else if selection && isSelectable(item.message)}
+          {@const on = selection.has(item.message.key)}
+          <!-- Пока выбирают, нажатие на сообщение ставит галочку и больше ничего: строка под ней
+               нарисована как всегда, но нажатий не принимает — ни меню, ни фото, ни ссылок. -->
+          <div
+            class="selectable"
+            role="checkbox"
+            aria-checked={on}
+            aria-label={spoken(item.message)}
+            tabindex="0"
+            onclick={() => ontoggle?.(item.message)}
+            onkeydown={(event) => toggleByKey(event, item.message)}
+          >
+            <span class="mark" class:on aria-hidden="true">
+              {#if on}<svg viewBox="0 0 24 24"><path d="M6 12.5l4 4 8-9" /></svg>{/if}
+            </span>
+            <div class="chosen-row" inert>
+              <MessageRow
+                message={item.message}
+                firstInRun={item.firstInRun}
+                lastInRun={item.lastInRun}
+                {showSenders}
+                senderPhoto={showSenders ? photoOf(item.message.senderId, item.message.senderAvatarUrl) : undefined}
+                {actions}
+                media={session.media}
+              />
+            </div>
+          </div>
         {:else}
           <MessageRow
             message={item.message}
@@ -276,6 +324,42 @@
     background: var(--color-incoming-bubble);
     font-size: var(--font-size-caption);
     color: var(--color-text-secondary);
+  }
+  .selectable {
+    display: flex;
+    align-items: center;
+    gap: var(--space-close);
+    border-radius: var(--radius-control);
+    cursor: pointer;
+  }
+  .selectable:focus-visible {
+    outline: var(--border-thick) solid var(--accent);
+  }
+  .chosen-row {
+    flex: 1;
+    min-width: 0;
+  }
+  .mark {
+    display: grid;
+    flex: none;
+    place-items: center;
+    width: var(--size-icon);
+    height: var(--size-icon);
+    border: var(--border-thick) solid var(--color-text-secondary);
+    border-radius: var(--radius-circle);
+  }
+  .mark.on {
+    border-color: var(--accent);
+    background: var(--accent);
+  }
+  .mark svg {
+    width: 100%;
+    height: 100%;
+    fill: none;
+    stroke: var(--on-accent);
+    stroke-width: 3;
+    stroke-linecap: round;
+    stroke-linejoin: round;
   }
   .unread {
     /* До краёв ленты, за поля, которые держат пузыри: полоса, остановившаяся там же, где они,

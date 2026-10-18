@@ -20,6 +20,9 @@
   import type { ComposerContext, MessageActions } from './actions';
   import Composer from './Composer.svelte';
   import PollComposer from './PollComposer.svelte';
+  import SelectionBar from './SelectionBar.svelte';
+  import { inTimelineOrder, selectionTranscript } from '../../core/timeline/selection';
+  import { SvelteSet } from 'svelte/reactivity';
   import MessageMenu from './MessageMenu.svelte';
   import PinnedStrip from './PinnedStrip.svelte';
   import { typingText } from './text';
@@ -58,6 +61,24 @@
   let deleting = $state<Message | null>(null);
   let endingPoll = $state<Message | null>(null);
   let creatingPoll = $state(false);
+  /** Выбранные сообщения — ключи, пока выбирают; `null` почти всегда. См. `selection.ts`. */
+  let selection = $state<SvelteSet<string> | null>(null);
+  let deletingSelection = $state(false);
+  const chosen = $derived(selection && store ? inTimelineOrder(store.messages, selection) : []);
+  const transcript = $derived(
+    selectionTranscript(chosen, (ts) => new Intl.DateTimeFormat(i18n.locale, { dateStyle: 'short', timeStyle: 'short' }).format(ts)),
+  );
+
+  function toggleSelected(message: Message) {
+    if (!selection) return;
+    if (selection.has(message.key)) selection.delete(message.key);
+    else selection.add(message.key);
+  }
+
+  function copySelection() {
+    if (transcript) void navigator.clipboard?.writeText(transcript).catch(() => {});
+    selection = null;
+  }
   let blocking = $state<Message | null>(null);
   let attachments = $state<OutgoingFile[]>([]);
   let dropping = $state(false);
@@ -101,6 +122,7 @@
     stashed = '';
     mentions = [];
     stashedMentions = [];
+    selection = null;
     attachments = [];
     notice = '';
     let loaded = false;
@@ -285,6 +307,7 @@
     react: (message, key) => store?.react(message, key),
     vote: (message, ids) => store?.vote(message, ids),
     endPoll: (message) => (endingPoll = message),
+    select: (message) => (selection = new SvelteSet([message.key])),
     pin: (message) => store?.pin(message),
     unpin: (message) => store?.unpin(message),
     remove: (message) => (deleting = message),
@@ -313,6 +336,11 @@
 
   /** `Esc` в чате, когда закрывать нечего: вниз и прочитано. */
   export function escape(): void {
+    // Сначала — выйти из выбора: это то, что сейчас на экране.
+    if (selection) {
+      selection = null;
+      return;
+    }
     timeline?.toBottom();
   }
 
@@ -351,7 +379,7 @@
   {/if}
   {#if store}
     {#key store}
-      <Timeline bind:this={timeline} {store} {session} showSenders={room?.kind !== 'direct'} {actions} />
+      <Timeline bind:this={timeline} {store} {session} showSenders={room?.kind !== 'direct'} {actions} {selection} ontoggle={toggleSelected} />
     {/key}
   {/if}
   <div class="below">
@@ -375,6 +403,16 @@
       </div>
     {/if}
   </div>
+  {#if selection}
+    <SelectionBar
+      count={selection.size}
+      canCopy={transcript !== null}
+      canDelete={chosen.length > 0 && chosen.every((m) => m.canDelete)}
+      oncancel={() => (selection = null)}
+      oncopy={copySelection}
+      ondelete={() => (deletingSelection = true)}
+    />
+  {:else}
   <Composer
     bind:this={composer}
     bind:text
@@ -393,6 +431,7 @@
     onlocation={locate}
     onpoll={room?.kind === 'direct' ? undefined : () => (creatingPoll = true)}
   />
+  {/if}
 </div>
 
 {#if viewing}
@@ -412,6 +451,21 @@
   onconfirm={() => {
     if (deleting) store?.remove(deleting);
     deleting = null;
+  }}
+/>
+
+<ConfirmDialog
+  open={deletingSelection}
+  title={t('message.selection.deleteTitle')}
+  message={t('message.selection.deleteMessage')}
+  confirmLabel={t('message.menu.delete')}
+  cancelLabel={t('common.cancel')}
+  destructive
+  onclose={() => (deletingSelection = false)}
+  onconfirm={() => {
+    for (const message of chosen) store?.remove(message);
+    deletingSelection = false;
+    selection = null;
   }}
 />
 
