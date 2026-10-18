@@ -3,11 +3,11 @@ import { execSync } from 'node:child_process';
 import { defineConfig, type Plugin } from 'vite';
 import { svelte } from '@sveltejs/vite-plugin-svelte';
 import { VitePWA } from 'vite-plugin-pwa';
-import { caddyHeaders, headersFile, metaCsp, securityHeaders } from './security-headers.ts';
+import { headersFile, metaCsp, nginxHeaders, securityHeaders } from './security-headers.ts';
 
 /**
  * Кладёт заголовки со строгой CSP в `dist/`: `_headers` — для статического хостинга,
- * `headers.caddy` — для боевого сервера; деплой выносит его из корня сайта.
+ * `headers.nginx` — для боевого сервера; деплой выносит его из корня сайта.
  */
 function staticHeaders(): Plugin {
   return {
@@ -15,7 +15,7 @@ function staticHeaders(): Plugin {
     apply: 'build',
     generateBundle() {
       this.emitFile({ type: 'asset', fileName: '_headers', source: headersFile() });
-      this.emitFile({ type: 'asset', fileName: 'headers.caddy', source: caddyHeaders() });
+      this.emitFile({ type: 'asset', fileName: 'headers.nginx', source: nginxHeaders() });
     },
   };
 }

@@ -100,11 +100,11 @@ jobs:
         with:
           artifact_name: github-pages-${{ github.run_attempt }}
 
-  # Боевой адрес https://web.iskra.wtf/ — каждый зелёный пуш в main, на российский VPS с Caddy
+  # Боевой адрес https://web.iskra.wtf/ — каждый зелёный пуш в main, на российский VPS с nginx
   # (зарубежные хостинги статики из России блокируют или режут). Заголовки — настоящие, из
-  # security-headers.ts: сборка кладёт их в headers.caddy, Caddyfile — в deploy/.
+  # security-headers.ts: сборка кладёт их в headers.nginx, конфиг nginx — в deploy/.
   # Каждая сборка — своя папка releases/<коммит>; current переключается одной ссылкой, и если
-  # Caddy не принял новые заголовки, ссылка возвращается на прежнюю. Как поднять сервер —
+  # nginx -t не принял новые заголовки, ссылка возвращается на прежнюю. Как поднять сервер —
   # deploy/README.md. Пока он не поднят (нет переменной DEPLOY_HOST), job пропускается.
   deploy:
     needs: [check, e2e]
@@ -130,11 +130,11 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm build
-      # Заголовки — рядом с сайтом, а не в нём; _headers Caddy не нужен.
+      # Заголовки — рядом с сайтом, а не в нём; _headers nginx не нужен.
       - name: Папка релиза
         run: |
           mkdir release
-          mv dist/headers.caddy release/
+          mv dist/headers.nginx release/
           rm dist/_headers
           mv dist release/site
       - name: Ключ SSH
@@ -155,10 +155,11 @@ jobs:
           cd /srv/iskra-web
           prev=$(readlink current || true)
           ln -sfn "releases/$RELEASE" current.new && mv -Tf current.new current
-          if ! caddy reload --config /etc/caddy/Caddyfile --adapter caddyfile; then
+          if ! sudo -n /usr/sbin/nginx -t; then
             if [ -n "$prev" ]; then ln -sfn "$prev" current.new && mv -Tf current.new current; fi
             exit 1
           fi
+          sudo -n /usr/sbin/nginx -s reload
           # Пять последних релизов — на откат руками.
           ls -1t releases | tail -n +6 | while read -r old; do rm -rf "releases/$old"; done
           SCRIPT

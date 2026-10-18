@@ -22,7 +22,7 @@ pnpm e2e            # Playwright — tests/e2e, три движка × теле�
 PW_ENGINES=chromium pnpm e2e # один движок
 pnpm icons          # перегенерировать public/icons из assets/iskra-spark.svg
 ISKRA_META_CSP=1 pnpm build   # как ночная сборка для GitHub Pages (nightly.web.iskra.wtf)
-# боевая (web.iskra.wtf) — обычная pnpm build из main, VPS с Caddy: см. deploy/README.md
+# боевая (web.iskra.wtf) — обычная pnpm build из main, VPS с nginx: см. deploy/README.md
 ISKRA_BASE=/iskra-web/ pnpm build   # сборка в подпапке — проверить, что нет путей от корня
 ```
 

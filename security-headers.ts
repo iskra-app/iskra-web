@@ -2,7 +2,7 @@
  * Заголовки безопасности — единственный источник.
  *
  * Отсюда их берут и dev-сервер Vite, и `vite preview`, и файлы `_headers` и
- * `headers.caddy`, которые сборка кладёт в `dist/` для хостинга. CSP отдаётся
+ * `headers.nginx`, которые сборка кладёт в `dist/` для хостинга. CSP отдаётся
  * заголовком, а не `<meta>`: `frame-ancestors` в `<meta>` не работает.
  *
  * Граница безопасности веб-клиента — CSP (см. план, «Безопасность»).
@@ -75,14 +75,12 @@ export function headersFile(): string {
 }
 
 /**
- * Блок `header` для Caddy — боевой адрес `web.iskra.wtf` (см. `deploy/Caddyfile`). В значениях
- * нет двойных кавычек, так что в строку Caddy они встают как есть.
+ * Строки `add_header` для nginx — боевой адрес `web.iskra.wtf` (см. `deploy/nginx.conf`).
+ * `always` — заголовки и на ответах с ошибкой. В значениях нет ни двойных кавычек, ни `$`,
+ * так что в строку nginx они встают как есть.
  */
-export function caddyHeaders(): string {
-  const lines = ['header {'];
-  for (const [name, value] of Object.entries(securityHeaders(false))) {
-    lines.push(`\t${name} "${value}"`);
-  }
-  lines.push('}');
-  return lines.join('\n') + '\n';
+export function nginxHeaders(): string {
+  return Object.entries(securityHeaders(false))
+    .map(([name, value]) => `add_header ${name} "${value}" always;\n`)
+    .join('');
 }
