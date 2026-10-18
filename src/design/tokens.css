@@ -59,6 +59,11 @@
   --size-waveform: 1.5rem; /* 24 — Theme.Size.waveform: высота волны голосового */
   --size-voice-waveform: 10rem; /* 160 — сорок столбиков волны в пузыре голосового */
   --size-voice-button: 1.75rem; /* 28 — Theme.Size.voiceButton: «▶» в пузыре; нажимается на 44 */
+  --size-video-note-camera: 27.5rem; /* 440 — Theme.Size.videoNoteCamera: кружок камеры */
+  --size-video-note-hint: 18.75rem; /* 300 — Theme.Size.videoNoteHint */
+  --size-recording-send: 4.5rem; /* 72 — Theme.Size.recordingSend: спуск под камерой */
+  --size-video-note-ring: 0.25rem; /* 4 — кольцо прогресса вокруг кружка */
+  --size-video-note-camera-fit: 60dvh; /* кружок не выше, чем оставляют спуск и подсказка */
   --size-icon: 1.25rem; /* 20 — значок рядом с текстом */
   --size-icon-button: 1.5rem; /* 24 — значок в кнопке-иконке */
   --size-sign-in-mark: 3.5rem; /* 56 — Theme.Size.signInMark */
@@ -181,6 +186,11 @@
   /* Предупреждение, а не ошибка: «Из России может быть недоступен» — systemOrange. */
   --color-warning: #ff9500;
   --color-on-danger: #ffffff;
+  /* Камера «кружочка» — одна и та же в обеих темах: под ней всегда тёмное размытие комнаты
+     (`Theme.Backdrop.dim` и `.plate` нативной). */
+  --color-camera-scrim: rgb(0 0 0 / 0.45);
+  --color-camera-plate: rgb(0 0 0 / 0.45);
+  --color-on-camera: #ffffff;
   /* Значок беззвучного чата — сплошной серый, не полупрозрачность: точка в десять пикселей
      из девяти процентов цвета текста — это пятно. */
   --color-muted-badge: #8e8e93;

@@ -11,18 +11,31 @@
 
   «Отмена» — всегда кнопка и всегда одно слово, в том числе пока палец держит запись: держит
   один палец, а нажать можно другим.
+
+  Одна на оба вида записи: та же полоса стоит в композере, пока говорят, и под камерой, пока
+  снимают (`onCamera`) — там она на тёмной плашке и без волны: лицо в кружке и так говорит,
+  что запись идёт.
 -->
 <script lang="ts">
   import Waveform from '../../design/Waveform.svelte';
   import { duration } from '../../design/time';
   import { t } from '../../i18n/index.svelte.ts';
-  import type { VoiceRecorder } from '../media/voiceRecorder.svelte.ts';
+  import type { Recording } from '../media/voiceRecorder.svelte.ts';
+
+  /** Что записывается: `VoiceRecorder` или `VideoNoteRecorder`. */
+  interface Source {
+    readonly state: string;
+    readonly elapsed: number;
+    readonly levels: readonly number[];
+    readonly result: Recording | null;
+  }
 
   interface Props {
-    recorder: VoiceRecorder;
+    recorder: Source;
     oncancel: () => void;
+    onCamera?: boolean;
   }
-  let { recorder, oncancel }: Props = $props();
+  let { recorder, oncancel, onCamera = false }: Props = $props();
 
   const live = $derived(recorder.state !== 'stopped');
 
@@ -54,7 +67,7 @@
   const shown = $derived(playing || position > 0 ? position * 1000 : total);
 </script>
 
-<div class="strip" role="group" aria-label={t('voice.recording')}>
+<div class="strip" class:camera={onCamera} role="group" aria-label={onCamera ? t('videoNote.recording') : t('voice.recording')}>
   {#if !live && url}
     <button type="button" class="play" aria-label={playing ? t('message.media.pause') : t('message.media.play')} title={playing ? t('message.media.pause') : t('message.media.play')} onclick={toggle}>
       <svg viewBox="0 0 24 24" aria-hidden="true">
@@ -78,7 +91,9 @@
   {/if}
   <span class="clock">{duration(shown)}</span>
   <span class="wave">
-    {#if !live && recorder.result}
+    {#if onCamera}
+      <!-- волны нет: см. выше -->
+    {:else if !live && recorder.result}
       <Waveform samples={recorder.result.waveform} mode="fit" progress={total ? Math.min(1, (position * 1000) / total) : 0} />
     {:else}
       <Waveform samples={recorder.levels} />
@@ -100,6 +115,11 @@
     border-radius: var(--radius-bubble);
     background: var(--color-background);
     transition: opacity var(--timing-chrome) var(--ease-out);
+  }
+  .strip.camera {
+    border-color: transparent;
+    background: var(--color-camera-plate);
+    color: var(--color-on-camera);
   }
   @starting-style {
     .strip {

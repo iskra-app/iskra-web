@@ -13,6 +13,9 @@
   import { fileSize } from '../media/files';
   import { prepareFile } from '../media/prepare';
   import type { Recording } from '../media/voiceRecorder.svelte.ts';
+  import { VideoNoteRecorder } from '../media/videoNoteRecorder.svelte.ts';
+  import { VIDEO_NOTE_SIDE } from '../media/videoNote';
+  import VideoNoteCapture from './VideoNoteCapture.svelte';
   import Viewer, { type ViewerItem } from '../media/Viewer.svelte';
   import type { Message } from '../../core/timeline/message';
   import type { UserSession } from '../../core/session/userSession.svelte.ts';
@@ -145,6 +148,7 @@
     });
     return () => {
       composer?.cancelRecording();
+      videoNote.cancel();
       clearTimeout(saveTimer);
       if (loaded) void session.saveDraft(id, draftText());
       created.destroy();
@@ -220,6 +224,46 @@
       context?.kind === 'reply' ? context.message : undefined,
     );
     if (context?.kind === 'reply') context = null;
+  }
+
+  // ————— «Кружочек» —————
+
+  /** Один на открытый чат: камеру держит он, слой камеры — здесь, поверх комнаты. */
+  const videoNote = new VideoNoteRecorder();
+  let videoHolding = $state(false);
+
+  /**
+   * Отправить снятое — тем же путём, что вложения: в зашифрованной комнате шифруется. Квадрат
+   * 480 и до минуты — по этому «кружочек» и узнают, своих полей в событии нет.
+   */
+  async function finishVideoNote() {
+    videoHolding = false;
+    const replyTo = context?.kind === 'reply' ? context.message : undefined;
+    const take = await videoNote.finish();
+    if (!take || !store) return;
+    store.sendFiles(
+      [
+        {
+          blob: take.blob,
+          name: `${t('videoNote.title')}.mp4`,
+          mimetype: take.mimetype,
+          kind: 'video',
+          width: VIDEO_NOTE_SIDE,
+          height: VIDEO_NOTE_SIDE,
+          duration: take.duration,
+          ...(take.thumbnail ? { thumbnail: { blob: take.thumbnail, width: VIDEO_NOTE_SIDE, height: VIDEO_NOTE_SIDE, mimetype: 'image/jpeg' } } : {}),
+        },
+      ],
+      undefined,
+      replyTo,
+    );
+    if (replyTo) context = null;
+  }
+
+  function cancelVideoNote() {
+    videoHolding = false;
+    composer?.cancelRecording();
+    videoNote.cancel();
   }
 
   function edit(message: Message) {
@@ -420,6 +464,9 @@
       <Timeline bind:this={timeline} {store} {session} showSenders={room?.kind !== 'direct'} {actions} {selection} ontoggle={toggleSelected} />
     {/key}
   {/if}
+  {#if videoNote.open}
+    <VideoNoteCapture recorder={videoNote} holding={videoHolding} onsend={() => void finishVideoNote()} oncancel={cancelVideoNote} />
+  {/if}
   <div class="below">
     <p class="typing" aria-live="polite">{showTyping ? typingLine : ''}</p>
     {#if notice}
@@ -471,6 +518,9 @@
     onlocation={locate}
     onpoll={room?.kind === 'direct' ? undefined : () => (creatingPoll = true)}
     {onvoice}
+    {videoNote}
+    bind:videoHolding
+    onfinishvideonote={() => void finishVideoNote()}
     onvoiceproblem={(problem) => (notice = problem === 'denied' ? t('voice.needsMicrophone') : t('voice.failed'))}
   />
   {/if}

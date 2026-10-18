@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { squareCrop, VIDEO_NOTE_BITRATE, VIDEO_NOTE_MAX_MS, videoNoteMimeType } from '../../src/features/media/videoNote';
 import { decibelsOf, levelFromDecibels, resampleWaveform, voiceMimeType, WAVEFORM_SAMPLES } from '../../src/features/media/voice';
 
 describe('волна голосового', () => {
@@ -46,5 +47,33 @@ describe('формат записи', () => {
     expect(voiceMimeType({ isTypeSupported: (type) => type === 'audio/webm;codecs=opus' })).toBeNull();
     expect(voiceMimeType({ isTypeSupported: (type) => type === 'audio/mp4' })).toBeNull();
     expect(voiceMimeType(undefined)).toBeNull();
+  });
+});
+
+describe('«кружочек»', () => {
+  afterEach(() => vi.unstubAllGlobals());
+
+  it('квадрат — из середины кадра: у вебкамеры обрезаются бока, у телефона — верх и низ', () => {
+    expect(squareCrop(1280, 720)).toEqual({ x: 280, y: 0, side: 720 });
+    expect(squareCrop(720, 1280)).toEqual({ x: 0, y: 280, side: 720 });
+    expect(squareCrop(480, 480)).toEqual({ x: 0, y: 0, side: 480 });
+  });
+
+  it('сжатие — десятая бита на пиксель: около 700 кбит/с, минута — около пяти мегабайт', () => {
+    expect(VIDEO_NOTE_BITRATE).toBe(691_200);
+    expect((VIDEO_NOTE_BITRATE * VIDEO_NOTE_MAX_MS) / 1000 / 8 / 1e6).toBeCloseTo(5.2, 1);
+  });
+
+  it('только H.264 с AAC: WebM и mp4 с Opus не годятся', () => {
+    vi.stubGlobal('navigator', { mediaDevices: { getUserMedia: () => Promise.reject(new Error('нет')) } });
+    vi.stubGlobal('HTMLCanvasElement', class {
+      captureStream() {}
+    });
+    expect(videoNoteMimeType({ isTypeSupported: (type) => type.startsWith('video/webm') })).toBeNull();
+    expect(videoNoteMimeType({ isTypeSupported: (type) => type === 'video/mp4;codecs=avc1,opus' })).toBeNull();
+    expect(videoNoteMimeType({ isTypeSupported: (type) => type.includes('avc1') && type.includes('mp4a.40.2') })).toBe('video/mp4;codecs=avc1.42E01F,mp4a.40.2');
+    // Без `captureStream` у канваса записывать нечего — камеры нет.
+    vi.stubGlobal('HTMLCanvasElement', class {});
+    expect(videoNoteMimeType({ isTypeSupported: () => true })).toBeNull();
   });
 });

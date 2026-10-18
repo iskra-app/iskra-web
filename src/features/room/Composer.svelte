@@ -29,7 +29,8 @@
   import { attachmentLabel } from './text';
   import { VoiceRecorder, type Recording } from '../media/voiceRecorder.svelte.ts';
   import RecordingStrip from './RecordingStrip.svelte';
-  import { moveOf, releaseOf } from './recordGesture';
+  import { HOLD_MS, moveOf, releaseOf } from './recordGesture';
+  import { VideoNoteRecorder } from '../media/videoNoteRecorder.svelte.ts';
 
   interface Props {
     text: string;
@@ -61,6 +62,12 @@
     onvoice?: (recording: Recording) => void;
     /** Микрофон не дали или он не включился. */
     onvoiceproblem?: (problem: 'denied' | 'unavailable') => void;
+    /** Рекордер «кружочков» — его держит `RoomView`, там же слой камеры. Нет — камеры нет. */
+    videoNote?: VideoNoteRecorder;
+    /** Палец держит кнопку, пока снимается «кружочек»: над спуском — замок. */
+    videoHolding?: boolean;
+    /** «Кружочек» пора отправить: отпустили, нажали «Отправить» или кончилась минута. */
+    onfinishvideonote?: () => void;
     disabled?: boolean;
   }
   let {
@@ -80,6 +87,11 @@
     mentionPhoto = () => undefined,
     onvoice,
     onvoiceproblem,
+    videoNote,
+    // Композер только пишет: читает `RoomView` — для замка над спуском.
+    // eslint-disable-next-line no-useless-assignment
+    videoHolding = $bindable(false),
+    onfinishvideonote,
     disabled = false,
   }: Props = $props();
 
@@ -145,17 +157,36 @@
     return false;
   }
 
-  // ————— Голосовое —————
+  // ————— Голосовое и «кружочек» —————
+
+  type RecordKind = 'voice' | 'video';
 
   const recorder = new VoiceRecorder();
-  const canRecord = VoiceRecorder.supported();
-  /** Нажатие на микрофон, пока палец (или мышь) его держит. */
-  let press = $state<{ x: number; y: number; at: number; id: number } | null>(null);
+  const canVoice = VoiceRecorder.supported();
+  const videoSupported = VideoNoteRecorder.supported();
+  const canVideo = $derived(!!videoNote && videoSupported);
+  /**
+   * Что записывает кнопка на телефоне — нажатие переключает, как в нативной Искре, и выбор
+   * помнится, пока открыт композер: кто шлёт «кружочки», шлёт их несколько. На десктопе кнопок
+   * две — микрофон и камера: клик начинает, переключать нечего.
+   */
+  let mode = $state<RecordKind>(canVoice ? 'voice' : 'video');
+  $effect(() => {
+    if (!canVoice && !canVideo) return;
+    if (mode === 'video' && !canVideo) mode = 'voice';
+  });
+  const kinds = $derived<RecordKind[]>(viewport.finePointer ? [...(canVideo ? ['video' as const] : []), ...(canVoice ? ['voice' as const] : [])] : [mode]);
+
+  /** Нажатие на кнопку записи, пока палец (или мышь) её держит. `started` — запись пошла. */
+  let press = $state<{ x: number; y: number; at: number; id: number; kind: RecordKind; started: boolean } | null>(null);
+  let arming: ReturnType<typeof setTimeout> | undefined;
   /** Клик следом за отпусканием — уже обработан жестом. */
   let swallowClick = false;
-  let voiceButton: HTMLButtonElement | undefined = $state();
+  /** Кнопки записи по виду — фокус после записи возвращается на свою. */
+  const buttons = $state<Partial<Record<RecordKind, HTMLButtonElement>>>({});
 
   const recording = $derived(recorder.active);
+  const filming = $derived(!!videoNote?.open);
 
   async function startRecording() {
     await recorder.start();
@@ -169,63 +200,125 @@
   async function sendVoice() {
     const done = await recorder.finish();
     if (done) onvoice?.(done);
-    voiceButton?.focus();
+    buttons.voice?.focus();
   }
 
   /** Выбросить запись — «Отмена», свайп в сторону, `Esc`, уход из чата. */
   export function cancelRecording() {
+    clearTimeout(arming);
     press = null;
+    videoHolding = false;
     recorder.cancel();
+    videoNote?.cancel();
   }
 
-  $effect(() => () => recorder.cancel());
+  $effect(() => () => {
+    clearTimeout(arming);
+    recorder.cancel();
+  });
 
-  function voiceDown(event: PointerEvent) {
+  /** Пошла запись. Камера поднимается слоем поверх комнаты (`VideoNoteCapture`). */
+  function begin(kind: RecordKind, held: boolean) {
+    if (kind === 'voice') {
+      void startRecording();
+      return;
+    }
+    videoHolding = held;
+    // Клавиатура уходит: камера закрывает комнату, а набирать во время съёмки нечего.
+    field?.blur();
+    void videoNote?.start(() => onfinishvideonote?.());
+  }
+
+  function finish(kind: RecordKind) {
+    if (kind === 'voice') void sendVoice();
+    else {
+      videoHolding = false;
+      onfinishvideonote?.();
+    }
+  }
+
+  function recordDown(event: PointerEvent, kind: RecordKind) {
     swallowClick = false;
-    if (recording || event.button !== 0 || !event.isPrimary) return;
+    if (recording || filming || event.button !== 0 || !event.isPrimary) return;
     // Иначе нажатие уведёт фокус и начнёт выделение текста под пальцем.
     event.preventDefault();
-    voiceButton?.setPointerCapture(event.pointerId);
+    try {
+      (event.currentTarget as HTMLElement).setPointerCapture(event.pointerId);
+    } catch {
+      // Указатель уже ушёл — захватывать нечего.
+    }
     // Время самого ввода, а не обработчика: занятый кадр не должен делать нажатие удержанием.
-    press = { x: event.clientX, y: event.clientY, at: event.timeStamp, id: event.pointerId };
-    void startRecording();
+    const current = { x: event.clientX, y: event.clientY, at: event.timeStamp, id: event.pointerId, kind, started: false };
+    press = current;
+    if (event.pointerType === 'mouse') {
+      // Мышь — сразу: короткий клик — запись без рук, держать не нужно.
+      press = { ...current, started: true };
+      begin(kind, true);
+      return;
+    }
+    // Палец — после удержания: короткое касание переключает голосовое и видео.
+    clearTimeout(arming);
+    arming = setTimeout(() => {
+      if (!press || press.id !== current.id) return;
+      press = { ...press, started: true };
+      begin(kind, true);
+    }, HOLD_MS);
   }
 
-  function voiceMove(event: PointerEvent) {
+  function recordMove(event: PointerEvent) {
     if (!press || event.pointerId !== press.id) return;
     const move = moveOf(event.clientX - press.x, event.clientY - press.y);
     if (move === 'hold') return;
     swallowClick = true;
-    if (move === 'cancel') cancelRecording();
-    else press = null; // без рук
+    if (!press.started) {
+      // Увёл, не дождавшись записи, — это не нажатие и не запись.
+      clearTimeout(arming);
+      press = null;
+    } else if (move === 'cancel') cancelRecording();
+    else {
+      // Без рук.
+      press = null;
+      videoHolding = false;
+    }
   }
 
-  function voiceUp(event: PointerEvent) {
+  function recordUp(event: PointerEvent) {
     if (!press || event.pointerId !== press.id) return;
-    const release = releaseOf(event.timeStamp - press.at);
+    clearTimeout(arming);
+    const { started, kind, at } = press;
     press = null;
     swallowClick = true;
-    if (release === 'send') void sendVoice();
+    if (!started) {
+      if (canVoice && canVideo) mode = mode === 'voice' ? 'video' : 'voice';
+      return;
+    }
+    if (releaseOf(event.timeStamp - at) === 'send') finish(kind);
+    else videoHolding = false;
   }
 
   /** Браузер забрал касание себе (прокрутка, системный жест) — записи никто не держит. */
-  function voiceLost(event: PointerEvent) {
-    if (press && event.pointerId === press.id) cancelRecording();
+  function recordLost(event: PointerEvent) {
+    if (!press || event.pointerId !== press.id) return;
+    if (press.started) cancelRecording();
+    else {
+      clearTimeout(arming);
+      press = null;
+    }
   }
 
-  function voiceClick(event: MouseEvent) {
+  function recordClick(event: MouseEvent, kind: RecordKind) {
     // С клавиатуры (`detail === 0`) — всегда клик: Enter начинает без рук, Enter отправляет.
     if (swallowClick && event.detail !== 0) {
       swallowClick = false;
       return;
     }
     if (recording) void sendVoice();
-    else void startRecording();
+    else if (!filming) begin(kind, false);
   }
 
   async function stopRecording() {
     await recorder.stop();
-    voiceButton?.focus();
+    buttons.voice?.focus();
   }
 
   function recordingKey(event: KeyboardEvent) {
@@ -233,7 +326,12 @@
     event.preventDefault();
     event.stopPropagation();
     cancelRecording();
-    void tick().then(() => voiceButton?.focus());
+    void tick().then(() => buttons.voice?.focus());
+  }
+
+  function recordLabel(kind: RecordKind): string {
+    if (recording) return t('recording.send');
+    return kind === 'voice' ? t('voice.record') : t('videoNote.record');
   }
 
   /** Меню скрепки — как «+» нативной Искры: фото, файл, место. */
@@ -259,7 +357,7 @@
   /** При правке вложений не бывает: меняется только текст. */
   const canAttach = $derived(!!onfiles && context?.kind !== 'edit' && !disabled);
   /** Микрофон на месте «Отправить»: поле пустое, вложений нет, это не правка. */
-  const voiceMode = $derived(!!onvoice && canRecord && (recording || (empty && context?.kind !== 'edit' && !disabled)));
+  const voiceMode = $derived((canVoice || canVideo) && (recording || filming || (empty && context?.kind !== 'edit' && !disabled)));
 
   /** Одна строка о том, на что отвечаем или что правим. */
   const quote = $derived.by(() => {
@@ -389,7 +487,7 @@
   {#if recording}
     <RecordingStrip {recorder} oncancel={() => {
       cancelRecording();
-      void tick().then(() => voiceButton?.focus());
+      void tick().then(() => buttons.voice?.focus());
     }} />
   {:else}
   {#if onfiles}
@@ -428,32 +526,35 @@
     </button>
   {/if}
   {#if voiceMode}
-    <span class="voice-slot">
-      {#if press && recording}
-        <span class="lock" aria-hidden="true">
-          <svg viewBox="0 0 24 24"><path d="M8 11V8a4 4 0 0 1 8 0v3M6 11h12v9H6z" /></svg>
-          <svg viewBox="0 0 24 24"><path d="M6 15l6-6 6 6" /></svg>
-        </span>
-      {/if}
-      <button
-        bind:this={voiceButton}
-        type="button"
-        class="send voice"
-        class:held={!!press}
-        aria-label={recording ? t('recording.send') : t('voice.record')}
-        title={recording ? t('recording.send') : t('voice.record')}
-        onpointerdown={voiceDown}
-        onpointermove={voiceMove}
-        onpointerup={voiceUp}
-        onpointercancel={voiceLost}
-        onclick={voiceClick}
-        oncontextmenu={(event) => event.preventDefault()}
-      >
-        <svg viewBox="0 0 24 24" aria-hidden="true">
-          {#if recording && !press}<path d="M12 19V5M5 12l7-7 7 7" />{:else}<path d="M12 3a3 3 0 0 0-3 3v6a3 3 0 0 0 6 0V6a3 3 0 0 0-3-3zM5 11a7 7 0 0 0 14 0M12 18v3" />{/if}
-        </svg>
-      </button>
-    </span>
+    {#each recording ? (['voice'] as RecordKind[]) : kinds as kind (kind)}
+      <span class="voice-slot">
+        {#if press?.started && press.kind === 'voice' && recording}
+          <span class="lock" aria-hidden="true">
+            <svg viewBox="0 0 24 24"><path d="M8 11V8a4 4 0 0 1 8 0v3M6 11h12v9H6z" /></svg>
+            <svg viewBox="0 0 24 24"><path d="M6 15l6-6 6 6" /></svg>
+          </span>
+        {/if}
+        <button
+          bind:this={buttons[kind]}
+          type="button"
+          class="send voice"
+          class:quiet={kinds.length > 1 && kind === 'video'}
+          class:held={press?.kind === kind && press.started}
+          aria-label={recordLabel(kind)}
+          title={viewport.finePointer || recording ? recordLabel(kind) : t('recording.hint')}
+          onpointerdown={(event) => recordDown(event, kind)}
+          onpointermove={recordMove}
+          onpointerup={recordUp}
+          onpointercancel={recordLost}
+          onclick={(event) => recordClick(event, kind)}
+          oncontextmenu={(event) => event.preventDefault()}
+        >
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            {#if recording && !press}<path d="M12 19V5M5 12l7-7 7 7" />{:else if kind === 'video'}<path d="M3 7h12v10H3zM15 10l6-3v10l-6-3" />{:else}<path d="M12 3a3 3 0 0 0-3 3v6a3 3 0 0 0 6 0V6a3 3 0 0 0-3-3zM5 11a7 7 0 0 0 14 0M12 18v3" />{/if}
+          </svg>
+        </button>
+      </span>
+    {/each}
   {:else}
     <button type="submit" class="send" disabled={empty || disabled} aria-label={t('room.send')} title={t('room.send')}>
       <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 19V5M5 12l7-7 7 7" /></svg>
@@ -626,6 +727,11 @@
     background: var(--accent);
     color: var(--on-accent);
     cursor: pointer;
+  }
+  /* Камера рядом с микрофоном на десктопе — вторая, тише: главная кнопка одна. */
+  .voice.quiet {
+    background: transparent;
+    color: var(--color-text-secondary);
   }
   .voice-slot {
     position: relative;

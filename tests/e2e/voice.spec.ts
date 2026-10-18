@@ -13,7 +13,7 @@ test.afterEach(async ({ page }, info) => {
 async function fakeMicrophone(page: Page) {
   await page.addInitScript(() => {
     class FakeRecorder extends EventTarget {
-      static isTypeSupported = (type: string) => type.startsWith('audio/mp4;codecs=');
+      static isTypeSupported = (type: string) => type.startsWith('audio/mp4;codecs=') || type.startsWith('video/mp4;codecs=avc1');
       state: 'inactive' | 'recording' = 'inactive';
       ondataavailable: ((event: Event) => void) | null = null;
       onstop: ((event: Event) => void) | null = null;
@@ -39,9 +39,26 @@ async function fakeMicrophone(page: Page) {
     Object.defineProperty(window, 'MediaRecorder', { value: FakeRecorder, configurable: true });
     const mediaDevices = navigator.mediaDevices ?? {};
     Object.defineProperty(navigator, 'mediaDevices', { value: mediaDevices, configurable: true });
+    Object.defineProperty(mediaDevices, 'enumerateDevices', {
+      configurable: true,
+      value: async () => [{ kind: 'videoinput', deviceId: 'cam', label: 'Камера', groupId: '' }],
+    });
     Object.defineProperty(mediaDevices, 'getUserMedia', {
       configurable: true,
-      value: async () => {
+      value: async (constraints: MediaStreamConstraints) => {
+        if (constraints.video) {
+          // Камера — канвас, по которому ползёт полоса: кадры меняются, как у настоящей.
+          const canvas = Object.assign(document.createElement('canvas'), { width: 640, height: 360 });
+          const context = canvas.getContext('2d')!;
+          let x = 0;
+          setInterval(() => {
+            context.fillStyle = '#336';
+            context.fillRect(0, 0, 640, 360);
+            context.fillStyle = '#fc6';
+            context.fillRect((x += 8) % 640, 120, 80, 120);
+          }, 33);
+          return canvas.captureStream(30);
+        }
         const audio = new AudioContext();
         const tone = audio.createOscillator();
         const out = audio.createMediaStreamDestination();
@@ -168,4 +185,50 @@ test('голосовое в ленте: волна и длительность �
   await expect(bubble.getByRole('alert')).toHaveCount(0);
   if (process.env['VOICE_SHOT']) await bubble.screenshot({ path: process.env['VOICE_SHOT'] });
   expect(problems).toEqual([]);
+});
+
+test('«кружочек»: камера поверх комнаты, кольцо минуты, «Отправить» — круглое видео в ленте', async ({ page }, info) => {
+  await fakeMicrophone(page);
+  await signInToDemo(page);
+  await openChat(page);
+  const notes = page.getByRole('log').getByRole('button', { name: 'Видеосообщение' });
+  await expect(notes).toHaveCount(0);
+
+  if (isPhone(info.project.name)) {
+    // Телефон: кнопка одна, касание переключает голосовое и видео.
+    await page.getByRole('button', { name: 'Записать голосовое' }).tap();
+    await expect(page.getByRole('button', { name: 'Записать голосовое' })).toBeHidden();
+  }
+  await page.getByRole('button', { name: 'Записать видеосообщение' }).click();
+  const camera = page.getByRole('dialog', { name: 'Видеосообщение' });
+  await expect(camera).toBeVisible();
+  const strip = camera.getByRole('group', { name: 'Запись видеосообщения' });
+  await expect(strip).toContainText('0:01', { timeout: 5000 });
+  // В кружке — тот самый канвас, который пишется: квадрат.
+  const box = (await camera.locator('canvas').boundingBox())!;
+  expect(Math.abs(box.width - box.height)).toBeLessThan(2);
+
+  await camera.getByRole('button', { name: 'Отправить' }).click();
+  await expect(camera).toBeHidden();
+  await expect(notes).toHaveCount(1);
+});
+
+test('«кружочек»: «Отмена» и Esc — камера закрыта, ничего не ушло', async ({ page }, info) => {
+  test.skip(isPhone(info.project.name), 'Esc — путь десктопа');
+  await fakeMicrophone(page);
+  await signInToDemo(page);
+  await openChat(page);
+  const record = page.getByRole('button', { name: 'Записать видеосообщение' });
+  const camera = page.getByRole('dialog', { name: 'Видеосообщение' });
+  await record.click();
+  await expect(camera.getByRole('button', { name: 'Отправить' })).toBeVisible();
+  await camera.getByRole('button', { name: 'Отмена' }).click();
+  await expect(camera).toBeHidden();
+
+  await record.click();
+  await expect(camera.getByRole('button', { name: 'Отправить' })).toBeFocused();
+  await page.keyboard.press('Escape');
+  await expect(camera).toBeHidden();
+  await page.waitForTimeout(500);
+  await expect(page.getByRole('log').getByRole('button', { name: 'Видеосообщение' })).toHaveCount(0);
 });

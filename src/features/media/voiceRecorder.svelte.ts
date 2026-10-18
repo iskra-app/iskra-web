@@ -106,6 +106,10 @@ export class VoiceRecorder {
     recorder.ondataavailable = (event) => {
       if (event.data.size) this.chunks.push(event.data);
     };
+    // Кодировщик отказал — то, что успело записаться, остаётся; не успело — `finish` вернёт `null`.
+    recorder.onerror = () => {
+      if (this.recorder === recorder && this.state === 'recording') void this.stop();
+    };
     // Остановился сам — микрофон отобрали. Сказанное остаётся.
     recorder.onstop = () => {
       if (this.recorder === recorder && this.state === 'recording') void this.stop();
