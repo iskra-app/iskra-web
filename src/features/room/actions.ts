@@ -11,6 +11,8 @@ export interface MessageActions {
   edit(message: Message): void;
   react(message: Message, key: string): void;
   vote(message: Message, answerIds: string[]): void;
+  /** Спросить «завершить опрос?» — и завершить. */
+  endPoll(message: Message): void;
   pin(message: Message): void;
   unpin(message: Message): void;
   /** Спросить «удалить у всех?» — и удалить. */

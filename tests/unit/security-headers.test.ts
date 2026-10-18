@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { caddyHeaders, headersFile, securityHeaders } from '../../security-headers';
+import { headersFile, nginxHeaders, securityHeaders } from '../../security-headers';
 
 describe('CSP — главная граница', () => {
   const csp = securityHeaders(false)['Content-Security-Policy']!;
@@ -31,11 +31,11 @@ describe('CSP — главная граница', () => {
     expect(headersFile()).toContain(`Content-Security-Policy: ${csp}`);
   });
 
-  it('Caddy несёт ту же политику и все заголовки', () => {
-    const caddy = caddyHeaders();
-    expect(caddy).toContain(`\tContent-Security-Policy "${csp}"\n`);
-    for (const name of Object.keys(securityHeaders(false))) expect(caddy).toContain(`\t${name} "`);
-    // Двойная кавычка внутри значения закрыла бы строку Caddy раньше времени.
-    for (const value of Object.values(securityHeaders(false))) expect(value).not.toContain('"');
+  it('nginx несёт ту же политику и все заголовки', () => {
+    const nginx = nginxHeaders();
+    expect(nginx).toContain(`add_header Content-Security-Policy "${csp}" always;\n`);
+    for (const name of Object.keys(securityHeaders(false))) expect(nginx).toContain(`add_header ${name} "`);
+    // Двойная кавычка закрыла бы строку nginx раньше времени, `$` он прочёл бы как переменную.
+    for (const value of Object.values(securityHeaders(false))) expect(value).not.toMatch(/["$]/);
   });
 });

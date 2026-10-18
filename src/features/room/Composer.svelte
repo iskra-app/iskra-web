@@ -40,6 +40,8 @@
     onremoveattachment?: (index: number) => void;
     /** «Геопозиция» в меню скрепки. */
     onlocation?: () => void;
+    /** «Опрос» в меню скрепки. Нет — пункта нет: в личном чате опрос ни к чему. */
+    onpoll?: () => void;
     /**
      * Выбранные из списка «@» — рядом с черновиком: в поле простые слова, а это говорит, какой
      * `@Кай` какой. Держит `RoomView`, как и сам черновик.
@@ -61,6 +63,7 @@
     onfiles,
     onremoveattachment,
     onlocation,
+    onpoll,
     mentions = $bindable([]),
     mentionCandidates,
     mentionPhoto = () => undefined,
@@ -313,6 +316,16 @@
 <Menu open={!!attachMenu} x={attachMenu?.x ?? 0} y={attachMenu?.y ?? 0} sheet={!viewport.finePointer} label={t('room.attach')} onclose={() => (attachMenu = null)}>
   <button type="button" role="menuitem" onclick={() => choose('image/*,video/*')}>{t('room.attachPhoto')}</button>
   <button type="button" role="menuitem" onclick={() => choose('')}>{t('room.attachFile')}</button>
+  {#if onpoll}
+    <button
+      type="button"
+      role="menuitem"
+      onclick={() => {
+        attachMenu = null;
+        onpoll?.();
+      }}>{t('poll.attach')}</button
+    >
+  {/if}
   {#if onlocation}
     <button
       type="button"

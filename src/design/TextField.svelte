@@ -17,6 +17,8 @@
     autofocus?: boolean;
     disabled?: boolean;
     invalid?: boolean;
+    /** Человек что-то набрал — для тех, кто держит значение сам, а не через `bind:`. */
+    oninput?: (value: string) => void;
   }
   let {
     value = $bindable(''),
@@ -29,6 +31,7 @@
     autofocus = false,
     disabled = false,
     invalid = false,
+    oninput,
   }: Props = $props();
 
   const id = $props.id();
@@ -51,6 +54,7 @@
     {inputmode}
     {disabled}
     aria-invalid={invalid || undefined}
+    oninput={() => oninput?.(value)}
     autocapitalize="off"
     autocorrect="off"
     spellcheck="false"

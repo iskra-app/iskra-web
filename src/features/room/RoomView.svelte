@@ -19,6 +19,7 @@
   import { i18n, t } from '../../i18n/index.svelte.ts';
   import type { ComposerContext, MessageActions } from './actions';
   import Composer from './Composer.svelte';
+  import PollComposer from './PollComposer.svelte';
   import MessageMenu from './MessageMenu.svelte';
   import PinnedStrip from './PinnedStrip.svelte';
   import { typingText } from './text';
@@ -55,6 +56,8 @@
   let stashedMentions: ComposerMention[] = [];
   let menu = $state<{ message: Message; at: { x: number; y: number }; sheet: boolean } | null>(null);
   let deleting = $state<Message | null>(null);
+  let endingPoll = $state<Message | null>(null);
+  let creatingPoll = $state(false);
   let blocking = $state<Message | null>(null);
   let attachments = $state<OutgoingFile[]>([]);
   let dropping = $state(false);
@@ -281,6 +284,7 @@
     edit,
     react: (message, key) => store?.react(message, key),
     vote: (message, ids) => store?.vote(message, ids),
+    endPoll: (message) => (endingPoll = message),
     pin: (message) => store?.pin(message),
     unpin: (message) => store?.unpin(message),
     remove: (message) => (deleting = message),
@@ -387,6 +391,7 @@
     onfiles={(files) => void addFiles(files)}
     onremoveattachment={(index) => (attachments = attachments.filter((_, i) => i !== index))}
     onlocation={locate}
+    onpoll={room?.kind === 'direct' ? undefined : () => (creatingPoll = true)}
   />
 </div>
 
@@ -407,6 +412,29 @@
   onconfirm={() => {
     if (deleting) store?.remove(deleting);
     deleting = null;
+  }}
+/>
+
+<PollComposer
+  open={creatingPoll}
+  onclose={() => (creatingPoll = false)}
+  onsend={(draft) => {
+    store?.sendPoll(draft);
+    creatingPoll = false;
+  }}
+/>
+
+<ConfirmDialog
+  open={!!endingPoll}
+  title={t('poll.endConfirmTitle')}
+  message={t('poll.endConfirmMessage')}
+  confirmLabel={t('poll.end')}
+  cancelLabel={t('common.cancel')}
+  destructive
+  onclose={() => (endingPoll = null)}
+  onconfirm={() => {
+    if (endingPoll) store?.endPoll(endingPoll, t('timeline.pollEndedBody'));
+    endingPoll = null;
   }}
 />
 

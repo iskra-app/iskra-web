@@ -20,6 +20,8 @@
   let { message, at, sheet, actions, onclose }: Props = $props();
 
   const text = $derived(message && 'body' in message.kind ? message.kind.body : '');
+  /** Опрос, который ещё идёт и уже ушёл: в нём можно отозвать голос, а автору — закрыть. */
+  const openPoll = $derived(message?.kind.type === 'poll' && !message.kind.poll.ended && !!message.eventId ? message.kind.poll : null);
 
   /** Пункт делает своё и закрывает меню — до действия: фокус вернётся туда, где был. */
   function run(action: (m: Message) => void) {
@@ -46,6 +48,14 @@
     </div>
     {#if actions.canReply}
       <button type="button" role="menuitem" onclick={() => run(actions.reply)}>{t('message.menu.reply')}</button>
+    {/if}
+    {#if openPoll && openPoll.mine.length > 0}
+      <!-- Пустой ответ — голоса нет (MSC3381). -->
+      <button type="button" role="menuitem" onclick={() => run((m) => actions.vote(m, []))}>{t('poll.retract')}</button>
+    {/if}
+    {#if openPoll && message.own}
+      <!-- Закрыть может только автор: конец от другого комната не признаёт. -->
+      <button type="button" role="menuitem" onclick={() => run(actions.endPoll)}>{t('poll.end')}</button>
     {/if}
     {#if message.canEdit}
       <button type="button" role="menuitem" onclick={() => run(actions.edit)}>{t('message.menu.edit')}</button>

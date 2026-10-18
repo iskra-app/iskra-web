@@ -32,9 +32,11 @@
   --radius-control: 0.75rem; /* 12 */
   --radius-menu: 1.75rem; /* 28 */
   --radius-circle: 9999px;
+  --radius-checkbox: 0.25rem; /* 4 — квадратик выбора */
 
   /* Theme.Border */
   --border-hairline: 1px;
+  --border-thick: 0.125rem; /* 2 — обводка кружка и квадратика выбора */
 
   /* Theme.Backdrop */
   --backdrop-blur: 24px;
@@ -60,6 +62,8 @@
   --size-media-max-width: 20rem; /* 320 — фото в ленте */
   --size-media-max-height: 25rem; /* 400 — высокое фото не занимает весь экран */
   --size-sticker: 10rem; /* 160 */
+  --size-poll: 16.5rem; /* 264 — Theme.Size.poll: ширина постоянная, полосы — сравнение */
+  --size-poll-bar: 0.25rem; /* 4 — Theme.Size.pollBar */
   --size-mention-row: 3.5rem; /* 56 — лицо и по 8 сверху и снизу */
   --size-mention-list: 16.25rem; /* 260 — четыре с половиной строки «@»: половина говорит, что есть ещё */
   --size-video-note: 12.5rem; /* 200 — «кружочек» */

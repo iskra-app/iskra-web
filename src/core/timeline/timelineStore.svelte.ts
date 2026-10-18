@@ -32,6 +32,7 @@ import {
 import { sendAttachment, uploadClientFor, type OutgoingFile, type UploadClient } from '../media/upload';
 import { geoUri, type Place } from './location';
 import { markdownContent } from './composerMarkdown';
+import { canSendPoll, pollEndContent, pollStartContent, type PollDraft } from './poll';
 import { mentionsMarkdown, rankCandidates, unlinkMentions, type ComposerMention, type RankedCandidate } from './composerMentions';
 import { mapEvent, type MapperContext } from './mapper';
 import { layout, type TimelineItem } from './layout';
@@ -52,7 +53,7 @@ export interface Upload {
 }
 
 /** Что не получилось — ключи текстов нативной Искры (`timeline.*Failed`). */
-export type TimelineFailure = 'reactionFailed' | 'deleteFailed' | 'editFailed' | 'pinFailed' | 'voteFailed';
+export type TimelineFailure = 'reactionFailed' | 'deleteFailed' | 'editFailed' | 'pinFailed' | 'pollFailed';
 
 const PINNED_EVENTS = 'm.room.pinned_events';
 /** Как долго «печатает» держится без нового нажатия — и как часто его повторять. */
@@ -582,7 +583,26 @@ export class TimelineStore {
     const [type, content] = stable
       ? ['m.poll.response', { ...relation, 'm.selections': selections }]
       : ['org.matrix.msc3381.poll.response', { ...relation, 'org.matrix.msc3381.poll.response': { answers: selections } }];
-    this.act('voteFailed', () => this.client.sendEvent(this.roomId, type as never, content as never));
+    this.act('pollFailed', () => this.client.sendEvent(this.roomId, type as never, content as never));
+  }
+
+  /**
+   * Закрыть опрос. Только автор: конец от кого-то другого комната не признаёт (см. маппер).
+   * `text` — для клиентов, которые опросов не знают.
+   */
+  endPoll(message: Message, text: string): void {
+    if (message.kind.type !== 'poll' || !message.own || !message.eventId || message.kind.poll.ended) return;
+    const { type, content } = pollEndContent(message.kind.poll, message.eventId, text);
+    this.act('pollFailed', () => this.client.sendEvent(this.roomId, type as never, content as never));
+  }
+
+  /** Новый опрос. Не ушёл — видно в нём самом («Не отправлено»), как у сообщения. */
+  sendPoll(draft: PollDraft): void {
+    if (!canSendPoll(draft)) return;
+    this.typingStopped();
+    const { type, content } = pollStartContent(draft);
+    this.client.sendEvent(this.roomId, type as never, content as never).catch(() => this.schedule());
+    this.schedule();
   }
 
   private act(failure: TimelineFailure, task: () => Promise<unknown>): void {

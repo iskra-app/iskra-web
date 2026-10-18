@@ -94,11 +94,60 @@ test('опрос: голос Веры уже есть, мой добавляет
   await signInToDemo(page);
   await openRoom(page, /^Выходные/);
   const poll = bubble(page, 'Куда едем?');
-  await expect(poll).toContainText('Проголосовал 1 человек');
+  // До своего голоса итогов не видно — только сколько проголосовало.
+  await expect(poll).toContainText('1 голос');
+  await expect(poll).not.toContainText('%');
   await poll.getByRole('radio', { name: /^В лес/ }).click();
   await expect(poll.getByRole('radio', { name: /^В лес/ })).toHaveAttribute('aria-checked', 'true', { timeout: 10_000 });
-  await expect(poll).toContainText('Проголосовали 2 человека');
-  await expect(poll.getByRole('radio', { name: /^На озеро/ })).toContainText('1 голос');
+  await expect(poll).toContainText('2 голоса');
+  await expect(poll.getByRole('radio', { name: /^На озеро/ })).toContainText('50');
+
+  // «Отменить голос» — пустой ответ; итоги снова прячутся.
+  await (await menuOf(page, 'Куда едем?')).getByRole('menuitem', { name: 'Отменить голос' }).click();
+  await expect(poll.getByRole('radio', { name: /^В лес/ })).toHaveAttribute('aria-checked', 'false', { timeout: 10_000 });
+  await expect(poll).toContainText('1 голос');
+  // Опрос не свой — закрыть его нельзя.
+  await expect((await menuOf(page, 'Куда едем?')).getByRole('menuitem', { name: 'Завершить опрос' })).toHaveCount(0);
+});
+
+test('свой опрос: создать из скрепки, проголосовать, завершить — с вопросом', async ({ page }) => {
+  const problems = watchForProblems(page);
+  await signInToDemo(page);
+  await openRoom(page, /^Выходные/);
+  await page.getByRole('button', { name: 'Добавить фото или файл' }).click();
+  await page.getByRole('menuitem', { name: 'Опрос' }).click();
+  const dialog = page.getByRole('dialog', { name: 'Новый опрос' });
+  const send = dialog.getByRole('button', { name: 'Отправить' });
+  await dialog.getByRole('textbox', { name: 'Вопрос' }).fill('Во сколько встречаемся?');
+  await dialog.getByRole('textbox', { name: 'Вариант 1' }).fill('В девять');
+  await expect(send).toBeDisabled();
+  await dialog.getByRole('textbox', { name: 'Вариант 2' }).fill('В десять');
+  // Набрали в последний — появился следующий, пустой.
+  await expect(dialog.getByRole('textbox', { name: 'Вариант 3' })).toHaveValue('');
+  await send.click();
+  await expect(dialog).toBeHidden();
+
+  const poll = bubble(page, 'Во сколько встречаемся?');
+  await expect(poll).toContainText('Пока никто не голосовал');
+  await poll.getByRole('radio', { name: /^В десять/ }).click();
+  await expect(poll.getByRole('radio', { name: /^В десять/ })).toHaveAttribute('aria-checked', 'true', { timeout: 10_000 });
+  await expect(poll.getByRole('radio', { name: /^В десять/ })).toContainText('100');
+
+  await (await menuOf(page, 'Во сколько встречаемся?')).getByRole('menuitem', { name: 'Завершить опрос' }).click();
+  const confirm = page.getByRole('dialog', { name: 'Завершить опрос?' });
+  await expect(confirm).toContainText('Голосовать больше будет нельзя');
+  await confirm.getByRole('button', { name: 'Завершить опрос' }).click();
+  await expect(poll).toContainText('Опрос завершён', { timeout: 10_000 });
+  await expect(poll.getByRole('radio', { name: /^В девять/ })).toBeDisabled();
+  expect(problems).toEqual([]);
+});
+
+test('в личном чате опроса в скрепке нет', async ({ page }) => {
+  await signInToDemo(page);
+  await openRoom(page, /^Аня/);
+  await page.getByRole('button', { name: 'Добавить фото или файл' }).click();
+  await expect(page.getByRole('menuitem').first()).toBeVisible();
+  await expect(page.getByRole('menuitem', { name: 'Опрос' })).toHaveCount(0);
 });
 
 test('закреплённое: полоса над лентой, нажатие ведёт к сообщению', async ({ page }) => {
