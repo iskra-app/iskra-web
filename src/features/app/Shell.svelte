@@ -28,6 +28,7 @@
   import HotkeyHelp from './HotkeyHelp.svelte';
   import NewChatDialog from '../rooms/NewChatDialog.svelte';
   import Settings from '../settings/Settings.svelte';
+  import { settingsTitles } from '../settings/sections';
   import RoomPanel from '../room/RoomPanel.svelte';
   import LockedHistoryStrip from '../recovery/LockedHistoryStrip.svelte';
   import type { TimelineStore } from '../../core/timeline/timelineStore.svelte.ts';
@@ -120,6 +121,9 @@
     panelOpen = false;
     router.go({ name: 'home' });
   }
+
+  /** Раздел настроек на экране; `undefined` — список разделов или не настройки. */
+  const settingsSection = $derived(router.route.name === 'settings' ? router.route.section : undefined);
 </script>
 
 <!--
@@ -186,9 +190,12 @@
       </div>
     {:else if router.route.name === 'settings'}
       <div class="main-column">
-        <Bar title={t('settings.title')}>
+        <Bar title={t(settingsSection ? settingsTitles[settingsSection] : 'settings.title')}>
           {#snippet leading()}
-            {#if viewport.layout === 'stack'}
+            <!-- Из раздела — к списку разделов; из списка — к чатам, если они не рядом. -->
+            {#if settingsSection}
+              <IconButton label={t('settings.back')} onclick={() => router.go({ name: 'settings' })}><Icon name="back" /></IconButton>
+            {:else if viewport.layout === 'stack'}
               <IconButton label={t('settings.back')} onclick={() => router.go({ name: 'home' })}><Icon name="back" /></IconButton>
             {/if}
           {/snippet}

@@ -1,5 +1,6 @@
 <!--
-  Настройки — одна страница с разделами, адрес ведёт к разделу (`#/settings/storage`).
+  Настройки — как `SettingsView` нативной Искры: список разделов (`#/settings`) и страница
+  каждого (`#/settings/storage`). Безопасность собрала шифрование, устройства и заблокированных.
   На десктопе — в колонке чата, на телефоне — вместо списка, как чат.
 
   Здесь только то, что работает: чего ещё нет (пуши, звонки), того и в настройках нет.
@@ -12,7 +13,8 @@
   import PlainButton from '../../design/PlainButton.svelte';
   import PrimaryButton from '../../design/PrimaryButton.svelte';
   import TextField from '../../design/TextField.svelte';
-  import type { SettingsSection } from '../../core/navigation/route';
+  import Icon, { type IconName } from '../../design/Icon.svelte';
+  import { formatRoute, type SettingsSection } from '../../core/navigation/route';
   import type { AccountSwitch, DefaultAlerts } from '../../core/rooms/pushRules';
   import { app } from '../../core/session/app.svelte.ts';
   import type { UserSession } from '../../core/session/userSession.svelte.ts';
@@ -23,19 +25,28 @@
   import RecoveryCode from '../recovery/RecoveryCode.svelte';
   import AccentSwatches from './AccentSwatches.svelte';
   import WallpaperPicker from './WallpaperPicker.svelte';
+  import { settingsTitles } from './sections';
   import { Photo, pixelsFor } from '../rooms/faces.svelte.ts';
 
   let { session, section }: { session: UserSession; section?: SettingsSection } = $props();
 
   let page: HTMLElement | undefined = $state();
 
-  // Раздел из адреса — прокрутить к нему.
+  // Другая страница — с начала.
   $effect(() => {
-    const target = section;
-    void tick().then(() => {
-      if (target) page?.querySelector(`#settings-${target}`)?.scrollIntoView({ block: 'start' });
-    });
+    void section;
+    void tick().then(() => page?.scrollTo({ top: 0 }));
   });
+
+  /** Строки списка — в порядке нативной Искры; профиль — карточкой над ними. */
+  const rows: Array<{ section: SettingsSection; icon: IconName }> = [
+    { section: 'appearance', icon: 'appearance' },
+    { section: 'notifications', icon: 'bell' },
+    { section: 'security', icon: 'shield' },
+    { section: 'storage', icon: 'storage' },
+    { section: 'about', icon: 'info' },
+  ];
+  const hrefOf = (target: SettingsSection) => formatRoute({ name: 'settings', section: target });
 
   // ————— Профиль —————
 
@@ -81,7 +92,10 @@
   // ————— Уведомления —————
 
   const rules = $derived(session.notificationRules);
-  onMount(() => void session.notificationRules.load());
+  // Перечитать при каждом открытии страницы: так видно изменённое в другом клиенте.
+  $effect(() => {
+    if (section === 'notifications') void session.notificationRules.load();
+  });
   const defaultChoices: Array<{ value: DefaultAlerts; label: TextKey }> = [
     { value: 'all', label: 'room.manage.alertsAll' },
     { value: 'mentions', label: 'room.manage.alertsMentions' },
@@ -114,10 +128,11 @@
 
   let devices = $state<Awaited<ReturnType<UserSession['devices']>> | null>(null);
   let devicesFailed = $state(false);
-  onMount(() => {
+  $effect(() => {
+    if (section !== 'security') return;
     session.devices().then(
-      (list) => (devices = list),
-      () => (devicesFailed = true),
+      (list) => ((devices = list), (devicesFailed = false)),
+      () => (devicesFailed = !devices),
     );
   });
   const accountPage = $derived(session.accountPage());
@@ -153,7 +168,9 @@
       usage = null;
     }
   }
-  onMount(() => void readStorage());
+  $effect(() => {
+    if (section === 'storage') void readStorage();
+  });
 
   async function askPersistence() {
     await requestPersistence();
@@ -207,8 +224,30 @@
 </script>
 
 <div class="settings" bind:this={page}>
-  <section id="settings-profile" aria-labelledby="profile-title">
-    <h2 id="profile-title">{t('account.editTitle')}</h2>
+  {#if !section}
+    <a class="card profile" href={hrefOf('profile')}>
+      <span class="avatar"><Avatar name={me.name} seed={me.id} photo={photo.url} mode={preferences.faces} /></span>
+      <span class="who">
+        <strong>{me.name}</strong>
+        <span class="secondary">{me.id}</span>
+      </span>
+      <span class="edit">{t('account.edit')}</span>
+    </a>
+    <nav aria-label={t('settings.title')}>
+      <ul class="rows">
+        {#each rows as row (row.section)}
+          <li>
+            <a href={hrefOf(row.section)}>
+              <span class="row-icon"><Icon name={row.icon} /></span>
+              <span class="row-label">{t(settingsTitles[row.section])}</span>
+              <span class="chevron"><Icon name="forward" /></span>
+            </a>
+          </li>
+        {/each}
+      </ul>
+    </nav>
+    <PlainButton danger onclick={() => (confirmingSignOut = true)}>{t('account.signOut')}</PlainButton>
+  {:else if section === 'profile'}
     <div class="profile">
       <span class="avatar"><Avatar name={me.name} seed={me.id} photo={photo.url} mode={preferences.faces} /></span>
       <span class="who">
@@ -231,10 +270,7 @@
     {#if profileProblem}
       <p class="problem" role="alert">{t(profileProblem === 'name' ? 'account.nameFailed' : 'account.pictureFailed')}</p>
     {/if}
-  </section>
-
-  <section id="settings-notifications" aria-labelledby="notifications-title">
-    <h2 id="notifications-title">{t('settings.notifications')}</h2>
+  {:else if section === 'notifications'}
     {#if rules.current}
       {@const current = rules.current}
       <h3>{t('notifications.defaults')}</h3>
@@ -276,67 +312,65 @@
     {#if rules.failure}
       <p class="problem" role="alert">{t(`notificationRules.${rules.failure}`)}</p>
     {/if}
-  </section>
+  {:else if section === 'security'}
+    {#if recovery}
+      <section aria-labelledby="encryption-title">
+        <h2 id="encryption-title">{t('settings.encryption')}</h2>
+        {#if recovery.protection === 'on'}
+          <p>{t('settings.deviceVerified')}</p>
+          <h3>{t('settings.recoveryCode')}</h3>
+          <PlainButton busy={recovery.working} onclick={() => (confirmNewCode = true)}>{t('settings.newCode')}</PlainButton>
+        {:else}
+          <p>{t('settings.deviceNotVerified')}</p>
+          <PrimaryButton onclick={() => app.openRecovery()}>{t('recovery.choose.title')}</PrimaryButton>
+        {/if}
+        {#if recovery.failure}
+          <p class="problem" role="alert">{t(`account.${recovery.failure}`)}</p>
+        {/if}
+      </section>
+    {/if}
 
-  {#if recovery}
-    <section id="settings-security" aria-labelledby="security-title">
-      <h2 id="security-title">{t('settings.security')}</h2>
-      {#if recovery.protection === 'on'}
-        <p>{t('settings.deviceVerified')}</p>
-        <h3>{t('settings.recoveryCode')}</h3>
-        <PlainButton busy={recovery.working} onclick={() => (confirmNewCode = true)}>{t('settings.newCode')}</PlainButton>
-      {:else}
-        <p>{t('settings.deviceNotVerified')}</p>
-        <PrimaryButton onclick={() => app.openRecovery()}>{t('recovery.choose.title')}</PrimaryButton>
+    <section aria-labelledby="devices-title">
+      <h2 id="devices-title">{t('settings.devices')}</h2>
+      {#if devices}
+        <ul class="list">
+          {#each devices as device (device.id)}
+            <li>
+              <strong>{device.name}</strong>
+              <span class="secondary">{device.current ? t('settings.thisDevice') : device.id}</span>
+            </li>
+          {/each}
+        </ul>
+      {:else if devicesFailed}
+        <p class="problem" role="alert">{t('settings.devicesFailed')}</p>
       {/if}
-      {#if recovery.failure}
-        <p class="problem" role="alert">{t(`account.${recovery.failure}`)}</p>
+      <p class="secondary">{t('settings.devicesHelp')}</p>
+      {#if accountPage}
+        <a class="link" href={accountPage} target="_blank" rel="noopener noreferrer">{t('settings.openAccountPage')}</a>
       {/if}
     </section>
-  {/if}
 
-  <section id="settings-devices" aria-labelledby="devices-title">
-    <h2 id="devices-title">{t('settings.devices')}</h2>
-    {#if devices}
-      <ul class="list">
-        {#each devices as device (device.id)}
-          <li>
-            <strong>{device.name}</strong>
-            <span class="secondary">{device.current ? t('settings.thisDevice') : device.id}</span>
-          </li>
-        {/each}
-      </ul>
-    {:else if devicesFailed}
-      <p class="problem" role="alert">{t('settings.devicesFailed')}</p>
-    {/if}
-    <p class="secondary">{t('settings.devicesHelp')}</p>
-    {#if accountPage}
-      <a class="link" href={accountPage} target="_blank" rel="noopener noreferrer">{t('settings.openAccountPage')}</a>
-    {/if}
-  </section>
+    <section aria-labelledby="blocked-title">
+      <h2 id="blocked-title">{t('settings.blocked')}</h2>
+      {#if blocked.ids.length}
+        <ul class="list">
+          {#each blocked.ids as userId (userId)}
+            <li class="row">
+              <span class="id">{userId}</span>
+              <PlainButton busy={unblocking === userId} disabled={offline} onclick={() => void unblock(userId)}>{t('settings.unblock')}</PlainButton>
+            </li>
+          {/each}
+        </ul>
+      {:else}
+        <p>{t('settings.blockedEmptyTitle')}</p>
+        <p class="secondary">{t('settings.blockedEmptyMessage')}</p>
+      {/if}
+      {#if blocked.failure === 'unblockFailed'}
+        <p class="problem" role="alert">{t('account.unblockFailed')}</p>
+      {/if}
+    </section>
 
-  <section id="settings-blocked" aria-labelledby="blocked-title">
-    <h2 id="blocked-title">{t('settings.blocked')}</h2>
-    {#if blocked.ids.length}
-      <ul class="list">
-        {#each blocked.ids as userId (userId)}
-          <li class="row">
-            <span class="id">{userId}</span>
-            <PlainButton busy={unblocking === userId} disabled={offline} onclick={() => void unblock(userId)}>{t('settings.unblock')}</PlainButton>
-          </li>
-        {/each}
-      </ul>
-    {:else}
-      <p>{t('settings.blockedEmptyTitle')}</p>
-      <p class="secondary">{t('settings.blockedEmptyMessage')}</p>
-    {/if}
-    {#if blocked.failure === 'unblockFailed'}
-      <p class="problem" role="alert">{t('account.unblockFailed')}</p>
-    {/if}
-  </section>
-
-  <section id="settings-appearance" aria-labelledby="appearance-title">
-    <h2 id="appearance-title">{t('settings.appearance')}</h2>
+  {:else if section === 'appearance'}
     <h3 id="theme-title">{t('appearance.theme')}</h3>
     <div class="options" role="radiogroup" aria-labelledby="theme-title">
       {#each themes as theme (theme.value)}
@@ -386,10 +420,7 @@
         </button>
       {/each}
     </div>
-  </section>
-
-  <section id="settings-storage" aria-labelledby="storage-title">
-    <h2 id="storage-title">{t('storage.title')}</h2>
+  {:else if section === 'storage'}
     {#if persisted !== null}
       <p>{persisted ? t('storage.persisted') : t('storage.notPersisted')}</p>
       {#if !persisted}
@@ -404,10 +435,7 @@
     <p class="secondary">{t('storage.cacheWeb')}</p>
     <PlainButton busy={clearing} onclick={() => (confirmClear = true)}>{clearing ? t('storage.clearing') : t('storage.clear')}</PlainButton>
     {#if clearFailed}<p class="problem" role="alert">{t('storage.failed')}</p>{/if}
-  </section>
-
-  <section id="settings-about" aria-labelledby="about-title">
-    <h2 id="about-title">{t('about.title')}</h2>
+  {:else if section === 'about'}
     <p>{t('about.webTagline')}</p>
     <dl>
       <dt>{t('about.build')}</dt>
@@ -426,11 +454,7 @@
       <dd>{t('about.protocolExplained')}</dd>
     </dl>
     <p class="secondary">{t('about.cryptographyWeb')}</p>
-  </section>
-
-  <section>
-    <PlainButton danger onclick={() => (confirmingSignOut = true)}>{t('account.signOut')}</PlainButton>
-  </section>
+  {/if}
 </div>
 
 <ConfirmDialog
@@ -478,13 +502,72 @@
   .settings {
     display: flex;
     flex-direction: column;
-    gap: var(--space-generous);
+    gap: var(--space-normal);
     width: 100%;
     max-width: var(--column-timeline-max);
     height: 100%;
     margin-inline: auto;
     padding: var(--space-roomy) var(--timeline-gutter) max(var(--space-generous), env(safe-area-inset-bottom));
     overflow-y: auto;
+  }
+  section + section {
+    margin-block-start: var(--space-generous);
+  }
+  /* Список разделов — строки-ссылки, как `Form` нативной: значок акцентом, шеврон. */
+  .card,
+  .rows {
+    border-radius: var(--radius-card);
+    background: var(--color-surface);
+  }
+  .card {
+    padding: var(--space-normal) var(--space-roomy);
+    color: inherit;
+    text-decoration: none;
+  }
+  .edit {
+    margin-inline-start: auto;
+    color: var(--accent);
+  }
+  .rows {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    overflow: hidden;
+  }
+  .rows a {
+    display: flex;
+    align-items: center;
+    gap: var(--space-normal);
+    min-height: var(--tap-target);
+    padding: var(--space-close) var(--space-normal) var(--space-close) var(--space-roomy);
+    color: inherit;
+    text-decoration: none;
+  }
+  .rows li + li a {
+    border-block-start: var(--border-hairline) solid var(--color-separator);
+  }
+  .card:hover,
+  .rows a:hover {
+    background: var(--color-incoming-bubble);
+  }
+  /* Кольцо фокуса — внутрь: снаружи его срезал бы `overflow` списка. */
+  .rows a:focus-visible {
+    outline-offset: calc(-1 * var(--space-tight));
+  }
+  .row-icon {
+    display: flex;
+    width: var(--size-icon);
+    height: var(--size-icon);
+    color: var(--accent);
+  }
+  .row-label {
+    flex: 1;
+  }
+  .chevron {
+    display: flex;
+    width: var(--size-icon);
+    height: var(--size-icon);
+    color: var(--color-text-secondary);
   }
   section {
     display: flex;

@@ -7,9 +7,21 @@ test.afterEach(async ({ page }, info) => {
 
 async function openRoom(page: Page, name: RegExp) {
   const back = page.getByRole('button', { name: 'Назад' });
-  if (await back.isVisible()) await back.click();
-  await page.getByRole('link', { name }).click();
+  const link = page.getByRole('link', { name });
+  // «Назад», пока не виден список чатов: из раздела настроек на телефоне это два шага.
+  // По видимости строки, а не кнопки: уходящая с анимацией кнопка ещё «видна».
+  await expect(async () => {
+    if (!(await link.isVisible())) await back.click({ timeout: 1000 });
+    await expect(link).toBeVisible({ timeout: 1000 });
+  }).toPass({ timeout: 10_000 });
+  await link.click();
   await expect(page.getByRole('log')).toBeVisible();
+}
+
+/** Настройки — список разделов; `row` — открыть раздел этой строки. */
+async function openSettings(page: Page, row?: string) {
+  await page.getByRole('button', { name: 'Настройки' }).click();
+  if (row) await page.getByRole('navigation', { name: 'Настройки' }).getByRole('link', { name: row }).click();
 }
 
 async function openPanel(page: Page) {
@@ -99,18 +111,30 @@ test('новая комната и новый чат — создаются и �
   await expect(page.getByRole('log')).toContainText('Возьми плед, там ветрено', { timeout: 10_000 });
 });
 
-test('настройки: имя, язык, тема, шрифт; устройство и хранилище видны', async ({ page }, info) => {
+test('настройки по разделам: имя, язык, тема, шрифт; устройство и хранилище видны', async ({ page }, info) => {
   await signInToDemo(page);
-  await page.getByRole('button', { name: 'Настройки' }).click();
-  await expect(page.getByRole('heading', { name: 'Ваш профиль' })).toBeVisible();
+  await openSettings(page);
+  const back = page.getByRole('button', { name: 'Назад' });
+  // Профиль — карточкой над разделами, «Изменить» ведёт на его страницу.
+  await page.getByRole('link', { name: /Изменить$/ }).click();
+  await expect(page.getByRole('heading', { name: 'Ваш профиль', level: 1 })).toBeVisible();
 
   const name = page.getByRole('textbox', { name: 'Имя' });
   await name.fill('Алиса Петровна');
   await page.getByRole('button', { name: 'Сохранить' }).click();
   await expect(page.getByText('Алиса Петровна', { exact: true })).toBeVisible({ timeout: 10_000 });
 
+  // «Назад» из раздела — к списку разделов, не к чатам.
+  await back.click();
+  await expect(page.getByRole('heading', { name: 'Настройки', level: 1 })).toBeVisible();
+  await page.getByRole('link', { name: 'Безопасность' }).click();
   await expect(page.getByText('Это устройство', { exact: true })).toBeVisible();
-  await expect(page.getByRole('heading', { name: 'Хранилище' })).toBeVisible();
+  await expect(page.getByRole('region', { name: 'Заблокированные' })).toBeVisible();
+  await back.click();
+  await page.getByRole('link', { name: 'Хранилище' }).click();
+  await expect(page.getByRole('heading', { name: 'Хранилище', level: 1 })).toBeVisible();
+  await back.click();
+  await page.getByRole('link', { name: 'Внешний вид' }).click();
 
   await page.getByRole('radio', { name: 'Тёмное' }).click();
   await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark');
@@ -126,16 +150,20 @@ test('настройки: имя, язык, тема, шрифт; устройс
   await expect(page.locator('html')).not.toHaveAttribute('data-font');
 
   await page.getByRole('radio', { name: 'English' }).click();
-  await expect(page.getByRole('heading', { name: 'Your profile' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Appearance', level: 1 })).toBeVisible();
   await page.getByRole('radio', { name: 'Русский' }).click();
-  await expect(page.getByRole('heading', { name: 'Ваш профиль' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Внешний вид', level: 1 })).toBeVisible();
+
+  // Старый адрес раздела ведёт туда, куда раздел переехал.
+  await page.goto('/#/settings/blocked', { waitUntil: 'domcontentloaded' });
+  await expect(page.getByRole('heading', { name: 'Безопасность', level: 1 })).toBeVisible({ timeout: 20_000 });
 
   if (!isPhone(info.project.name)) {
     // `Ctrl/⌘ ,` — из любого места.
     await page.goto('/#/', { waitUntil: 'domcontentloaded' });
     await expect(page.getByRole('heading', { name: 'Чаты', level: 1 })).toBeVisible({ timeout: 20_000 });
     await page.keyboard.press('ControlOrMeta+Comma');
-    await expect(page.getByRole('heading', { name: 'Ваш профиль' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Настройки', level: 1 })).toBeVisible();
   }
 });
 
@@ -158,7 +186,7 @@ test('заблокировать из меню сообщения — сообщ
   // И в списке чатов её слова не превью.
   await expect(page.getByRole('link', { name: /^Дом 14/ })).not.toContainText('Лифт опять');
 
-  await page.getByRole('button', { name: 'Настройки' }).click();
+  await openSettings(page, 'Безопасность');
   const section = page.getByRole('region', { name: 'Заблокированные' });
   await expect(section).toContainText('@vera:demo.iskra.invalid');
   await section.getByRole('button', { name: 'Разблокировать' }).click();
@@ -240,7 +268,7 @@ test('локальное имя личного чата: видно везде, 
 test('обои: градиент за перепиской и непрозрачные пузыри; своё фото — до выхода из аккаунта', async ({ page }) => {
   const problems = watchForProblems(page);
   await signInToDemo(page);
-  await page.getByRole('button', { name: 'Настройки' }).click();
+  await openSettings(page, 'Внешний вид');
   const tiles = page.getByRole('radiogroup', { name: 'Обои' });
   await expect(tiles.getByRole('radio', { name: 'Без обоев' })).toHaveAttribute('aria-checked', 'true');
   await expect(page.getByRole('slider')).toHaveCount(0);
@@ -257,7 +285,7 @@ test('обои: градиент за перепиской и непрозрач
   // Своё фото: выбрать — и оно за перепиской, и переживает перезагрузку.
   const back = page.getByRole('button', { name: 'Назад' });
   if (await back.isVisible()) await back.click();
-  await page.getByRole('button', { name: 'Настройки' }).click();
+  await openSettings(page, 'Внешний вид');
   const png = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==', 'base64');
   const chooser = page.waitForEvent('filechooser');
   await tiles.getByRole('radio', { name: 'Своё фото' }).click();
@@ -267,7 +295,7 @@ test('обои: градиент за перепиской и непрозрач
 
   await page.reload({ waitUntil: 'domcontentloaded' });
   // Сначала дождаться экрана: `openRoom` спрашивает «видно ли „Назад“» один раз и сразу.
-  await expect(page.getByRole('heading', { name: 'Настройки', level: 1 })).toBeVisible({ timeout: 20_000 });
+  await expect(page.getByRole('heading', { name: 'Внешний вид', level: 1 })).toBeVisible({ timeout: 20_000 });
   await openRoom(page, /^Аня/);
   await expect(page.locator('[data-wallpaper-kind="photo"] img')).toBeVisible();
 
@@ -286,7 +314,7 @@ test('компактный вид: без пузырей, имя — у кажд
 
   const back = page.getByRole('button', { name: 'Назад' });
   if (await back.isVisible()) await back.click();
-  await page.getByRole('button', { name: 'Настройки' }).click();
+  await openSettings(page, 'Внешний вид');
   await page.getByRole('switch', { name: 'Компактный вид' }).check();
 
   await openRoom(page, /^Аня/);
@@ -299,8 +327,8 @@ test('компактный вид: без пузырей, имя — у кажд
 test('уведомления аккаунта: группы — только упоминания, приглашения выключены; открыл заново — так же', async ({ page }) => {
   const problems = watchForProblems(page);
   await signInToDemo(page);
-  await page.getByRole('button', { name: 'Настройки' }).click();
-  const section = page.getByRole('region', { name: 'Уведомления' });
+  await openSettings(page, 'Уведомления');
+  const section = page;
   const groups = section.getByRole('radiogroup', { name: 'Группы' });
   await expect(groups.getByRole('radio', { name: 'Все сообщения' })).toHaveAttribute('aria-checked', 'true');
   // Умолчание «выключены» не бывает: без notify оно и есть «только упоминания».
@@ -316,8 +344,8 @@ test('уведомления аккаунта: группы — только у�
   await expect(section.getByRole('switch', { name: 'Когда меня упоминают' })).toBeChecked();
 
   // Правила — на сервере: раздел, открытый заново, перечитывает их оттуда.
-  await page.goto(page.url().replace(/#.*$/, '#/'));
-  await page.getByRole('button', { name: 'Настройки' }).click();
+  await page.getByRole('button', { name: 'Назад' }).click();
+  await page.getByRole('link', { name: 'Уведомления' }).click();
   await expect(section.getByRole('radiogroup', { name: 'Группы' }).getByRole('radio', { name: 'Только упоминания' })).toHaveAttribute('aria-checked', 'true');
   await expect(section.getByRole('switch', { name: 'Приглашения в чаты' })).not.toBeChecked();
   expect(problems).toEqual([]);
