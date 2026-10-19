@@ -134,7 +134,6 @@
 
   const autoDownloadHelp: Record<MediaAutoDownload, TextKey> = {
     always: 'media.autoDownload.alwaysHelp',
-    wifi: 'media.autoDownload.wifiHelpWeb',
     never: 'media.autoDownload.neverHelp',
   };
 

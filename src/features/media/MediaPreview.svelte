@@ -11,7 +11,6 @@
   import { t } from '../../i18n/index.svelte.ts';
   import { aspect, ratio } from './files';
   import { preferences } from '../app/preferences.svelte.ts';
-  import { allowsAutoDownload } from './mediaSettings';
   import { untrack } from 'svelte';
 
   interface Props {
@@ -28,7 +27,7 @@
   let failed = $state(false);
   /** Попросили загрузить сами. */
   let requested = $state(false);
-  const allowed = $derived(kind === 'sticker' || own || requested || allowsAutoDownload(preferences.autoDownload));
+  const allowed = $derived(kind === 'sticker' || own || requested || preferences.autoDownload === 'always');
 
   const round = $derived(kind === 'videoNote');
   const shape = $derived(round ? 1 : ratio(attachment.width, attachment.height));

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { allowsAutoDownload, photoPlan, renamed } from '../../src/features/media/mediaSettings';
+import { photoPlan, renamed } from '../../src/features/media/mediaSettings';
 
 const settings = (stripMetadata: boolean, compress: boolean) => ({ stripMetadata, compress, compression: 'balanced' as const });
 
@@ -24,14 +24,5 @@ describe('фото перед отправкой', () => {
     expect(photoPlan('image/avif', 100, 100, settings(true, true))?.mimetype).toBe('image/jpeg');
     expect(renamed('IMG_1.HEIC.avif', 'image/jpeg')).toBe('IMG_1.HEIC.jpg');
     expect(renamed('.png', 'image/png')).toBe('image.png');
-  });
-});
-
-describe('автозагрузка', () => {
-  it('«Только по Wi-Fi» — только в дешёвой сети; «Никогда» — никогда', () => {
-    expect(allowsAutoDownload('always', true)).toBe(true);
-    expect(allowsAutoDownload('wifi', false)).toBe(true);
-    expect(allowsAutoDownload('wifi', true)).toBe(false);
-    expect(allowsAutoDownload('never', false)).toBe(false);
   });
 });
