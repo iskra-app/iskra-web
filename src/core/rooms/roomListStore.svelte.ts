@@ -21,7 +21,7 @@ import {
 } from 'matrix-js-sdk';
 import { badgeCount, organize, type Organized } from './organize';
 import type { LocalNameSource } from './localNames.svelte.ts';
-import { mutedRoomIds } from './pushRules';
+import { mutedRoomIds, reactionsNotify } from './pushRules';
 import { isMarkedUnread, MARKED_UNREAD, spaceChildren, summarize, type SummaryContext } from './summarize';
 import type { RoomSummary } from './types';
 
@@ -68,6 +68,7 @@ export class RoomListStore {
       ownUserId: this.client.getSafeUserId(),
       directRooms,
       mutedRooms: mutedRoomIds(this.client.pushRules),
+      reactionsNotify: reactionsNotify(this.client.pushRules),
       // eslint-disable-next-line svelte/prefer-svelte-reactivity -- снимок, как и весь контекст
       blocked: new Set(this.client.getIgnoredUsers()),
       ...(this.localNames ? { localName: (roomId: string) => this.localNames!.get(roomId) } : {}),

@@ -63,6 +63,7 @@
   --size-avatar-profile: 6rem; /* 96 */
   --size-room-avatar: 3.5rem; /* 56 — Theme.Size.roomAvatar; под мышью меньше, см. ниже */
   --size-unread-badge: 1.25rem; /* 20 — Theme.Size.unreadBadge: высота значка и ширина «@» */
+  --size-unread-heart: 0.75rem; /* 12 — сердечко в значке: половина его, как у нативной, до сетки 4 */
   --size-navigation-bar: 2.75rem; /* 44 */
   --size-sign-in-column: 26.25rem; /* 420 */
   --size-menu-width: 15rem; /* 240 */

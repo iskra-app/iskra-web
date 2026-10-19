@@ -581,6 +581,9 @@
   "roomList.peek.staysUnread": "のぞいているだけなので、既読にはなりません",
   "roomList.pinned": "ピン留めしたチャット",
   "roomList.privateChat": "保護されたチャット",
+  "roomList.reactions": {
+    "other": "新しいリアクション {count} 件"
+  },
   "roomList.swipe.archive": "アーカイブ",
   "roomList.swipe.pin": "ピン留め",
   "roomList.swipe.unarchive": "アーカイブ解除",

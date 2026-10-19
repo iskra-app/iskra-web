@@ -11,6 +11,8 @@ export interface SummaryContext {
   /** Из `m.direct`: комната → собеседник. */
   directRooms: Map<string, string>;
   mutedRooms: Set<string>;
+  /** Реакции уведомляют (правило нативной, `pushRules.ts`) — и сидят в счётчике сервера. */
+  reactionsNotify?: boolean;
   /** Заблокированные: их сообщение не становится превью. */
   blocked: Set<string>;
   /** Как *я* зову собеседника на этом устройстве (`LocalNames`) — только личные чаты. */
@@ -91,6 +93,7 @@ export function summarize(room: Room, context: SummaryContext): RoomSummary | un
     const sender = room.getMember(lastEvent.getSender() ?? '');
     lastSender = sender ? displayName(sender) : (lastEvent.getSender() ?? undefined);
   }
+  const reactions = invited ? { notifying: 0, toMe: 0 } : unreadReactionsOf(room, me, context.blocked);
   const typing = !invited && room.getMembers().some((m) => m.typing && m.userId !== me);
 
   // Непрочитанное без уведомлений: у беззвучного чата сервер не считает, но новое есть.
@@ -110,9 +113,11 @@ export function summarize(room: Room, context: SummaryContext): RoomSummary | un
     encrypted: room.hasEncryptionStateEvent(),
     membership: invited ? 'invite' : 'join',
     ...(inviter ? { invitedBy: inviterMember ? displayName(inviterMember) : inviter } : {}),
-    unreadCount: room.getUnreadNotificationCount(NotificationCountType.Total),
+    // Счётчик сервера — без реакций: они сказаны сердечком (`unreadReactions`).
+    unreadCount: Math.max(0, room.getUnreadNotificationCount(NotificationCountType.Total) - (context.reactionsNotify ? reactions.notifying : 0)),
     mentionCount: room.getUnreadNotificationCount(NotificationCountType.Highlight),
     hasUnreadMessages,
+    unreadReactions: reactions.toMe,
     isMarkedUnread: isMarkedUnread(room),
     isMuted: context.mutedRooms.has(room.roomId),
     isFavourite: 'm.favourite' in room.tags,
@@ -125,6 +130,28 @@ export function summarize(room: Room, context: SummaryContext): RoomSummary | un
     ...(partnerId ? { counterpartId: partnerId } : {}),
     lastActivity,
   };
+}
+
+/**
+ * Чужие реакции после моей отметки о прочтении — с конца ленты, пока не дошли до прочитанного.
+ * `notifying` — все (их считает сервер, если реакции уведомляют), `toMe` — на мои сообщения.
+ * Цель не загружена — не на моё: лучше без сердечка, чем сердечко ни за что.
+ */
+function unreadReactionsOf(room: Room, me: string, blocked: Set<string>): { notifying: number; toMe: number } {
+  let notifying = 0;
+  let toMe = 0;
+  const events = room.getLiveTimeline().getEvents();
+  for (let i = events.length - 1; i >= 0; i--) {
+    const event = events[i]!;
+    const id = event.getId();
+    if (!id || room.hasUserReadEvent(me, id)) break;
+    const sender = event.getSender() ?? '';
+    if (event.getType() !== EventType.Reaction || event.isRedacted() || sender === me || blocked.has(sender)) continue;
+    notifying++;
+    const target = event.getRelation()?.event_id;
+    if (target && room.findEventById(target)?.getSender() === me) toMe++;
+  }
+  return { notifying, toMe };
 }
 
 function stateContent(room: Room, type: string): Record<string, unknown> | undefined {

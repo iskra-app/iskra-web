@@ -238,3 +238,15 @@ test('строка — как в нативной: в группе автор н
   await expect(anya.getByRole('img', { name: /^(Отправлено|Прочитано)$/ })).toBeVisible();
   expect(problems).toEqual([]);
 });
+
+test('реакция на ваше — сердечко в строке, а не число; открыли чат — сердечка нет', async ({ page }) => {
+  await signInToDemo(page);
+  // Борис отреагировал на последнее сообщение Алисы, уже прочитанное.
+  const history = page.getByRole('link', { name: /^Длинная история/ });
+  await expect(history).toHaveAccessibleName(/1 новая реакция/);
+  await expect(history).not.toHaveAccessibleName(/непрочитанн/);
+  await expect(history.locator('.reacted')).toBeVisible();
+  await expect(history.locator('.count, .dot')).toHaveCount(0);
+  await openRoom(page, /^Длинная история/);
+  await expect(page.getByRole('link', { name: /^Длинная история/ }).locator('.reacted')).toHaveCount(0, { timeout: 10_000 });
+});

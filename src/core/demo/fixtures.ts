@@ -259,9 +259,13 @@ export function buildDemoWorld(now: number): { rooms: DemoRoom[]; invites: DemoI
   const history = demoRooms.history;
   const historyTimeline = stamp(
     history,
-    Array.from({ length: 400 }, (_, i) =>
-      text(i % 3 === 0 ? alice : i % 3 === 1 ? boris : vera, `Сообщение номер ${i + 1}`),
-    ),
+    [
+      ...Array.from({ length: 400 }, (_, i) =>
+        text(i % 3 === 0 ? alice : i % 3 === 1 ? boris : vera, `Сообщение номер ${i + 1}`),
+      ),
+      // Последнее — Алисы, и прочитано; Борис отреагировал позже — сердечко в строке, не число.
+      { type: 'm.reaction', sender: boris, content: { 'm.relates_to': { rel_type: 'm.annotation', event_id: '$history-399', key: '👍' } } },
+    ],
     now,
     60 * 26,
     3,
@@ -309,7 +313,7 @@ export function buildDemoWorld(now: number): { rooms: DemoRoom[]; invites: DemoI
           { type: 'm.room.name', sender: alice, state_key: '', content: { name: 'Длинная история' }, event_id: `$name-${history}` },
         ]),
         timeline: historyTimeline,
-        readUpTo: historyTimeline[historyTimeline.length - 1]!.event_id!,
+        readUpTo: '$history-399',
       },
       {
         roomId: demoRooms.archived,

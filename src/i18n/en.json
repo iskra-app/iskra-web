@@ -586,6 +586,10 @@
   "roomList.peek.staysUnread": "Just peeking — nothing gets marked as read",
   "roomList.pinned": "Pinned chat",
   "roomList.privateChat": "Private chat",
+  "roomList.reactions": {
+    "one": "{count} new reaction",
+    "other": "{count} new reactions"
+  },
   "roomList.swipe.archive": "Archive",
   "roomList.swipe.pin": "Pin",
   "roomList.swipe.unarchive": "Unarchive",

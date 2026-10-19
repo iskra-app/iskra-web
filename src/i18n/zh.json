@@ -581,6 +581,9 @@
   "roomList.peek.staysUnread": "只是偷看一眼——不会标为已读",
   "roomList.pinned": "已置顶的聊天",
   "roomList.privateChat": "受保护的聊天",
+  "roomList.reactions": {
+    "other": "{count} 个新回应"
+  },
   "roomList.swipe.archive": "归档",
   "roomList.swipe.pin": "置顶",
   "roomList.swipe.unarchive": "取消归档",

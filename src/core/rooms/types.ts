@@ -50,6 +50,11 @@ export interface RoomSummary {
   mentionCount: number;
   /** Есть новое после отметки о прочтении — хоть бы и без уведомлений. */
   hasUnreadMessages: boolean;
+  /**
+   * Чужие реакции на мои сообщения после отметки о прочтении — сердечко в строке, а не число:
+   * реакция — ответ на прочитанное, и считать её сообщением — звать в чат, где нового нет.
+   */
+  unreadReactions: number;
   isMarkedUnread: boolean;
   isMuted: boolean;
   isFavourite: boolean;

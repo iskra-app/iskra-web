@@ -111,9 +111,11 @@
           >{#if sender}<span class="sender">{sender}</span><span class="colon">:</span><br class="break" />{/if}{previewText(room.preview)}</span
         >
       {/if}
-      {#if hasUnread(room) || room.mentionCount > 0}
+      {#if hasUnread(room) || room.mentionCount > 0 || room.unreadReactions > 0}
         <UnreadBadge
           count={room.unreadCount}
+          unread={hasUnread(room)}
+          reacted={room.unreadReactions > 0}
           mentioned={room.mentionCount > 0}
           muted={emphasisOf(room) === 'muted'}
           format={(n) => number.format(n)}

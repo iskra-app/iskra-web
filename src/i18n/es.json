@@ -588,6 +588,10 @@
   "roomList.peek.staysUnread": "Solo está echando un vistazo: no se marcará como leído",
   "roomList.pinned": "Chat fijado",
   "roomList.privateChat": "Chat protegido",
+  "roomList.reactions": {
+    "one": "{count} reacción nueva",
+    "other": "{count} reacciones nuevas"
+  },
   "roomList.swipe.archive": "Archivar",
   "roomList.swipe.pin": "Fijar",
   "roomList.swipe.unarchive": "Desarchivar",

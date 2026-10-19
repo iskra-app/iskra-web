@@ -586,6 +586,10 @@
   "roomList.peek.staysUnread": "Nur ein Blick – nichts wird als gelesen markiert",
   "roomList.pinned": "Angehefteter Chat",
   "roomList.privateChat": "Geschützter Chat",
+  "roomList.reactions": {
+    "one": "{count} neue Reaktion",
+    "other": "{count} neue Reaktionen"
+  },
   "roomList.swipe.archive": "Archivieren",
   "roomList.swipe.pin": "Anheften",
   "roomList.swipe.unarchive": "Zurückholen",

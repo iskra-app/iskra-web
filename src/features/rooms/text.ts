@@ -28,5 +28,6 @@ export function rowLabel(room: RoomSummary, draft?: string): string {
   if (room.unreadCount > 0) parts.push(plural('roomList.unread', room.unreadCount));
   else if (hasUnread(room)) parts.push(t('roomList.hasUnread'));
   if (room.mentionCount > 0) parts.push(plural('roomList.mentions', room.mentionCount));
+  if (room.unreadReactions > 0) parts.push(plural('roomList.reactions', room.unreadReactions));
   return parts.join(', ');
 }

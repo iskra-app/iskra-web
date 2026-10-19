@@ -588,6 +588,10 @@
   "roomList.peek.staysUnread": "Juste un coup d’œil : rien ne sera marqué comme lu",
   "roomList.pinned": "Discussion épinglée",
   "roomList.privateChat": "Discussion protégée",
+  "roomList.reactions": {
+    "one": "{count} nouvelle réaction",
+    "other": "{count} nouvelles réactions"
+  },
   "roomList.swipe.archive": "Archiver",
   "roomList.swipe.pin": "Épingler",
   "roomList.swipe.unarchive": "Désarchiver",

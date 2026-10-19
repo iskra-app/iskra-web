@@ -596,6 +596,12 @@
   "roomList.peek.staysUnread": "Вы только подглядываете — прочитанным не отметится",
   "roomList.pinned": "Закреплённый чат",
   "roomList.privateChat": "Защищённый чат",
+  "roomList.reactions": {
+    "one": "{count} новая реакция",
+    "few": "{count} новые реакции",
+    "many": "{count} новых реакций",
+    "other": "{count} новых реакций"
+  },
   "roomList.swipe.archive": "В архив",
   "roomList.swipe.pin": "Закрепить",
   "roomList.swipe.unarchive": "Из архива",
