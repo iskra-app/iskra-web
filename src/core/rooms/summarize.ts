@@ -17,7 +17,11 @@ export interface SummaryContext {
   localName?: (roomId: string) => string | undefined;
 }
 
-const MARKED_UNREAD = ['m.marked_unread', 'com.famedly.marked_unread'];
+/** Метка «непрочитано»: пишем стабильное имя, читаем и его, и старое (MSC2867). */
+export const MARKED_UNREAD = 'm.marked_unread';
+const MARKED_UNREAD_TYPES = [MARKED_UNREAD, 'com.famedly.marked_unread'];
+
+export const isMarkedUnread = (room: Room): boolean => MARKED_UNREAD_TYPES.some((type) => room.getAccountData(type)?.getContent()?.['unread'] === true);
 
 export function summarize(room: Room, context: SummaryContext): RoomSummary | undefined {
   const membership = room.getMyMembership();
@@ -91,7 +95,7 @@ export function summarize(room: Room, context: SummaryContext): RoomSummary | un
     unreadCount: room.getUnreadNotificationCount(NotificationCountType.Total),
     mentionCount: room.getUnreadNotificationCount(NotificationCountType.Highlight),
     hasUnreadMessages,
-    isMarkedUnread: MARKED_UNREAD.some((type) => room.getAccountData(type)?.getContent()?.['unread'] === true),
+    isMarkedUnread: isMarkedUnread(room),
     isMuted: context.mutedRooms.has(room.roomId),
     isFavourite: 'm.favourite' in room.tags,
     isLowPriority: 'm.lowpriority' in room.tags,

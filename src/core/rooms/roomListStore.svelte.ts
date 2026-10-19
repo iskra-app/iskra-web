@@ -20,8 +20,11 @@ import {
 import { badgeCount, organize, type Organized } from './organize';
 import type { LocalNameSource } from './localNames.svelte.ts';
 import { mutedRoomIds } from './pushRules';
-import { spaceChildren, summarize, type SummaryContext } from './summarize';
+import { isMarkedUnread, MARKED_UNREAD, spaceChildren, summarize, type SummaryContext } from './summarize';
 import type { RoomSummary } from './types';
+
+const FAVOURITE = 'm.favourite';
+const LOW_PRIORITY = 'm.lowpriority';
 
 export class RoomListStore {
   /** Все комнаты, которые показываются в списке: вошли или приглашены. */
@@ -170,6 +173,53 @@ export class RoomListStore {
     return spaceChildren(space)
       .map((id) => this.byId.get(id))
       .filter((room): room is RoomSummary => !!room);
+  }
+
+  // ————— Из меню строки: `RoomListStore` нативной —————
+  // Каждое — `true`, если сервер принял: что не так, скажет экран, а строка вернётся сама —
+  // сводка пересобирается из того, что пришло синхронизацией, а не из того, что просили.
+
+  /** Закрепить — тег `m.favourite`. */
+  setPinned(roomId: string, pinned: boolean): Promise<boolean> {
+    return this.act(() => (pinned ? this.client.setRoomTag(roomId, FAVOURITE, {}) : this.client.deleteRoomTag(roomId, FAVOURITE)));
+  }
+
+  /**
+   * В архив — тег `m.lowpriority`, ближайшее, что в Matrix есть к архиву. История не трогается:
+   * чат просто уходит из списка в «Архив».
+   */
+  setArchived(roomId: string, archived: boolean): Promise<boolean> {
+    return this.act(() => (archived ? this.client.setRoomTag(roomId, LOW_PRIORITY, {}) : this.client.deleteRoomTag(roomId, LOW_PRIORITY)));
+  }
+
+  /**
+   * Прочитано — отметка о прочтении на последнем и снятая метка «непрочитано». Обе половины:
+   * отметка метку не снимает, и без второй значок оставался бы.
+   */
+  markRead(roomId: string): Promise<boolean> {
+    return this.act(async () => {
+      const room = this.client.getRoom(roomId);
+      const last = room
+        ?.getLiveTimeline()
+        .getEvents()
+        .findLast((event) => !!event.getId() && !event.getId()!.startsWith('~') && !event.status);
+      if (last && !room!.hasUserReadEvent(this.client.getSafeUserId(), last.getId()!)) await this.client.sendReadReceipt(last);
+      if (room && isMarkedUnread(room)) await this.client.setRoomAccountData(roomId, MARKED_UNREAD as never, { unread: false } as never);
+    });
+  }
+
+  /** Непрочитано — метка `m.marked_unread`: значок вернётся, хотя нового нет, — как напоминание. */
+  markUnread(roomId: string): Promise<boolean> {
+    return this.act(() => this.client.setRoomAccountData(roomId, MARKED_UNREAD as never, { unread: true } as never));
+  }
+
+  private async act(task: () => Promise<unknown>): Promise<boolean> {
+    try {
+      await task();
+      return true;
+    } catch {
+      return false;
+    }
   }
 
   /** «Войти» по приглашению. */

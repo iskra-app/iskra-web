@@ -60,6 +60,8 @@ export interface DemoRoom {
   fullyRead?: string;
   /** Теги комнаты: `m.favourite` — закреплённый, `m.lowpriority` — архив. */
   tags?: Record<string, Record<string, unknown>>;
+  /** Данные комнаты, кроме тегов и маркера, — метка «непрочитано» (`m.marked_unread`). */
+  accountData?: Record<string, unknown>;
 }
 
 export interface DemoInvite {

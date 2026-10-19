@@ -13,6 +13,7 @@
   import type { UserSession } from '../../core/session/userSession.svelte.ts';
   import { i18n, t } from '../../i18n/index.svelte.ts';
   import RoomFace from './RoomFace.svelte';
+  import { longPress } from '../room/gestures';
   import { previewText, roomName, rowLabel } from './text';
 
   interface Props {
@@ -21,8 +22,33 @@
     selected: boolean;
     now: number;
     onopen?: (roomId: string) => void;
+    /** Меню строки: у точки — мышью и с клавиатуры, листом (`sheet`) — пальцем. */
+    onmenu?: (at: { x: number; y: number }, sheet: boolean) => void;
   }
-  let { room, session, selected, now, onopen }: Props = $props();
+  let { room, session, selected, now, onopen, onmenu }: Props = $props();
+
+  /**
+   * Правый щелчок — у указателя. С клавиатуры у события нет точки — тогда под строкой.
+   */
+  function oncontextmenu(event: MouseEvent) {
+    if (!onmenu) return;
+    event.preventDefault();
+    const fromKeyboard = event.button !== 2 || (event.clientX === 0 && event.clientY === 0);
+    if (fromKeyboard) menuUnder(event.currentTarget as HTMLElement);
+    else onmenu({ x: event.clientX, y: event.clientY }, false);
+  }
+
+  /** `Shift F10` и клавиша меню — сами, как у сообщения в ленте: не каждый браузер шлёт на них `contextmenu`. */
+  function onkeydown(event: KeyboardEvent) {
+    if (!onmenu || !(event.key === 'ContextMenu' || (event.key === 'F10' && event.shiftKey))) return;
+    event.preventDefault();
+    menuUnder(event.currentTarget as HTMLElement);
+  }
+
+  function menuUnder(row: HTMLElement) {
+    const rect = row.getBoundingClientRect();
+    onmenu?.({ x: rect.left + rect.height / 2, y: rect.bottom }, false);
+  }
 
   const number = $derived(new Intl.NumberFormat(i18n.locale));
 </script>
@@ -33,6 +59,9 @@
   aria-current={selected ? 'page' : undefined}
   aria-label={rowLabel(room)}
   data-room-id={room.id}
+  {oncontextmenu}
+  {onkeydown}
+  use:longPress={(at) => onmenu?.(at, true)}
   onclick={(event) => {
     if (!onopen || event.metaKey || event.ctrlKey || event.shiftKey || event.button !== 0) return;
     event.preventDefault();
@@ -82,6 +111,8 @@
     /* Пятьсот комнат — не беда: строки вне экрана не раскладываются и не рисуются. */
     content-visibility: auto;
     contain-intrinsic-size: auto var(--row-room);
+    /* Долгое нажатие — наше меню, а не системное «Открыть ссылку» поверх (iOS). */
+    -webkit-touch-callout: none;
   }
   /* Наведение — только там, где указатель умеет наводиться: на телефоне тап оставлял бы «залипшую» подсветку. */
   @media (hover: hover) {

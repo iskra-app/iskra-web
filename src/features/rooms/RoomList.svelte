@@ -24,6 +24,9 @@
   import { folderSelection } from './folderSelection.svelte.ts';
   import { roomsOf } from '../../core/rooms/folders';
   import { roomName } from './text';
+  import Menu from '../../design/Menu.svelte';
+  import FolderMembership from './FolderMembership.svelte';
+  import { hasUnread } from '../../core/rooms/types';
 
   let { session }: { session: UserSession } = $props();
 
@@ -79,6 +82,20 @@
     router.go({ name: 'room', roomId: room.id });
   }
 
+  // ————— Меню строки — то, что в нативной под «подглядыванием» —————
+
+  let menu = $state<{ room: RoomSummary; at: { x: number; y: number }; sheet: boolean } | null>(null);
+  let choosingFolders = $state<RoomSummary | null>(null);
+
+  /** Пункт меню: закрыть меню, сделать, не вышло — сказать. */
+  function act(task: (room: RoomSummary) => Promise<boolean> | void, failed?: TextKey) {
+    const room = menu?.room;
+    menu = null;
+    if (!room) return;
+    const result = task(room);
+    if (result && failed) void result.then((ok) => !ok && (failure = failed));
+  }
+
   /** ↑/↓ — по строкам списка. */
   function onkeydown(event: KeyboardEvent) {
     if (event.key !== 'ArrowDown' && event.key !== 'ArrowUp') return;
@@ -131,11 +148,51 @@
       {#if room.membership === 'invite'}
         <InviteRow {room} {session} onfailure={(key) => (failure = key)} />
       {:else}
-        <RoomRow {room} {session} {now} selected={room.id === selectedId} onopen={() => open(room)} />
+        <RoomRow
+          {room}
+          {session}
+          {now}
+          selected={room.id === selectedId}
+          onopen={() => open(room)}
+          onmenu={(at, sheet) => (menu = { room, at, sheet })}
+        />
       {/if}
     {/each}
   {/if}
 </div>
+
+<Menu
+  open={!!menu}
+  x={menu?.at.x ?? 0}
+  y={menu?.at.y ?? 0}
+  sheet={menu?.sheet ?? false}
+  label={t('roomList.menuWeb', { name: menu ? roomName(menu.room) : '' })}
+  onclose={() => (menu = null)}
+>
+  {#if menu}
+    {@const room = menu.room}
+    {@const rooms = session.rooms}
+    <button type="button" role="menuitem" onclick={() => act(open)}>{t('roomList.peek.open')}</button>
+    {#if hasUnread(room)}
+      <button type="button" role="menuitem" onclick={() => act((r) => rooms.markRead(r.id), 'roomAction.readFailed')}>{t('roomList.peek.markRead')}</button>
+    {:else}
+      <button type="button" role="menuitem" onclick={() => act((r) => rooms.markUnread(r.id), 'roomAction.readFailed')}>{t('roomList.peek.markUnread')}</button>
+    {/if}
+    <button type="button" role="menuitem" onclick={() => act((r) => rooms.setPinned(r.id, !r.isFavourite), 'roomAction.pinFailed')}>
+      {t(room.isFavourite ? 'roomList.swipe.unpin' : 'roomList.swipe.pin')}
+    </button>
+    {#if room.kind !== 'space'}
+      <button type="button" role="menuitem" onclick={() => act((r) => rooms.setArchived(r.id, !r.isLowPriority), 'roomAction.archiveFailed')}>
+        {t(room.isLowPriority ? 'roomList.swipe.unarchive' : 'roomList.swipe.archive')}
+      </button>
+    {/if}
+    {#if folders.length > 0}
+      <button type="button" role="menuitem" onclick={() => act((r) => void (choosingFolders = r))}>{t('folders.addToFolder')}</button>
+    {/if}
+  {/if}
+</Menu>
+
+<FolderMembership room={choosingFolders} {session} onclose={() => (choosingFolders = null)} />
 
 <style>
   .list {

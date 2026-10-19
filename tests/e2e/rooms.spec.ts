@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test';
+import { expect, test, type Page } from '@playwright/test';
 import { isPhone, signInToDemo, watchForProblems } from './helpers';
 
 test('список чатов из демо: имена, превью, значки, заголовок вкладки', async ({ page }) => {
@@ -79,4 +79,107 @@ test('Alt ↓ — следующий чат', async ({ page }, info) => {
   await expect(page.getByRole('heading', { name: 'Аня', level: 1 })).toBeVisible();
   await page.keyboard.press('Alt+ArrowDown');
   await expect(page.getByRole('heading', { name: 'Выходные', level: 1 })).toBeVisible();
+});
+
+/** Меню строки: правым щелчком на десктопе, долгим нажатием — на телефоне. */
+async function rowMenu(page: Page, name: RegExp, phone: boolean) {
+  const row = page.getByRole('link', { name });
+  const menu = page.getByRole('menu', { name: /^Действия с чатом/ });
+  if (phone) {
+    const box = (await row.boundingBox())!;
+    const at = { clientX: box.x + 20, clientY: box.y + 20, pointerId: 9, pointerType: 'touch', isPrimary: true };
+    await row.dispatchEvent('pointerdown', at);
+    await expect(menu).toBeVisible();
+    await row.dispatchEvent('pointerup', at);
+    // Отпущенный палец — не щелчок по ссылке: чат не открылся.
+    await row.dispatchEvent('click', { button: 0 });
+    await expect(page).not.toHaveURL(/#\/room\//);
+  } else {
+    await row.click({ button: 'right' });
+  }
+  await expect(menu).toBeVisible();
+  return menu;
+}
+
+test('меню строки: прочитано и непрочитано, закрепить, в архив — как под «подглядыванием» нативной', async ({ page }, info) => {
+  const problems = watchForProblems(page);
+  const phone = isPhone(info.project.name);
+  await signInToDemo(page);
+  const weekend = page.getByRole('link', { name: /^Выходные/ });
+
+  let menu = await rowMenu(page, /^Выходные/, phone);
+  // Папок нет — нет и «В папку».
+  await expect(menu.getByRole('menuitem')).toHaveText(['Открыть чат', 'Отметить прочитанным', 'Закрепить', 'В архив']);
+  await menu.getByRole('menuitem', { name: 'Отметить прочитанным' }).click();
+  await expect(weekend).not.toHaveAccessibleName(/непрочитанн/);
+
+  menu = await rowMenu(page, /^Выходные/, phone);
+  await menu.getByRole('menuitem', { name: 'Отметить непрочитанным' }).click();
+  await expect(weekend).toHaveAccessibleName(/Есть непрочитанные/);
+
+  menu = await rowMenu(page, /^Выходные/, phone);
+  await menu.getByRole('menuitem', { name: 'Закрепить' }).click();
+  await expect(weekend).toHaveAccessibleName(/Закреплённый чат/);
+
+  menu = await rowMenu(page, /^Выходные/, phone);
+  await menu.getByRole('menuitem', { name: 'В архив' }).click();
+  await expect(weekend).toHaveCount(0);
+  await page.getByRole('button', { name: 'Архив (2)' }).click();
+  menu = await rowMenu(page, /^Выходные/, phone);
+  await menu.getByRole('menuitem', { name: 'Из архива' }).click();
+  await expect(weekend).toHaveCount(0);
+  await page.getByRole('button', { name: 'Назад' }).first().click();
+  await expect(weekend).toBeVisible();
+
+  // С клавиатуры — клавиша меню на строке в фокусе; «Открыть чат» открывает.
+  if (!phone) {
+    await weekend.focus();
+    await page.keyboard.press('Shift+F10');
+    menu = page.getByRole('menu', { name: /^Действия с чатом/ });
+    await menu.getByRole('menuitem', { name: 'Открыть чат' }).click();
+    await expect(page).toHaveURL(/#\/room\/!weekend/);
+  }
+  expect(problems).toEqual([]);
+});
+
+test('«В папку» из меню строки: галочка — чат в папке, снятая — исключён', async ({ page }, info) => {
+  const problems = watchForProblems(page);
+  const phone = isPhone(info.project.name);
+  await signInToDemo(page);
+  await page.getByRole('button', { name: 'Настройки' }).click();
+  await page.getByRole('navigation', { name: 'Настройки' }).getByRole('link', { name: 'Папки' }).click();
+  await page
+    .getByRole('list', { name: 'Можно начать с этих' })
+    .getByRole('listitem')
+    .filter({ hasText: 'Личные' })
+    .getByRole('button', { name: 'Добавить' })
+    .click();
+  await expect(page.getByRole('button', { name: /^Личные\s*\d+$/ })).toBeVisible();
+  const tabs = page.getByRole('tablist', { name: 'Папки' });
+  await expect(async () => {
+    if (!(await tabs.isVisible())) await page.getByRole('button', { name: 'Назад' }).click({ timeout: 1000 });
+    await expect(tabs).toBeVisible({ timeout: 1000 });
+  }).toPass({ timeout: 10_000 });
+
+  const menu = await rowMenu(page, /^Выходные/, phone);
+  await menu.getByRole('menuitem', { name: 'В папку' }).click();
+  const sheet = page.getByRole('dialog', { name: 'Выходные' });
+  const personal = sheet.getByRole('checkbox', { name: 'Личные' });
+  await expect(personal).not.toBeChecked();
+  await personal.check();
+  await expect(personal).toBeChecked();
+  await sheet.getByRole('button', { name: 'Готово' }).click();
+  await expect(sheet).toBeHidden();
+
+  await tabs.getByRole('tab', { name: /^Личные/ }).click();
+  await expect(page.getByRole('link', { name: /^Выходные/ })).toBeVisible();
+  await expect(page.getByRole('link', { name: /^Аня/ })).toBeVisible();
+
+  // Сняли галочку у личного чата — его в «Личных» нет, хоть он и подходит под правило.
+  const again = await rowMenu(page, /^Аня/, phone);
+  await again.getByRole('menuitem', { name: 'В папку' }).click();
+  await page.getByRole('dialog', { name: 'Аня' }).getByRole('checkbox', { name: 'Личные' }).uncheck();
+  await page.getByRole('dialog', { name: 'Аня' }).getByRole('button', { name: 'Готово' }).click();
+  await expect(page.getByRole('link', { name: /^Аня/ })).toHaveCount(0);
+  expect(problems).toEqual([]);
 });

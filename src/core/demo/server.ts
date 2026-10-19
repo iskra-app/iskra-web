@@ -177,6 +177,9 @@ export class DemoHomeserver {
       ['GET', re(`${c}/v3/room_keys/keys`), (r) => this.getBackupKeys(r)],
       // Ключи одной комнаты — их просит Rust-крипто, приглашая: чтобы передать приглашённому историю.
       ['GET', re(`${c}/v3/room_keys/keys/([^/]+)`), (r) => this.getRoomBackupKeys(r)],
+      ['PUT', re(`${c}/v3/user/([^/]+)/rooms/([^/]+)/tags/([^/]+)`), (r) => this.putTag(r.params[1]!, r.params[2]!, r.body)],
+      ['DELETE', re(`${c}/v3/user/([^/]+)/rooms/([^/]+)/tags/([^/]+)`), (r) => this.putTag(r.params[1]!, r.params[2]!, undefined)],
+      ['PUT', re(`${c}/v3/user/([^/]+)/rooms/([^/]+)/account_data/([^/]+)`), (r) => this.putRoomAccountData(r.params[1]!, r.params[2]!, r.body)],
       ['GET', re(`${c}/v3/user/([^/]+)/account_data/([^/]+)`), (r) => this.getAccountData(r.params[1]!)],
       ['PUT', re(`${c}/v3/user/([^/]+)/account_data/([^/]+)`), (r) => this.putAccountData(r.params[1]!, r.body)],
     ];
@@ -361,6 +364,26 @@ export class DemoHomeserver {
     this.save();
     this.pendingAccountData.push({ type, content });
     this.wake?.();
+    return json(200, {});
+  }
+
+  /** Тег комнаты: `content` — поставить, `undefined` — снять. Приходит синхронизацией целиком. */
+  private putTag(roomId: string, tag: string, content: unknown): Response {
+    const room = this.rooms.get(roomId);
+    if (!room) return json(403, { errcode: 'M_FORBIDDEN', error: 'Not in room' });
+    const tags = { ...room.tags };
+    if (content === undefined) delete tags[tag];
+    else tags[tag] = (content ?? {}) as Record<string, unknown>;
+    room.tags = tags;
+    this.enqueue({ kind: 'join', roomId: room.roomId, body: { account_data: { events: [{ type: 'm.tag', content: { tags } }] } } });
+    return json(200, {});
+  }
+
+  private putRoomAccountData(roomId: string, type: string, content: unknown): Response {
+    const room = this.rooms.get(roomId);
+    if (!room) return json(403, { errcode: 'M_FORBIDDEN', error: 'Not in room' });
+    room.accountData = { ...room.accountData, [type]: content };
+    this.enqueue({ kind: 'join', roomId: room.roomId, body: { account_data: { events: [{ type, content }] } } });
     return json(200, {});
   }
 
@@ -576,6 +599,7 @@ export class DemoHomeserver {
           events: [
             ...(room.tags ? [{ type: 'm.tag', content: { tags: room.tags } }] : []),
             ...(room.fullyRead ? [{ type: 'm.fully_read', content: { event_id: room.fullyRead } }] : []),
+            ...Object.entries(room.accountData ?? {}).map(([type, content]) => ({ type, content })),
           ],
         },
         unread_notifications: {

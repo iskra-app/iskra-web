@@ -112,3 +112,70 @@ export function touchGestures(node: HTMLElement, handlers: GestureHandlers) {
     },
   };
 }
+
+/**
+ * Одно долгое нажатие пальцем — для строки списка чатов, где ни свайпа, ни двойного касания
+ * нет. Отпущенный после него палец — не щелчок: строка — ссылка, и без этого она открыла бы
+ * чат, меню которого только что открылось. `contextmenu` следом (Android) — тоже гасится.
+ */
+export function longPress(node: HTMLElement, handler: (at: { x: number; y: number }) => void) {
+  let current = handler;
+  let start: { x: number; y: number; id: number } | null = null;
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  let pressedAt = Number.NEGATIVE_INFINITY;
+  /** Палец, открывший меню, ещё не отпущен — щелчок от него не в счёт, сколько бы ни держали. */
+  let held = false;
+
+  const down = (event: PointerEvent) => {
+    held = false;
+    if (event.pointerType !== 'touch' || !event.isPrimary) return;
+    start = { x: event.clientX, y: event.clientY, id: event.pointerId };
+    const at = { x: event.clientX, y: event.clientY };
+    clearTimeout(timer);
+    timer = setTimeout(() => {
+      pressedAt = performance.now();
+      held = true;
+      start = null;
+      current(at);
+    }, LONG_PRESS_MS);
+  };
+  const move = (event: PointerEvent) => {
+    if (start && event.pointerId === start.id && Math.hypot(event.clientX - start.x, event.clientY - start.y) > TAP_SLOP_PX) clearTimeout(timer);
+  };
+  const cancel = () => {
+    clearTimeout(timer);
+    start = null;
+  };
+  const swallowMenu = (event: Event) => {
+    if (performance.now() - pressedAt >= LONG_PRESS_MS * 2) return;
+    event.preventDefault();
+    event.stopImmediatePropagation();
+  };
+  const swallowClick = (event: Event) => {
+    if (!held) return;
+    held = false;
+    event.preventDefault();
+    event.stopImmediatePropagation();
+  };
+
+  node.addEventListener('pointerdown', down);
+  node.addEventListener('pointermove', move);
+  node.addEventListener('pointerup', cancel);
+  node.addEventListener('pointercancel', cancel);
+  node.addEventListener('contextmenu', swallowMenu, { capture: true });
+  node.addEventListener('click', swallowClick, { capture: true });
+  return {
+    update(next: (at: { x: number; y: number }) => void) {
+      current = next;
+    },
+    destroy() {
+      clearTimeout(timer);
+      node.removeEventListener('pointerdown', down);
+      node.removeEventListener('pointermove', move);
+      node.removeEventListener('pointerup', cancel);
+      node.removeEventListener('pointercancel', cancel);
+      node.removeEventListener('contextmenu', swallowMenu, { capture: true });
+      node.removeEventListener('click', swallowClick, { capture: true });
+    },
+  };
+}
