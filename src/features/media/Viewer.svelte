@@ -24,6 +24,7 @@
 </script>
 
 <script lang="ts">
+  import { ICON_VIEWBOX, icons } from '../../design/icons.ts';
   import { onMount } from 'svelte';
   import { MediaError, type MediaLoader } from '../../core/media/media';
   import { viewport } from '../../design/viewport.svelte.ts';
@@ -344,15 +345,15 @@
 <dialog bind:this={dialog} class="viewer" aria-label={label} {onclose} {onkeydown}>
   <div class="bar">
     <button type="button" aria-label={t('message.media.close')} title={t('message.media.close')} onclick={close}>
-      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18" /></svg>
+      <svg viewBox={ICON_VIEWBOX} aria-hidden="true"><path d={icons.close} /></svg>
     </button>
     <span class="position" role="status">{items.length > 1 ? t('message.media.position', { index: index + 1, count: items.length }) : ''}</span>
     {#if !isVideo && viewport.finePointer}
       <button type="button" aria-label={t('message.media.zoomOut')} title={t('message.media.zoomOut')} onclick={() => zoomTo(view.scale / STEP)}>
-        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14" /></svg>
+        <svg viewBox={ICON_VIEWBOX} aria-hidden="true"><path d={icons.minus} /></svg>
       </button>
       <button type="button" aria-label={t('message.media.zoomIn')} title={t('message.media.zoomIn')} onclick={() => zoomTo(view.scale * STEP)}>
-        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14" /></svg>
+        <svg viewBox={ICON_VIEWBOX} aria-hidden="true"><path d={icons.plus} /></svg>
       </button>
       <button type="button" disabled={!full} onclick={copy}>{copied ? t('message.media.copied') : t('message.media.copy')}</button>
     {/if}
@@ -390,10 +391,10 @@
 
   {#if items.length > 1 && viewport.finePointer}
     <button type="button" class="side previous" disabled={index === 0} aria-label={t('message.media.previous')} title={t('message.media.previous')} onclick={() => go(-1)}>
-      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 5l-7 7 7 7" /></svg>
+      <svg viewBox={ICON_VIEWBOX} aria-hidden="true"><path d={icons.previous} /></svg>
     </button>
     <button type="button" class="side next" disabled={index === items.length - 1} aria-label={t('message.media.next')} title={t('message.media.next')} onclick={() => go(1)}>
-      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 5l7 7-7 7" /></svg>
+      <svg viewBox={ICON_VIEWBOX} aria-hidden="true"><path d={icons.forward} /></svg>
     </button>
   {/if}
 
@@ -463,11 +464,7 @@
   svg {
     width: var(--size-icon-button);
     height: var(--size-icon-button);
-    fill: none;
-    stroke: currentColor;
-    stroke-width: 2;
-    stroke-linecap: round;
-    stroke-linejoin: round;
+    fill: currentColor;
   }
   .stage {
     position: absolute;

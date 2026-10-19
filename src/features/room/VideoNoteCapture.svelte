@@ -11,6 +11,7 @@
   Телефон — «Перевернуть камеру», десктоп — выбор камеры из списка, если их больше одной.
 -->
 <script lang="ts">
+  import { ICON_VIEWBOX, icons } from '../../design/icons.ts';
   import { tick } from 'svelte';
   import { viewport } from '../../design/viewport.svelte.ts';
   import { t, type TextKey } from '../../i18n/index.svelte.ts';
@@ -89,7 +90,7 @@
         </select>
       {:else if !viewport.finePointer && recorder.canFlip}
         <button type="button" class="flip" aria-label={t('videoNote.flipCamera')} title={t('videoNote.flipCamera')} onclick={() => void recorder.flip()}>
-          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12a8 8 0 0 1 14-5.3M20 12a8 8 0 0 1-14 5.3M18 3v4h-4M6 21v-4h4" /></svg>
+          <svg viewBox={ICON_VIEWBOX} aria-hidden="true"><path d={icons.switchCamera} /></svg>
         </button>
       {/if}
       <RecordingStrip {recorder} onCamera {oncancel} />
@@ -97,8 +98,8 @@
     <div class="right">
       {#if holding && recording}
         <span class="lock" aria-hidden="true">
-          <svg viewBox="0 0 24 24"><path d="M8 11V8a4 4 0 0 1 8 0v3M6 11h12v9H6z" /></svg>
-          <svg viewBox="0 0 24 24"><path d="M6 15l6-6 6 6" /></svg>
+          <svg viewBox={ICON_VIEWBOX}><path d={icons.lock} /></svg>
+          <svg viewBox={ICON_VIEWBOX}><path d={icons.up} /></svg>
         </span>
       {/if}
       <button
@@ -111,8 +112,8 @@
         title={recording ? t('recording.send') : t('videoNote.holdToRecord')}
         onclick={press}
       >
-        <svg viewBox="0 0 24 24" aria-hidden="true">
-          {#if recording}<path d="M12 19V5M5 12l7-7 7 7" />{:else}<path d="M3 7h12v10H3zM15 10l6-3v10l-6-3" />{/if}
+        <svg viewBox={ICON_VIEWBOX} aria-hidden="true">
+          {#if recording}<path d={icons.send} />{:else}<path d={icons.video} />{/if}
         </svg>
       </button>
     </div>
@@ -252,11 +253,7 @@
   .lock svg {
     width: var(--size-icon);
     height: var(--size-icon);
-    fill: none;
-    stroke: currentColor;
-    stroke-width: 2;
-    stroke-linecap: round;
-    stroke-linejoin: round;
+    fill: currentColor;
   }
   .lock {
     display: flex;
@@ -299,10 +296,6 @@
   .shutter svg {
     width: var(--size-icon-button);
     height: var(--size-icon-button);
-    fill: none;
-    stroke: currentColor;
-    stroke-width: 2.5;
-    stroke-linecap: round;
-    stroke-linejoin: round;
+    fill: currentColor;
   }
 </style>

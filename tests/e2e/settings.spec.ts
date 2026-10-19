@@ -25,7 +25,31 @@ async function openPanel(page: Page) {
   return panel;
 }
 
-test('«О чате» там, где прав нет: только уведомления, закреплённые, участники и выход', async ({ page }) => {
+test('«О чате» в личном чате: ID собеседника, «Поделиться», «Заблокировать», «Удалить чат»', async ({ page }, info) => {
+  const problems = watchForProblems(page);
+  await page.context().grantPermissions(['clipboard-read', 'clipboard-write']).catch(() => {});
+  await signInToDemo(page);
+  await openRoom(page, /^Аня/);
+  const panel = await openPanel(page);
+  await expect(panel.locator('header')).toContainText('@anya:demo.iskra.invalid');
+  await expect(panel.locator('header')).toContainText('Переписка зашифрована');
+  if (!isPhone(info.project.name) && info.project.name.startsWith('chromium')) {
+    await panel.getByRole('button', { name: 'Поделиться' }).click();
+    await expect(panel.getByRole('status')).toHaveText('Ссылка скопирована');
+    expect(await page.evaluate(() => navigator.clipboard.readText())).toBe('https://matrix.to/#/%40anya%3Ademo.iskra.invalid');
+  } else {
+    await expect(panel.getByRole('button', { name: 'Поделиться' })).toBeVisible();
+  }
+  await panel.getByRole('button', { name: 'Заблокировать пользователя' }).click();
+  await expect(panel).toContainText('Вы заблокировали этого пользователя');
+  await panel.getByRole('button', { name: 'Разблокировать пользователя' }).click();
+  await expect(panel.getByRole('button', { name: 'Заблокировать пользователя' })).toBeVisible();
+  await panel.getByRole('button', { name: 'Удалить чат' }).click();
+  await expect(page.getByRole('dialog', { name: 'Удалить чат?' })).toBeVisible();
+  expect(problems).toEqual([]);
+});
+
+test('«О чате» там, где прав нет: шапка, кнопки, уведомления, закреплённые, участники', async ({ page }) => {
   const problems = watchForProblems(page);
   await signInToDemo(page);
   await openRoom(page, /^Выходные/);
@@ -34,10 +58,17 @@ test('«О чате» там, где прав нет: только уведом�
   await expect(panel.getByRole('button', { name: /Борис.*Администратор/ })).toBeVisible();
   await expect(panel).toContainText('3 участника');
 
+  // Шапка — как в нативной: сколько участников и что с шифрованием; под ней — кнопки.
+  await expect(panel.locator('header')).toContainText('3 участника');
+  await expect(panel.locator('header')).toContainText('Переписка не зашифрована');
+  await expect(panel.getByRole('button', { name: 'Пригласить' })).toBeVisible();
+
   const alerts = panel.getByRole('radiogroup', { name: 'Уведомления' });
   await expect(alerts.getByRole('radio', { name: 'Все сообщения' })).toHaveAttribute('aria-checked', 'true');
-  await alerts.getByRole('radio', { name: 'Выключены' }).click();
+  // «Без звука» под шапкой — то же, что «Выключены».
+  await panel.getByRole('button', { name: 'Без звука' }).click();
   await expect(alerts.getByRole('radio', { name: 'Выключены' })).toHaveAttribute('aria-checked', 'true');
+  await expect(panel.getByRole('button', { name: 'Со звуком' })).toBeVisible();
 
   // Закреплённое из панели ведёт к сообщению.
   await panel.getByRole('button', { name: /Кто что берёт на пикник/ }).click();

@@ -4,6 +4,7 @@
   попросили. Голосовые — своим пузырём, `VoiceMessage`.
 -->
 <script lang="ts">
+  import { ICON_VIEWBOX, icons } from '../../design/icons.ts';
   import { MediaError, type MediaLoader } from '../../core/media/media';
   import type { Attachment } from '../../core/timeline/message';
   import { i18n, t } from '../../i18n/index.svelte.ts';
@@ -50,8 +51,8 @@
 </script>
 
 <div class="file">
-  <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
-    {#if kind === 'file'}<path d="M6 3h8l4 4v14H6zM14 3v4h4" />{:else}<path d="M9 18V6l10-2v12M9 18a3 3 0 1 1-3-3 3 3 0 0 1 3 3zM19 16a3 3 0 1 1-3-3 3 3 0 0 1 3 3z" />{/if}
+  <svg class="icon" viewBox={ICON_VIEWBOX} aria-hidden="true">
+    {#if kind === 'file'}<path d={icons.file} />{:else}<path d={icons.audio} />{/if}
   </svg>
   <span class="what">
     <span class="name">{attachment.name}</span>
@@ -80,10 +81,7 @@
     flex: none;
     width: var(--size-avatar-small);
     height: var(--size-avatar-small);
-    fill: none;
-    stroke: currentColor;
-    stroke-width: 1.5;
-    stroke-linejoin: round;
+    fill: currentColor;
     opacity: 0.8;
   }
   .what {

@@ -5,6 +5,7 @@
   только когда есть что затемнять.
 -->
 <script lang="ts">
+  import { ICON_VIEWBOX, icons } from '../../design/icons.ts';
   import PlainButton from '../../design/PlainButton.svelte';
   import { t, type TextKey } from '../../i18n/index.svelte.ts';
   import { MAX_DIMMING, preferences, wallpapers, type Wallpaper } from '../app/preferences.svelte.ts';
@@ -46,10 +47,10 @@
         {#if wallpaperPhoto.url}
           <img src={wallpaperPhoto.url} alt="" draggable="false" />
         {:else}
-          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h16v12H4zM4 15l4-4 4 4 3-3 5 5" /><circle cx="15" cy="9" r="1.5" /></svg>
+          <svg viewBox={ICON_VIEWBOX} aria-hidden="true"><path d={icons.photo} /></svg>
         {/if}
       {:else if w === 'none'}
-        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 19 19 5" /></svg>
+        <svg viewBox={ICON_VIEWBOX} aria-hidden="true"><path d={icons.none} /></svg>
       {/if}
     </button>
   {/each}
@@ -112,11 +113,7 @@
   .tile svg {
     width: var(--size-icon-button);
     height: var(--size-icon-button);
-    fill: none;
-    stroke: currentColor;
-    stroke-width: 1.5;
-    stroke-linecap: round;
-    stroke-linejoin: round;
+    fill: currentColor;
   }
   .dimming {
     display: flex;

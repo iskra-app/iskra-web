@@ -4,6 +4,7 @@
   перетаскивание — «с превью и подписью перед отправкой, никогда не сразу» (план).
 -->
 <script lang="ts">
+  import { ICON_VIEWBOX, icons } from '../../design/icons.ts';
   import type { OutgoingFile } from '../../core/media/upload';
   import { i18n, t } from '../../i18n/index.svelte.ts';
   import { fileSize } from './files';
@@ -31,7 +32,7 @@
         </span>
       {/if}
       <button type="button" aria-label={`${t('room.removeAttachment')}: ${file.name}`} title={t('room.removeAttachment')} onclick={() => onremove(index)}>
-        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 7l10 10M17 7L7 17" /></svg>
+        <svg viewBox={ICON_VIEWBOX} aria-hidden="true"><path d={icons.close} /></svg>
       </button>
     </li>
   {/each}
@@ -100,9 +101,6 @@
   svg {
     width: var(--size-icon);
     height: var(--size-icon);
-    fill: none;
-    stroke: currentColor;
-    stroke-width: 2.5;
-    stroke-linecap: round;
+    fill: currentColor;
   }
 </style>

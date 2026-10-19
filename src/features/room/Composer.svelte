@@ -17,6 +17,7 @@
   «Стекло» — навигационный слой: полупрозрачность и размытие, где браузер их тянет.
 -->
 <script lang="ts">
+  import { ICON_VIEWBOX, icons } from '../../design/icons.ts';
   import { tick } from 'svelte';
   import Menu from '../../design/Menu.svelte';
   import { viewport } from '../../design/viewport.svelte.ts';
@@ -460,8 +461,8 @@
 <div class="composer glass" onkeydown={recordingKey}>
 {#if context}
   <div class="context">
-    <svg viewBox="0 0 24 24" aria-hidden="true">
-      {#if context.kind === 'reply'}<path d="M10 7L4 12l6 5M4 12h11a5 5 0 0 1 5 5v1" />{:else}<path d="M4 20h4L19 9l-4-4L4 16v4z" />{/if}
+    <svg viewBox={ICON_VIEWBOX} aria-hidden="true">
+      {#if context.kind === 'reply'}<path d={icons.reply} />{:else}<path d={icons.edit} />{/if}
     </svg>
     <span class="what">
       <span class="title">
@@ -471,7 +472,7 @@
       <span class="quote">{quote}</span>
     </span>
     <button type="button" class="cancel" aria-label={t('room.stopReplying')} title={t('room.stopReplying')} onclick={oncancelcontext}>
-      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18" /></svg>
+      <svg viewBox={ICON_VIEWBOX} aria-hidden="true"><path d={icons.close} /></svg>
     </button>
   </div>
 {/if}
@@ -496,7 +497,7 @@
   {:else}
   {#if onfiles}
     <button type="button" class="attach" disabled={!canAttach} aria-label={t('room.attach')} title={t('room.attach')} aria-haspopup="menu" onclick={openAttachMenu}>
-      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 11l-8.5 8.5a5 5 0 0 1-7-7L13 4a3.5 3.5 0 0 1 5 5l-8.5 8.5a2 2 0 0 1-3-3L14 7" /></svg>
+      <svg viewBox={ICON_VIEWBOX} aria-hidden="true"><path d={icons.attach} /></svg>
     </button>
     <input bind:this={picker} type="file" multiple hidden onchange={picked} />
   {/if}
@@ -526,7 +527,7 @@
   {/if}
   {#if recorder.state === 'recording' && !press}
     <button type="button" class="stop" aria-label={t('voice.stop')} title={t('voice.stop')} onclick={stopRecording}>
-      <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="7" y="7" width="10" height="10" rx="2" /></svg>
+      <svg viewBox={ICON_VIEWBOX} aria-hidden="true"><path d={icons.stop} /></svg>
     </button>
   {/if}
   {#if voiceMode}
@@ -534,8 +535,8 @@
       <span class="voice-slot">
         {#if press?.started && press.kind === 'voice' && recording}
           <span class="lock" aria-hidden="true">
-            <svg viewBox="0 0 24 24"><path d="M8 11V8a4 4 0 0 1 8 0v3M6 11h12v9H6z" /></svg>
-            <svg viewBox="0 0 24 24"><path d="M6 15l6-6 6 6" /></svg>
+            <svg viewBox={ICON_VIEWBOX}><path d={icons.lock} /></svg>
+            <svg viewBox={ICON_VIEWBOX}><path d={icons.up} /></svg>
           </span>
         {/if}
         <button
@@ -553,15 +554,15 @@
           onclick={(event) => recordClick(event, kind)}
           oncontextmenu={(event) => event.preventDefault()}
         >
-          <svg viewBox="0 0 24 24" aria-hidden="true">
-            {#if recording && !press}<path d="M12 19V5M5 12l7-7 7 7" />{:else if kind === 'video'}<path d="M3 7h12v10H3zM15 10l6-3v10l-6-3" />{:else}<path d="M12 3a3 3 0 0 0-3 3v6a3 3 0 0 0 6 0V6a3 3 0 0 0-3-3zM5 11a7 7 0 0 0 14 0M12 18v3" />{/if}
+          <svg viewBox={ICON_VIEWBOX} aria-hidden="true">
+            {#if recording && !press}<path d={icons.send} />{:else if kind === 'video'}<path d={icons.video} />{:else}<path d={icons.mic} />{/if}
           </svg>
         </button>
       </span>
     {/each}
   {:else}
     <button type="submit" class="send" disabled={empty || disabled} aria-label={t('room.send')} title={t('room.send')}>
-      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 19V5M5 12l7-7 7 7" /></svg>
+      <svg viewBox={ICON_VIEWBOX} aria-hidden="true"><path d={icons.send} /></svg>
     </button>
   {/if}
 </form>
@@ -627,11 +628,7 @@
     flex: none;
     width: var(--size-icon);
     height: var(--size-icon);
-    fill: none;
-    stroke: currentColor;
-    stroke-width: 2;
-    stroke-linecap: round;
-    stroke-linejoin: round;
+    fill: currentColor;
   }
   .what {
     display: flex;
@@ -714,11 +711,7 @@
   .attach svg {
     width: var(--size-icon-button);
     height: var(--size-icon-button);
-    fill: none;
-    stroke: currentColor;
-    stroke-width: 2;
-    stroke-linecap: round;
-    stroke-linejoin: round;
+    fill: currentColor;
   }
   .send {
     display: grid;
@@ -779,11 +772,7 @@
   .lock svg {
     width: var(--size-icon);
     height: var(--size-icon);
-    fill: none;
-    stroke: currentColor;
-    stroke-width: 2;
-    stroke-linecap: round;
-    stroke-linejoin: round;
+    fill: currentColor;
   }
   .stop {
     display: grid;
@@ -809,10 +798,6 @@
   .send svg {
     width: var(--size-icon);
     height: var(--size-icon);
-    fill: none;
-    stroke: currentColor;
-    stroke-width: 2.5;
-    stroke-linecap: round;
-    stroke-linejoin: round;
+    fill: currentColor;
   }
 </style>

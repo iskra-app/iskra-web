@@ -4,6 +4,7 @@
   по нему (`object-fit: cover`). «Кружочек» — круглый. Нажатие — просмотрщик.
 -->
 <script lang="ts">
+  import { ICON_VIEWBOX, icons } from '../../design/icons.ts';
   import { untrack } from 'svelte';
   import type { MediaLoader } from '../../core/media/media';
   import type { Attachment } from '../../core/timeline/message';
@@ -37,7 +38,7 @@
 <button type="button" class="tile" class:round={kind === 'videoNote'} aria-label={label} title={t('message.media.openFullScreen')} onclick={onopen}>
   {#if url}<img src={url} alt={attachment.caption ?? attachment.name} draggable="false" />{/if}
   {#if video}
-    <span class="play" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z" /></svg></span>
+    <span class="play" aria-hidden="true"><svg viewBox={ICON_VIEWBOX}><path d={icons.play} /></svg></span>
   {/if}
 </button>
 

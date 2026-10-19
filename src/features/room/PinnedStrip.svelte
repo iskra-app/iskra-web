@@ -3,6 +3,7 @@
   сообщению (подгружая историю, если надо); «Открепить» — тем, у кого есть право.
 -->
 <script lang="ts">
+  import { ICON_VIEWBOX, icons } from '../../design/icons.ts';
   import { firstLineOf } from '../../core/timeline/words';
   import type { Message } from '../../core/timeline/message';
   import { t } from '../../i18n/index.svelte.ts';
@@ -28,7 +29,7 @@
 
 <div class="pinned">
   <button type="button" class="jump" aria-label={t('room.pinnedJump')} title={t('room.pinnedJump')} onclick={onjump} disabled={!message}>
-    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 4h6l-1 6 3 3H7l3-3-1-6zM12 13v7" /></svg>
+    <svg viewBox={ICON_VIEWBOX} aria-hidden="true"><path d={icons.pin} /></svg>
     <span class="what">
       <strong>{t('room.pinned')}</strong>
       <span class="text">{text}</span>
@@ -36,7 +37,7 @@
   </button>
   {#if canUnpin && message}
     <button type="button" class="unpin" aria-label={t('room.unpin')} title={t('room.unpin')} onclick={onunpin}>
-      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18" /></svg>
+      <svg viewBox={ICON_VIEWBOX} aria-hidden="true"><path d={icons.close} /></svg>
     </button>
   {/if}
 </div>
@@ -70,11 +71,7 @@
     flex: none;
     width: var(--size-icon);
     height: var(--size-icon);
-    fill: none;
-    stroke: currentColor;
-    stroke-width: 2;
-    stroke-linecap: round;
-    stroke-linejoin: round;
+    fill: currentColor;
   }
   .jump svg {
     color: var(--accent);

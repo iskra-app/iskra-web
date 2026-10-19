@@ -6,6 +6,7 @@
   строк разной высоты читается так, будто список отсортирован по длине сообщения.
 -->
 <script lang="ts">
+  import { ICON_VIEWBOX, icons } from '../../design/icons.ts';
   import UnreadBadge from '../../design/UnreadBadge.svelte';
   import { roomTimestamp } from '../../design/time';
   import { formatRoute } from '../../core/navigation/route';
@@ -77,22 +78,22 @@
     <span class="line">
       <span class="name">{roomName(room)}</span>
       {#if room.encrypted}
-        <svg class="lock" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 11V8a5 5 0 0 1 10 0v3M5 11h14v10H5z" /></svg>
+        <svg class="lock" viewBox={ICON_VIEWBOX} aria-hidden="true"><path d={icons.lock} /></svg>
       {/if}
       <span class="spacer"></span>
       {#if room.isFavourite}
-        <svg class="pin" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 3h6l-1 6 4 4H6l4-4-1-6zM12 13v8" /></svg>
+        <svg class="pin" viewBox={ICON_VIEWBOX} aria-hidden="true"><path d={icons.pin} /></svg>
       {/if}
       {#if room.lastMark && !room.typing}
         <span class="mark" data-mark={room.lastMark}>
           {#if room.lastMark === 'sending'}
-            <svg viewBox="0 0 24 24" role="img" aria-label={t('message.delivery.sending')}><circle cx="12" cy="12" r="8" /><path d="M12 8v4l3 2" /></svg>
+            <svg viewBox={ICON_VIEWBOX} role="img" aria-label={t('message.delivery.sending')}><path d={icons.sending} /></svg>
           {:else if room.lastMark === 'read'}
-            <svg viewBox="0 0 24 24" role="img" aria-label={t('message.delivery.read')}><path d="M2 12s3.5-6 10-6 10 6 10 6-3.5 6-10 6S2 12 2 12z" /><circle cx="12" cy="12" r="2.5" /></svg>
+            <svg viewBox={ICON_VIEWBOX} role="img" aria-label={t('message.delivery.read')}><path d={icons.read} /></svg>
           {:else if room.lastMark === 'sent'}
-            <svg viewBox="0 0 24 24" role="img" aria-label={t('message.delivery.sent')}><path d="M5 12.5l4.5 4.5L19 7.5" /></svg>
+            <svg viewBox={ICON_VIEWBOX} role="img" aria-label={t('message.delivery.sent')}><path d={icons.check} /></svg>
           {:else}
-            <svg viewBox="0 0 24 24" role="img" aria-label={t('message.delivery.failed')}><circle cx="12" cy="12" r="9" /><path d="M12 7.5v5.5M12 16.5v.01" /></svg>
+            <svg viewBox={ICON_VIEWBOX} role="img" aria-label={t('message.delivery.failed')}><path d={icons.failed} /></svg>
           {/if}
         </span>
       {/if}
@@ -188,22 +189,14 @@
   .mark svg {
     width: var(--font-size-caption);
     height: var(--font-size-caption);
-    fill: none;
-    stroke: currentColor;
-    stroke-width: 2;
-    stroke-linecap: round;
-    stroke-linejoin: round;
+    fill: currentColor;
   }
   .lock,
   .pin {
     flex: none;
     width: var(--font-size-caption);
     height: var(--font-size-caption);
-    fill: none;
-    stroke: currentColor;
-    stroke-width: 2.5;
-    stroke-linejoin: round;
-    stroke-linecap: round;
+    fill: currentColor;
   }
   .lock {
     color: var(--color-text-secondary);

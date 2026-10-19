@@ -10,6 +10,7 @@
   ровно то, чего автор опроса не хочет.
 -->
 <script lang="ts">
+  import { ICON_VIEWBOX, icons } from '../../design/icons.ts';
   import { choiceAfterTapping, isWinner, shareOf, showsResults } from '../../core/timeline/poll';
   import type { Poll } from '../../core/timeline/message';
   import { i18n, plural, t } from '../../i18n/index.svelte.ts';
@@ -69,7 +70,7 @@
         onclick={() => choose(answer.id)}
       >
         <span class="marker" class:square={!single} class:chosen class:hidden={poll.ended && !chosen} aria-hidden="true">
-          {#if chosen}<svg viewBox="0 0 24 24" fill="none" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M6 12.5l4 4 8-9" /></svg>{/if}
+          {#if chosen}<svg viewBox={ICON_VIEWBOX}><path d={icons.check} /></svg>{/if}
         </span>
         <span class="text">{answer.text}</span>
         {#if results}
@@ -147,10 +148,10 @@
   .marker svg {
     width: 100%;
     height: 100%;
-    stroke: var(--color-background);
+    fill: var(--color-background);
   }
   .poll.own .marker svg {
-    stroke: var(--accent);
+    fill: var(--accent);
   }
   .share {
     font-size: var(--font-size-caption);

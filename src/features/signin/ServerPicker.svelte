@@ -4,6 +4,7 @@
   человеком.
 -->
 <script lang="ts">
+  import { ICON_VIEWBOX, icons } from '../../design/icons.ts';
   import Dialog from '../../design/Dialog.svelte';
   import QuietButton from '../../design/QuietButton.svelte';
   import { t } from '../../i18n/index.svelte.ts';
@@ -28,7 +29,7 @@
               <span class="warning small">{t(server.warning)}</span>
             {/if}
           </span>
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 5l7 7-7 7" /></svg>
+          <svg viewBox={ICON_VIEWBOX} aria-hidden="true"><path d={icons.forward} /></svg>
         </button>
       </li>
     {/each}
@@ -38,7 +39,7 @@
           <strong>{t('servers.ownTitle')}</strong>
           <span class="about">{t('servers.ownAbout')}</span>
         </span>
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 16 16 8M9 8h7v7" /></svg>
+        <svg viewBox={ICON_VIEWBOX} aria-hidden="true"><path d={icons.external} /></svg>
       </a>
     </li>
   </ul>

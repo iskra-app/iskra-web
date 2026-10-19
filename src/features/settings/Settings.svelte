@@ -15,7 +15,8 @@
   import PlainButton from '../../design/PlainButton.svelte';
   import PrimaryButton from '../../design/PrimaryButton.svelte';
   import TextField from '../../design/TextField.svelte';
-  import Icon, { type IconName } from '../../design/Icon.svelte';
+  import Icon from '../../design/Icon.svelte';
+  import type { IconName } from '../../design/icons.ts';
   import { formatRoute, type SettingsSection } from '../../core/navigation/route';
   import type { AccountSwitch, DefaultAlerts } from '../../core/rooms/pushRules';
   import { app } from '../../core/session/app.svelte.ts';

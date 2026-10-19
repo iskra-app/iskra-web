@@ -6,6 +6,7 @@
   подгруженной истории. Новые входящие объявляет отдельная вежливая область.
 -->
 <script lang="ts">
+  import { ICON_VIEWBOX, icons } from '../../design/icons.ts';
   import { onMount, tick } from 'svelte';
   import EmptyState from '../../design/EmptyState.svelte';
   import PrimaryButton from '../../design/PrimaryButton.svelte';
@@ -251,7 +252,7 @@
             onkeydown={(event) => toggleByKey(event, item.message)}
           >
             <span class="mark" class:on aria-hidden="true">
-              {#if on}<svg viewBox="0 0 24 24"><path d="M6 12.5l4 4 8-9" /></svg>{/if}
+              {#if on}<svg viewBox={ICON_VIEWBOX}><path d={icons.check} /></svg>{/if}
             </span>
             <div class="chosen-row" inert>
               <MessageRow
@@ -299,7 +300,7 @@
     title={t('room.scrollToBottom')}
     onclick={() => anchor?.scrollToBottom()}
   >
-    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6" /></svg>
+    <svg viewBox={ICON_VIEWBOX} aria-hidden="true"><path d={icons.down} /></svg>
     {#if unseenBelow > 0}<span class="unseen" aria-hidden="true">{new Intl.NumberFormat(i18n.locale).format(unseenBelow)}</span>{/if}
   </button>
 {/if}
@@ -387,11 +388,7 @@
   .mark svg {
     width: 100%;
     height: 100%;
-    fill: none;
-    stroke: var(--on-accent);
-    stroke-width: 3;
-    stroke-linecap: round;
-    stroke-linejoin: round;
+    fill: var(--on-accent);
   }
   .item.arrived {
     animation: arrive var(--timing-arrival) var(--ease-out);
@@ -479,10 +476,6 @@
   .to-bottom svg {
     width: var(--size-icon);
     height: var(--size-icon);
-    fill: none;
-    stroke: currentColor;
-    stroke-width: 2.5;
-    stroke-linecap: round;
-    stroke-linejoin: round;
+    fill: currentColor;
   }
 </style>
