@@ -384,16 +384,19 @@ test('«Переслать»: текст и файл в другой чат — 
   expect(problems).toEqual([]);
 });
 
-test('«Больше эмодзи»: панель с разделами, реакция из неё — и она в «Недавних»', async ({ page }) => {
+test('«Больше эмодзи»: панель с разделами, реакция из неё — и она в «Недавних»', async ({ page }, info) => {
   const problems = watchForProblems(page);
   await signInToDemo(page);
   await openRoom(page, /^Выходные/);
   let menu = await menuOf(page, 'Я — пирог');
   await menu.getByRole('menuitem', { name: 'Больше эмодзи' }).click();
-  // Колёсико листает панель, а не закрывает меню.
-  await menu.getByRole('menuitemcheckbox', { name: 'Реакция 😀' }).hover();
-  await page.mouse.wheel(0, 400);
-  await expect(menu).toBeVisible();
+  // Колёсико листает панель, а не закрывает меню. Колёсико — у мыши: в мобильном WebKit
+  // Playwright его и не умеет.
+  if (!isPhone(info.project.name)) {
+    await menu.getByRole('menuitemcheckbox', { name: 'Реакция 😀' }).hover();
+    await page.mouse.wheel(0, 400);
+    await expect(menu).toBeVisible();
+  }
   await menu.getByRole('button', { name: 'Еда и напитки' }).click();
   await menu.getByRole('menuitemcheckbox', { name: 'Реакция 🍕' }).click();
   await expect(menu).toBeHidden();
