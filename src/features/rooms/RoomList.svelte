@@ -3,8 +3,9 @@
 
   Один список, как в нативной Искре, на любой ширине: приглашения сверху (на них надо
   ответить), под ними закреплённые, дальше всё по последней активности — пространства вместе
-  с чатами. Без заголовков и фильтров. «Архив» — тихой строкой над списком, когда в нём что-то
-  есть; пространство и архив открываются на месте списка со стрелкой «назад».
+  с чатами. «Архив» — тихой строкой над списком, когда в нём что-то есть; пространство и
+  архив открываются на месте списка со стрелкой «назад». Есть папки — над списком вкладки
+  (`FolderTabs`), и папка показывает свои чаты в том же порядке.
 
   Стрелки ↑/↓ ходят по строкам, как в любом списке на десктопе.
 -->
@@ -19,6 +20,9 @@
   import { t, type TextKey } from '../../i18n/index.svelte.ts';
   import InviteRow from './InviteRow.svelte';
   import RoomRow from './RoomRow.svelte';
+  import FolderTabs from './FolderTabs.svelte';
+  import { folderSelection } from './folderSelection.svelte.ts';
+  import { roomsOf } from '../../core/rooms/folders';
   import { roomName } from './text';
 
   let { session }: { session: UserSession } = $props();
@@ -43,12 +47,18 @@
   const selectedId = $derived(router.route.name === 'room' ? router.route.roomId : null);
   const organized = $derived(session.rooms.organized);
 
+  const folders = $derived(session.folders.folders);
+  /** Выбранная папка; удалили её (здесь или на другом устройстве) — снова «Все». */
+  const folder = $derived(folders.find((f) => f.id === folderSelection.id));
+
   const shown = $derived(
     view.kind === 'archive'
       ? organized.archived
       : view.kind === 'space'
         ? session.rooms.childrenOf(view.id)
-        : organized.list,
+        : folder
+          ? roomsOf(folder, organized.list, organized.archived)
+          : organized.list,
   );
 
   const nothingAtAll = $derived(view.kind === 'all' && organized.list.length === 0 && organized.archived.length === 0);
@@ -84,6 +94,10 @@
   }
 </script>
 
+{#if view.kind === 'all' && folders.length > 0}
+  <FolderTabs {folders} list={organized.list} archived={organized.archived} selected={folder?.id ?? ''} onselect={(id) => (folderSelection.id = id)} />
+{/if}
+
 {#if view.kind !== 'all'}
   <div class="subheader">
     <IconButton label={t('room.back')} onclick={() => (view = { kind: 'all' })}><Icon name="back" /></IconButton>
@@ -105,8 +119,10 @@
     <EmptyState title={t('roomList.emptyTitle')} message={t('roomList.emptyMessage')} />
   {:else if view.kind === 'space' && shown.length === 0}
     <EmptyState title={t('room.spaceEmptyTitle')} />
+  {:else if folder && shown.length === 0}
+    <EmptyState title={t('folders.emptyTitle')} message={t('folders.emptyMessage')} />
   {:else}
-    {#if view.kind === 'all' && organized.archived.length > 0}
+    {#if view.kind === 'all' && !folder && organized.archived.length > 0}
       <button type="button" class="archive" onclick={() => (view = { kind: 'archive' })}>
         {t('roomList.archive.entry', { count: organized.archived.length })}
       </button>

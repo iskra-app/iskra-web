@@ -9,10 +9,11 @@
     /** Сочетание клавиш для тултипа, уже в виде для этой платформы: «Ctrl K» или «⌘K». */
     shortcut?: string;
     pressed?: boolean;
+    disabled?: boolean;
     onclick: () => void;
     children: Snippet;
   }
-  let { label, shortcut, pressed, onclick, children }: Props = $props();
+  let { label, shortcut, pressed, disabled = false, onclick, children }: Props = $props();
 </script>
 
 <button
@@ -20,6 +21,7 @@
   class="icon-button"
   aria-label={label}
   aria-pressed={pressed}
+  {disabled}
   title={shortcut ? `${label} (${shortcut})` : label}
   {onclick}
 >
@@ -27,6 +29,10 @@
 </button>
 
 <style>
+  .icon-button:disabled {
+    color: var(--color-text-secondary);
+    cursor: default;
+  }
   .icon-button {
     display: inline-grid;
     place-items: center;

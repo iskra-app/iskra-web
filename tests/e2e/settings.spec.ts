@@ -423,3 +423,54 @@ test('«Реакции»: быстрая реакция — из шести ил
   await expect(quick.getByRole('radio', { name: '🍕' })).toHaveAttribute('aria-checked', 'true');
   expect(problems).toEqual([]);
 });
+
+test('«Папки»: подсказка — и вкладка над списком; своя папка из редактора; удалить — вкладки нет', async ({ page }) => {
+  const problems = watchForProblems(page);
+  await signInToDemo(page);
+  // Папок нет — нет и полосы вкладок.
+  await expect(page.getByRole('tablist', { name: 'Папки' })).toHaveCount(0);
+
+  await openSettings(page, 'Папки');
+  const suggestions = page.getByRole('list', { name: 'Можно начать с этих' });
+  await suggestions.getByRole('listitem').filter({ hasText: 'Личные' }).getByRole('button', { name: 'Добавить' }).click();
+  await expect(page.getByRole('button', { name: /^Личные\s*\d+$/ })).toBeVisible();
+
+  // Своя: группы и вручную Аня.
+  await page.getByRole('button', { name: 'Новая папка' }).click();
+  const editor = page.getByRole('dialog', { name: 'Новая папка' });
+  const done = editor.getByRole('button', { name: 'Готово' });
+  await editor.getByRole('textbox', { name: 'Название' }).fill('Дача');
+  await expect(done).toBeDisabled();
+  await editor.getByRole('switch', { name: 'Группы' }).check();
+  await editor.getByRole('list', { name: 'Всегда показывать' }).getByRole('button', { name: 'Добавить чаты' }).click();
+  const chooser = page.getByRole('dialog', { name: 'Выберите чаты' });
+  await chooser.getByRole('textbox', { name: 'Поиск' }).fill('аня');
+  await chooser.getByRole('checkbox', { name: /Аня/ }).check();
+  await chooser.getByRole('button', { name: 'Готово' }).click();
+  await expect(editor.getByRole('list', { name: 'Всегда показывать' })).toContainText('Аня');
+  await done.click();
+  await expect(editor).toBeHidden();
+
+  // Вкладки над списком: «Личные» — только личный чат; «Дача» — группы и Аня.
+  const back = page.getByRole('button', { name: 'Назад' });
+  await expect(async () => {
+    if (!(await page.getByRole('tablist', { name: 'Папки' }).isVisible())) await back.click({ timeout: 1000 });
+    await expect(page.getByRole('tablist', { name: 'Папки' })).toBeVisible({ timeout: 1000 });
+  }).toPass({ timeout: 10_000 });
+  const tabs = page.getByRole('tablist', { name: 'Папки' });
+  await expect(tabs.getByRole('tab')).toHaveText([/^Все/, /^Личные/, /^Дача/]);
+  await tabs.getByRole('tab', { name: /^Личные/ }).click();
+  await expect(page.getByRole('link', { name: /^Аня/ })).toBeVisible();
+  await expect(page.getByRole('link', { name: /^Выходные/ })).toHaveCount(0);
+  await tabs.getByRole('tab', { name: /^Дача/ }).click();
+  await expect(page.getByRole('link', { name: /^Выходные/ })).toBeVisible();
+  await expect(page.getByRole('link', { name: /^Аня/ })).toBeVisible();
+
+  // Удалить — с вопросом; вкладка уходит, список снова весь.
+  await openSettings(page, 'Папки');
+  await page.getByRole('button', { name: /^Дача\s*\d+$/ }).click();
+  await page.getByRole('dialog', { name: 'Папка' }).getByRole('button', { name: 'Удалить папку' }).click();
+  await page.getByRole('dialog', { name: 'Удалить папку «Дача»?' }).getByRole('button', { name: 'Удалить папку' }).click();
+  await expect(page.getByRole('button', { name: /^Дача\s*\d+$/ })).toHaveCount(0);
+  expect(problems).toEqual([]);
+});

@@ -39,6 +39,7 @@ import { vault, type Account, type AccountSecrets } from '../storage/vault';
 import { quietLogger } from '../support/logger';
 import { BlockList } from './blockList.svelte.ts';
 import { NotificationRules } from './notificationRules.svelte.ts';
+import { ChatFolders } from './chatFolders.svelte.ts';
 import { LocalNames } from '../rooms/localNames.svelte.ts';
 
 export type Connection = 'connecting' | 'online' | 'offline';
@@ -90,6 +91,8 @@ export class UserSession {
   readonly blocked: BlockList;
   /** Уведомления всего аккаунта — push rules на сервере. */
   readonly notificationRules: NotificationRules;
+  /** Папки чатов — в данных аккаунта, общие для всех устройств. */
+  readonly folders: ChatFolders;
   /** Как я зову собеседников на этом устройстве. */
   readonly localNames: LocalNames;
   private readonly client: MatrixClient;
@@ -118,6 +121,7 @@ export class UserSession {
     this.verification = keys ? new VerificationStore(client) : null;
     this.blocked = new BlockList(client);
     this.notificationRules = new NotificationRules(client);
+    this.folders = new ChatFolders(client);
   }
 
   /** Лента комнаты. Живёт, пока открыт чат: тот, кто открыл, её и `destroy()`. */
@@ -421,6 +425,7 @@ export class UserSession {
     this.rooms.destroy();
     this.blocked.destroy();
     this.notificationRules.destroy();
+    this.folders.destroy();
     this.verification?.destroy();
     this.thumbnails.clear();
     this.media.clear();
