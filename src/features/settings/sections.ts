@@ -5,6 +5,7 @@ import type { TextKey } from '../../i18n/index.svelte.ts';
 export const settingsTitles: Record<SettingsSection, TextKey> = {
   profile: 'account.editTitle',
   appearance: 'settings.appearance',
+  chats: 'settings.chats',
   notifications: 'settings.notifications',
   security: 'settings.security',
   media: 'settings.media',

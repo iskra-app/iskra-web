@@ -50,6 +50,26 @@ function merged(previous: Message, message: Message): Message | undefined {
 export const UNREAD_DIVIDER_KEY = 'unread-divider';
 
 /**
+ * Какие служебные строки лента оставляет за кадром — `ServiceEventSettings` нативной Искры.
+ * Два переключателя, потому что это два разных шума: «вошёл» и «вышел» в большой комнате —
+ * почти всё, что там происходит; смена имени реже, и из неё узнаёшь, что «Кот» теперь «Аня».
+ * Что сделали с самим чатом (название, фото, шифрование) — видно всегда.
+ */
+export interface ServiceHiding {
+  nameChanges: boolean;
+  membership: boolean;
+}
+
+export const SHOW_ALL_SERVICE: ServiceHiding = { nameChanges: false, membership: false };
+
+export function hides(message: Message, hiding: ServiceHiding): boolean {
+  if (message.kind.type !== 'service') return false;
+  const type = message.kind.event.type;
+  if (type === 'renamedThemselves') return hiding.nameChanges;
+  return PEOPLE.has(type) && hiding.membership;
+}
+
+/**
  * Полоса заслужена, только если под ней есть что-то чужое. Маркер SDK стоит за последним
  * *событием*, которое аккаунт прочёл, и может оказаться над входом в чат, над пустотой или над
  * своим ответом с другого устройства. «Непрочитанное» над своими словами — это приложение, не
@@ -63,7 +83,11 @@ function earned(messages: readonly Message[], from: number): boolean {
  * `unreadFrom` — ключ первого сообщения после маркера прочитанного: над ним встаёт полоса
  * «Непрочитанные сообщения». Она, как дата, рвёт серию.
  */
-export function layout(messages: readonly Message[], unreadFrom?: string): TimelineItem[] {
+export function layout(all: readonly Message[], unreadFrom?: string, hiding: ServiceHiding = SHOW_ALL_SERVICE): TimelineItem[] {
+  // Спрятанная строка могла быть первой непрочитанной — тогда полоса встаёт над следующей.
+  const firstUnread = unreadFrom === undefined ? -1 : all.findIndex((m) => m.key === unreadFrom);
+  if (firstUnread >= 0) unreadFrom = all.slice(firstUnread).find((m) => !hides(m, hiding))?.key;
+  const messages = all.filter((m) => !hides(m, hiding));
   const unreadAt = unreadFrom === undefined ? -1 : messages.findIndex((m) => m.key === unreadFrom);
   const withDivider = unreadAt >= 0 && earned(messages, unreadAt);
   const items: TimelineItem[] = [];

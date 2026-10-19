@@ -50,6 +50,9 @@ const keys = {
   compress: 'media.compresses',
   compression: 'media.compression',
   autoDownload: 'media.autoDownload',
+  hideNameChanges: 'chats.hidesNameChanges',
+  hideMembershipChanges: 'chats.hidesMembershipChanges',
+  sendWithModEnter: 'composer.sendsWithCommandReturn',
 } as const;
 
 function read(key: string): string | null {
@@ -97,6 +100,11 @@ class Preferences {
   compress = $state<boolean>(read(keys.compress) !== 'false');
   compression = $state<MediaCompression>(oneOf(read(keys.compression), compressions, 'balanced'));
   autoDownload = $state<MediaAutoDownload>(oneOf(read(keys.autoDownload), autoDownloads, 'always'));
+  /** «Чаты» — ключи нативной: служебные строки видны, Enter отправляет. */
+  hideNameChanges = $state<boolean>(read(keys.hideNameChanges) === 'true');
+  hideMembershipChanges = $state<boolean>(read(keys.hideMembershipChanges) === 'true');
+  /** Enter переносит строку, отправляет `Ctrl/⌘ Enter` — для тех, кто пишет абзацами. */
+  sendWithModEnter = $state<boolean>(read(keys.sendWithModEnter) === 'true');
   /** Недавние реакции — наверху панели «Больше эмодзи» (`RecentEmoji` нативной, тот же ключ). */
   recentEmoji = $state.raw<string[]>(recentList(read(keys.recentEmoji)));
 
@@ -116,6 +124,9 @@ class Preferences {
       $effect(() => write(keys.compress, String(this.compress)));
       $effect(() => write(keys.compression, this.compression));
       $effect(() => write(keys.autoDownload, this.autoDownload));
+      $effect(() => write(keys.hideNameChanges, String(this.hideNameChanges)));
+      $effect(() => write(keys.hideMembershipChanges, String(this.hideMembershipChanges)));
+      $effect(() => write(keys.sendWithModEnter, String(this.sendWithModEnter)));
       $effect(() => {
         write(keys.language, this.language);
         i18n.locale = this.language === 'system' ? preferredLocale(navigator.languages ?? []) : this.language;

@@ -26,6 +26,8 @@
   import AccentSwatches from './AccentSwatches.svelte';
   import WallpaperPicker from './WallpaperPicker.svelte';
   import { settingsTitles } from './sections';
+  import { isMac } from '../../design/hotkeys';
+  import { viewport } from '../../design/viewport.svelte.ts';
   import { autoDownloads, compressions, type MediaAutoDownload } from '../media/mediaSettings';
   import { Photo, pixelsFor } from '../rooms/faces.svelte.ts';
 
@@ -42,6 +44,7 @@
   /** Строки списка — в порядке нативной Искры; профиль — карточкой над ними. */
   const rows: Array<{ section: SettingsSection; icon: IconName }> = [
     { section: 'appearance', icon: 'appearance' },
+    { section: 'chats', icon: 'chats' },
     { section: 'notifications', icon: 'bell' },
     { section: 'security', icon: 'shield' },
     { section: 'media', icon: 'photo' },
@@ -114,6 +117,11 @@
     { name: 'invitations', label: 'notifications.invitations' },
     { name: 'calls', label: 'notifications.calls' },
   ];
+
+  // ————— Чаты —————
+
+  /** Как назвать клавишу-модификатор: ⌘ на Mac, Ctrl везде ещё. */
+  const mod = isMac() ? '⌘' : 'Ctrl';
 
   // ————— Фото и видео —————
 
@@ -430,6 +438,26 @@
         </button>
       {/each}
     </div>
+  {:else if section === 'chats'}
+    <h3>{t('chats.serviceSection')}</h3>
+    <label class="switch">
+      <span>{t('chats.hideNameChanges')}</span>
+      <input type="checkbox" role="switch" bind:checked={preferences.hideNameChanges} />
+    </label>
+    <label class="switch">
+      <span>{t('chats.hideMembershipChanges')}</span>
+      <input type="checkbox" role="switch" bind:checked={preferences.hideMembershipChanges} />
+    </label>
+    <p class="secondary">{t('chats.serviceHelp')}</p>
+    <!-- Только с клавиатурой: на сенсорном Enter и так переносит строку, а отправляет кнопка. -->
+    {#if viewport.finePointer}
+      <h3>{t('chats.keyboardSection')}</h3>
+      <label class="switch">
+        <span>{t('chats.modReturnWeb', { mod })}</span>
+        <input type="checkbox" role="switch" bind:checked={preferences.sendWithModEnter} />
+      </label>
+      <p class="secondary">{preferences.sendWithModEnter ? t('chats.modReturnOnHelpWeb', { mod }) : t('chats.enterSendsHelpWeb')}</p>
+    {/if}
   {:else if section === 'media'}
     <h3 id="auto-download-title">{t('media.autoDownload')}</h3>
     <div class="options" role="radiogroup" aria-labelledby="auto-download-title">

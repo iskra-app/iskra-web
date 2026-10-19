@@ -36,7 +36,7 @@ import { currentMarker, rememberMovedMarker } from './readMarker';
 import { canSendPoll, pollEndContent, pollStartContent, type PollDraft } from './poll';
 import { mentionsMarkdown, rankCandidates, unlinkMentions, type ComposerMention, type RankedCandidate } from './composerMentions';
 import { mapEvent, type MapperContext } from './mapper';
-import { layout, type TimelineItem } from './layout';
+import { layout, SHOW_ALL_SERVICE, type ServiceHiding, type TimelineItem } from './layout';
 import type { Message, Reaction } from './message';
 
 /**
@@ -72,6 +72,9 @@ type PageOutcome = 'fetched' | 'waited' | 'failed' | 'start';
 
 export class TimelineStore {
   items = $state.raw<TimelineItem[]>([]);
+  /** Какие служебные строки спрятать — решают настройки устройства, наверху. */
+  private hiding: ServiceHiding = SHOW_ALL_SERVICE;
+  private unreadFrom: string | undefined;
   messages = $state.raw<Message[]>([]);
   /** Дошли до начала комнаты — больше просить нечего. */
   atStart = $state(false);
@@ -200,6 +203,13 @@ export class TimelineStore {
     }
   }
 
+  /** Спрятать или вернуть служебные строки — без новой сборки из SDK, только раскладка. */
+  setServiceHiding(hiding: ServiceHiding): void {
+    if (hiding.nameChanges === this.hiding.nameChanges && hiding.membership === this.hiding.membership) return;
+    this.hiding = { ...hiding };
+    this.items = layout(this.messages, this.unreadFrom, this.hiding);
+  }
+
   /** Пересобирает ленту сейчас. Тестам — чтобы не ждать кадра. */
   rebuild(): void {
     const room = this.room;
@@ -233,7 +243,8 @@ export class TimelineStore {
     }
     markRead(room, this.ownUserId, messages);
     this.messages = messages;
-    this.items = layout(messages, unreadFrom);
+    this.unreadFrom = unreadFrom;
+    this.items = layout(messages, unreadFrom, this.hiding);
     this.readPinnedMessage(room, context);
     if (this.atStart === false && room.getLiveTimeline().getPaginationToken(Direction.Backward) === null) {
       this.atStart = true;

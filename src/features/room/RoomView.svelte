@@ -128,6 +128,11 @@
   }
   let viewing = $state<{ items: ViewerItem[]; start: string } | null>(null);
 
+  // Служебные строки — по настройкам «Чаты»: лента перекладывается сразу, без перезагрузки.
+  $effect(() => {
+    store?.setServiceHiding({ nameChanges: preferences.hideNameChanges, membership: preferences.hideMembershipChanges });
+  });
+
   $effect(() => {
     const id = roomId;
     const created = session.timeline(id);

@@ -67,3 +67,25 @@ describe('число на кнопке «вниз»', () => {
     expect(arrivedFromOthers(messages, 'пропал')).toBe(0);
   });
 });
+
+describe('служебные строки по настройкам «Чаты»', () => {
+  const renamed = (key: string) => ({ ...message(key), kind: { type: 'service', event: { type: 'renamedThemselves', from: 'Кот', to: 'Аня' } } }) as Message;
+  const roomRenamed = (key: string) => ({ ...message(key), kind: { type: 'service', event: { type: 'roomRenamed', name: 'Дача' } } }) as Message;
+  const all = [message('a'), joined('j'), renamed('r'), roomRenamed('n'), message('b')];
+
+  it('прячется только своё: вход и выход — одним переключателем, смена имени — другим; чат — никогда', () => {
+    expect(keys(layout(all, undefined, { nameChanges: false, membership: true }))).toEqual(['a', 'r', 'n', 'b']);
+    expect(keys(layout(all, undefined, { nameChanges: true, membership: false }))).toEqual(['a', 'j', 'n', 'b']);
+    expect(keys(layout(all, undefined, { nameChanges: true, membership: true }))).toEqual(['a', 'n', 'b']);
+  });
+
+  it('спрятанная строка была первой непрочитанной — полоса над следующей', () => {
+    expect(keys(layout([message('a'), joined('j'), message('b')], 'j', { nameChanges: false, membership: true }))).toEqual(['a', UNREAD_DIVIDER_KEY, 'b']);
+  });
+
+  it('между двумя сообщениями одного человека спрятанная строка серию не рвёт', () => {
+    const items = layout([message('a'), joined('j'), message('b', false, 1)], undefined, { nameChanges: false, membership: true });
+    const b = items.find((i) => i.key === 'b');
+    expect(b && b.kind === 'message' && b.firstInRun).toBe(false);
+  });
+});

@@ -2,8 +2,9 @@
   Композер.
 
   Что делает `Enter`, решает указатель, а не ширина: с мышью и клавиатурой `Enter`
-  отправляет, `Shift+Enter` — новая строка; на сенсорном — наоборот: `Enter` переносит
-  строку, отправляет кнопка. Ноутбук с сенсорным экраном широкий, но у него есть мышь.
+  отправляет, `Shift+Enter` — новая строка (или, по настройке «Чаты», `Enter` переносит, а
+  отправляет `Ctrl/⌘ Enter`); на сенсорном — `Enter` переносит строку, отправляет кнопка.
+  Ноутбук с сенсорным экраном широкий, но у него есть мышь.
 
   Над полем — полоса ответа или правки. `Esc` её убирает, `↑` в пустом поле берёт в правку
   последнее своё сообщение. Текст и полосу держит `RoomView` (черновик, «печатает»);
@@ -19,6 +20,8 @@
   import { tick } from 'svelte';
   import Menu from '../../design/Menu.svelte';
   import { viewport } from '../../design/viewport.svelte.ts';
+  import { isMac } from '../../design/hotkeys';
+  import { preferences } from '../app/preferences.svelte.ts';
   import { t } from '../../i18n/index.svelte.ts';
   import type { OutgoingFile } from '../../core/media/upload';
   import AttachmentTray from '../media/AttachmentTray.svelte';
@@ -419,7 +422,8 @@
     }
     // Набор через IME (японский, китайский…) — Enter подтверждает слово, а не отправляет.
     if (event.key !== 'Enter') return;
-    const sends = viewport.finePointer ? !event.shiftKey : false;
+    const withMod = isMac() ? event.metaKey : event.ctrlKey;
+    const sends = viewport.finePointer && (preferences.sendWithModEnter ? withMod : !event.shiftKey);
     if (!sends) return;
     event.preventDefault();
     send();

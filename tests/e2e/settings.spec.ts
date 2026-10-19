@@ -7,7 +7,14 @@ test.afterEach(async ({ page }, info) => {
 
 /** Настройки — список разделов; `row` — открыть раздел этой строки. */
 async function openSettings(page: Page, row?: string) {
-  await page.getByRole('button', { name: 'Настройки' }).click();
+  const settings = page.getByRole('button', { name: 'Настройки' });
+  const back = page.getByRole('button', { name: 'Назад' });
+  // Из чата на телефоне кнопки не видно — сначала к списку.
+  await expect(async () => {
+    if (!(await settings.isVisible())) await back.click({ timeout: 1000 });
+    await expect(settings).toBeVisible({ timeout: 1000 });
+  }).toPass({ timeout: 10_000 });
+  await settings.click();
   if (row) await page.getByRole('navigation', { name: 'Настройки' }).getByRole('link', { name: row }).click();
 }
 
@@ -336,4 +343,41 @@ test('уведомления аккаунта: группы — только у�
   await expect(section.getByRole('radiogroup', { name: 'Группы' }).getByRole('radio', { name: 'Только упоминания' })).toHaveAttribute('aria-checked', 'true');
   await expect(section.getByRole('switch', { name: 'Приглашения в чаты' })).not.toBeChecked();
   expect(problems).toEqual([]);
+});
+
+test('«Чаты»: вход и выход спрятаны — строки нет, сообщения на месте; вернули — снова видна', async ({ page }) => {
+  await signInToDemo(page);
+  await openRoom(page, /^Выходные/);
+  const log = page.getByRole('log');
+  await expect(log).toContainText('Борис и Вера теперь в чате');
+
+  await openSettings(page, 'Чаты');
+  const membership = page.getByRole('switch', { name: 'Скрывать вход и выход участников' });
+  await membership.check();
+  await openRoom(page, /^Выходные/);
+  await expect(log).toContainText('Кто что берёт на пикник?');
+  await expect(log).not.toContainText('теперь в чате');
+
+  await openSettings(page, 'Чаты');
+  await membership.uncheck();
+  await openRoom(page, /^Выходные/);
+  await expect(log).toContainText('Борис и Вера теперь в чате');
+});
+
+test('«Чаты»: отправлять по Ctrl/⌘ Enter — Enter переносит строку', async ({ page }, info) => {
+  test.skip(isPhone(info.project.name), 'на сенсорном Enter и так переносит, а настройки нет');
+  await signInToDemo(page);
+  await openSettings(page, 'Чаты');
+  await page.getByRole('switch', { name: /^Отправлять по (Ctrl|⌘) \+ Enter$/ }).check();
+  await expect(page.getByText(/Enter переносит строку, (Ctrl|⌘) \+ Enter отправляет/)).toBeVisible();
+
+  await openRoom(page, /^Аня/);
+  const field = page.getByRole('textbox', { name: 'Сообщение' });
+  await field.fill('Первая строка');
+  await field.press('Enter');
+  await field.pressSequentially('вторая');
+  await expect(field).toHaveValue('Первая строка\nвторая');
+  await field.press('ControlOrMeta+Enter');
+  await expect(field).toHaveValue('');
+  await expect(page.getByRole('log').getByRole('article').filter({ hasText: 'вторая' })).toBeVisible();
 });
