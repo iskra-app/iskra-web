@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
-import { consoleOf, isPhone, signInToDemo, watchForProblems } from './helpers';
+import { consoleOf, isPhone, openRoom, signInToDemo, watchForProblems } from './helpers';
 
 // Упал — показать консоль: падения в Firefox воспроизводятся только в CI.
 test.afterEach(async ({ page }, info) => {
@@ -8,13 +8,6 @@ test.afterEach(async ({ page }, info) => {
 
 /** Настоящая PNG 32×20 — градиент. */
 const PNG = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAACAAAAAUCAIAAABj86gYAAAEqUlEQVR42g3Noc9EYADAYU2xiSZdI14QLr5RsYkmXXPRplx8o2ITTfIrJtoU8Y1XbCJNMtGmqN/3/AOPpmnoGqaGpfHQcDWeGi8NoeFrhBqRxlvjo5FqfDWkRq5RalQajUan0WuMGkrjpzFrLBqbxqFxatwammagG5gGlsHDwDV4GrwMhIFvEBpEBm+Dj0Fq8DWQBrlBaVAZNAadQW8wGiiDn8FssBhsBofBaXAb/4GNbmPaWDYPG9fmafOyETa+TWgT2bxtPjapzddG2uQ2pU1l09h0Nr3NaKNsfjazzWKz2Rw2p81t/wcOuoPpYDk8HFyHp8PLQTj4DqFD5PB2+DikDl8H6ZA7lA6VQ+PQOfQOo4Ny+DnMDovD5nA4nA638x946B6mh+Xx8HA9nh4vD+Hhe4Qekcfb4+ORenw9pEfuUXpUHo1H59F7jB7K4+cxeywem8fhcXrc3n8g0AWmwBI8BK7gKXgJhMAXhIJI8BZ8BKngK5CCXFAKKkEj6AS9YBQowU8wCxbBJjgEp+AW/0GAHmAGWAGPADfgGfAKEAF+QBgQBbwDPgFpwDdABuQBZUAV0AR0AX3AGKACfgFzwBKwBRwBZ8Ad/AcxeowZY8U8YtyYZ8wrRsT4MWFMFPOO+cSkMd8YGZPHlDFVTBPTxfQxY4yK+cXMMUvMFnPEnDF3/B8k6AlmgpXwSHATngmvBJHgJ4QJUcI74ZOQJnwTZEKeUCZUCU1Cl9AnjAkq4ZcwJywJW8KRcCbcyX+QoWeYGVbGI8PNeGa8MkSGnxFmRBnvjE9GmvHNkBl5RplRZTQZXUafMWaojF/GnLFkbBlHxplxZ/+BRJeYEkvykLiSp+QlERJfEkoiyVvykaSSr0RKckkpqSSNpJP0klGiJD/JLFkkm+SQnJJb/gcFeoFZYBU8CtyCZ8GrQBT4BWFBVPAu+BSkBd8CWZAXlAVVQVPQFfQFY4Eq+BXMBUvBVnAUnAV38R/U6DVmjVXzqHFrnjWvGlHj14Q1Uc275lOT1nxrZE1eU9ZUNU1NV9PXjDWq5lcz1yw1W81Rc9bc9X/QoreYLVbLo8Vteba8WkSL3xK2RC3vlk9L2vJtkS15S9lStTQtXUvfMraoll/L3LK0bC1Hy9lyt//BgD5gDlgDjwF34DnwGhAD/kA4EA28Bz4D6cB3QA7kA+VANdAMdAP9wDigBn4D88AysA0cA+fAPfwHCl1hKizFQ+EqnoqXQih8RaiIFG/FR5EqvgqpyBWlolI0ik7RK0aFUvwUs2JRbIpDcSpu9R9M6BPmhDXxmHAnnhOvCTHhT4QT0cR74jORTnwn5EQ+UU5UE81EN9FPjBNq4jcxTywT28QxcU7c03+woq+YK9bKY8Vdea68VsSKvxKuRCvvlc9KuvJdkSv5SrlSrTQr3Uq/Mq6old/KvLKsbCvHyrlyr//Bjr5j7lg7jx1357nz2hE7/k64E+28dz476c53R+7kO+VOtdPsdDv9zrijdn47886ys+0cO+fOvf8HF/qFeWFdPC7ci+fF60Jc+BfhRXTxvvhcpBffC3mRX5QX1UVz0V30F+OFuvhdzBfLxXZxXJwX98Uf1wfxouWu4FQAAAAASUVORK5CYII=', 'base64');
-
-async function openRoom(page: Page, name: RegExp) {
-  const back = page.getByRole('button', { name: 'Назад' });
-  if (await back.isVisible()) await back.click();
-  await page.getByRole('link', { name }).click();
-  await expect(page.getByRole('log')).toBeVisible();
-}
 
 test('фото в ленте: место отведено до загрузки, просмотрщик листает и закрывается', async ({ page }, info) => {
   const problems = watchForProblems(page);
@@ -152,4 +145,82 @@ test('телефон: свайп вниз закрывает просмотрщ�
   for (const y of [320, 360, 420, 480, 520]) await stage.dispatchEvent('pointermove', at(y));
   await stage.dispatchEvent('pointerup', at(520));
   await expect(viewer).toBeHidden();
+});
+
+/** JPEG с EXIF-блоком, в котором метка: если метка доехала до получателя — метаданные ушли. */
+const EXIF_MARK = 'ISKRA-GPS-55.7558N-37.6173E';
+async function jpegWithExif(page: Page): Promise<Buffer> {
+  const bytes = await page.evaluate(async (mark) => {
+    const canvas = Object.assign(document.createElement('canvas'), { width: 64, height: 48 });
+    const context = canvas.getContext('2d')!;
+    context.fillStyle = '#3a6';
+    context.fillRect(0, 0, 64, 48);
+    const jpeg = new Uint8Array(await (await new Promise<Blob>((r) => canvas.toBlob((b) => r(b!), 'image/jpeg', 0.9))).arrayBuffer());
+    const payload = new TextEncoder().encode(`Exif\0\0${mark}`);
+    const app1 = new Uint8Array([0xff, 0xe1, (payload.length + 2) >> 8, (payload.length + 2) & 0xff, ...payload]);
+    return [...jpeg.slice(0, 2), ...app1, ...jpeg.slice(2)];
+  }, EXIF_MARK);
+  return Buffer.from(bytes);
+}
+
+/** Отправить фото в «Аню» и скачать то, что ушло, — через просмотрщик. */
+async function sendAndDownload(page: Page, jpeg: Buffer, caption: string): Promise<{ name: string; bytes: Buffer }> {
+  await page.locator('input[type=file]').setInputFiles({ name: 'IMG_0001.jpeg', mimeType: 'image/jpeg', buffer: jpeg });
+  await expect(page.getByRole('img', { name: 'Фото к сообщению' })).toBeVisible();
+  await page.getByRole('textbox', { name: 'Сообщение' }).fill(caption);
+  await page.getByRole('button', { name: 'Отправить' }).click();
+  const sent = page.getByRole('log').getByRole('article').filter({ hasText: caption });
+  await expect(sent.getByRole('button', { name: 'Фото' }).locator('img')).toHaveAttribute('src', /^blob:/, { timeout: 20_000 });
+  await sent.getByRole('button', { name: 'Фото' }).click();
+  const viewer = page.getByRole('dialog', { name: 'Фото' });
+  const download = page.waitForEvent('download');
+  await viewer.getByRole('button', { name: 'Сохранить' }).click();
+  const file = await download;
+  const bytes = await (await import('node:fs/promises')).readFile((await file.path())!);
+  await page.keyboard.press('Escape');
+  await expect(viewer).toBeHidden();
+  return { name: file.suggestedFilename(), bytes };
+}
+
+test('фото уходит без метаданных; выключили — уходит как есть', async ({ page }) => {
+  await signInToDemo(page);
+  await openRoom(page, /^Аня/);
+  const jpeg = await jpegWithExif(page);
+  expect(jpeg.includes(EXIF_MARK)).toBe(true);
+
+  // По умолчанию — без метаданных и сжатое: метки нет, имя — под новый тип.
+  const clean = await sendAndDownload(page, jpeg, 'Без метаданных');
+  expect(clean.bytes.includes(EXIF_MARK)).toBe(false);
+  expect(clean.name).toBe('IMG_0001.jpg');
+
+  // Выключили и то и другое — файл тот же, байт в байт.
+  const back = page.getByRole('button', { name: 'Назад' });
+  if (await back.isVisible()) await back.click();
+  await page.getByRole('button', { name: 'Настройки' }).click();
+  await page.getByRole('navigation', { name: 'Настройки' }).getByRole('link', { name: 'Фото и видео' }).click();
+  await page.getByRole('switch', { name: 'Отправлять без метаданных' }).uncheck();
+  await page.getByRole('switch', { name: 'Сжимать фото' }).uncheck();
+  await expect(page.getByRole('radiogroup', { name: 'Степень сжатия' })).toHaveCount(0);
+  await openRoom(page, /^Аня/);
+  const asIs = await sendAndDownload(page, jpeg, 'Как есть');
+  expect(asIs.bytes.equals(jpeg)).toBe(true);
+});
+
+test('автозагрузка «Никогда»: чужое фото — рамкой с «Загрузить», нажатие загружает', async ({ page }) => {
+  const problems = watchForProblems(page);
+  await signInToDemo(page);
+  await page.getByRole('button', { name: 'Настройки' }).click();
+  await page.getByRole('navigation', { name: 'Настройки' }).getByRole('link', { name: 'Фото и видео' }).click();
+  await page.getByRole('radiogroup', { name: 'Автозагрузка' }).getByRole('radio', { name: 'Никогда' }).click();
+  await expect(page.getByText('Аватарки и стикеры — всегда')).toBeVisible();
+
+  await openRoom(page, /^Выходные/);
+  const waiting = page.getByRole('log').getByRole('button', { name: 'Фото: Загрузить' });
+  await expect(waiting).toHaveCount(2);
+  await expect(waiting.first().locator('img')).toHaveCount(0);
+  await waiting.first().click();
+  const photos = page.getByRole('log').getByRole('button', { name: 'Фото', exact: true });
+  await expect(photos.first().locator('img')).toHaveAttribute('src', /^blob:/);
+  await expect(waiting).toHaveCount(1);
+  expect(problems).toEqual([]);
 });

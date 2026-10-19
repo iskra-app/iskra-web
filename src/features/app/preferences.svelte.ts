@@ -7,6 +7,7 @@
  */
 import { clampListWidth, LIST_IDEAL } from '../../design/columns';
 import { RECENT_LIMIT } from '../room/emojiCatalog';
+import { autoDownloads, compressions, type MediaAutoDownload, type MediaCompression } from '../media/mediaSettings';
 import { i18n, locales, preferredLocale, type Locale } from '../../i18n/index.svelte.ts';
 
 export const accents = ['blue', 'red', 'orange', 'yellow', 'green', 'cyan', 'violet', 'mono'] as const;
@@ -45,6 +46,10 @@ const keys = {
   layout: 'messages.layout',
   wallpaper: 'appearance.wallpaper',
   wallpaperDimming: 'appearance.wallpaperDimming',
+  stripMetadata: 'media.stripsMetadata',
+  compress: 'media.compresses',
+  compression: 'media.compression',
+  autoDownload: 'media.autoDownload',
 } as const;
 
 function read(key: string): string | null {
@@ -87,6 +92,11 @@ class Preferences {
   layout = $state<MessageLayout>(oneOf(read(keys.layout), layouts, 'bubbles'));
   wallpaper = $state<Wallpaper>(oneOf(read(keys.wallpaper), wallpapers, 'none'));
   wallpaperDimming = $state<number>(dimming(read(keys.wallpaperDimming)));
+  /** Фото и видео — ключи и умолчания `MediaSettings` нативной: метаданные стираются, сжатие среднее. */
+  stripMetadata = $state<boolean>(read(keys.stripMetadata) !== 'false');
+  compress = $state<boolean>(read(keys.compress) !== 'false');
+  compression = $state<MediaCompression>(oneOf(read(keys.compression), compressions, 'balanced'));
+  autoDownload = $state<MediaAutoDownload>(oneOf(read(keys.autoDownload), autoDownloads, 'always'));
   /** Недавние реакции — наверху панели «Больше эмодзи» (`RecentEmoji` нативной, тот же ключ). */
   recentEmoji = $state.raw<string[]>(recentList(read(keys.recentEmoji)));
 
@@ -102,6 +112,10 @@ class Preferences {
       $effect(() => write(keys.wallpaper, this.wallpaper));
       $effect(() => write(keys.wallpaperDimming, String(this.wallpaperDimming)));
       $effect(() => write(keys.recentEmoji, this.recentEmoji.join(' ')));
+      $effect(() => write(keys.stripMetadata, String(this.stripMetadata)));
+      $effect(() => write(keys.compress, String(this.compress)));
+      $effect(() => write(keys.compression, this.compression));
+      $effect(() => write(keys.autoDownload, this.autoDownload));
       $effect(() => {
         write(keys.language, this.language);
         i18n.locale = this.language === 'system' ? preferredLocale(navigator.languages ?? []) : this.language;

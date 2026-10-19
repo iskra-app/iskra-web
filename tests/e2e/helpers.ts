@@ -178,3 +178,18 @@ export async function signOut(page: Page): Promise<void> {
   await dialog.getByRole('button', { name: 'Выйти' }).click();
   await expect(page.getByRole('heading', { name: 'Где ваш аккаунт?' })).toBeVisible();
 }
+
+/**
+ * Открыть чат из списка. «Назад» — пока строка чата не видна: из раздела настроек на телефоне
+ * это два шага. По видимости строки, а не кнопки: уходящая с анимацией кнопка ещё «видна».
+ */
+export async function openRoom(page: Page, name: RegExp): Promise<void> {
+  const back = page.getByRole('button', { name: 'Назад' });
+  const link = page.getByRole('link', { name });
+  await expect(async () => {
+    if (!(await link.isVisible())) await back.click({ timeout: 1000 });
+    await expect(link).toBeVisible({ timeout: 1000 });
+  }).toPass({ timeout: 10_000 });
+  await link.click();
+  await expect(page.getByRole('log')).toBeVisible();
+}

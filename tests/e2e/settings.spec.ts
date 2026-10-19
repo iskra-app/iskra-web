@@ -1,22 +1,9 @@
 import { expect, test, type Page } from '@playwright/test';
-import { consoleOf, isPhone, signInToDemo, signOut, watchForProblems } from './helpers';
+import { consoleOf, isPhone, openRoom, signInToDemo, signOut, watchForProblems } from './helpers';
 
 test.afterEach(async ({ page }, info) => {
   if (info.status !== info.expectedStatus) console.log(`Консоль «${info.title}»:\n${consoleOf(page).slice(-40).join('\n')}`);
 });
-
-async function openRoom(page: Page, name: RegExp) {
-  const back = page.getByRole('button', { name: 'Назад' });
-  const link = page.getByRole('link', { name });
-  // «Назад», пока не виден список чатов: из раздела настроек на телефоне это два шага.
-  // По видимости строки, а не кнопки: уходящая с анимацией кнопка ещё «видна».
-  await expect(async () => {
-    if (!(await link.isVisible())) await back.click({ timeout: 1000 });
-    await expect(link).toBeVisible({ timeout: 1000 });
-  }).toPass({ timeout: 10_000 });
-  await link.click();
-  await expect(page.getByRole('log')).toBeVisible();
-}
 
 /** Настройки — список разделов; `row` — открыть раздел этой строки. */
 async function openSettings(page: Page, row?: string) {

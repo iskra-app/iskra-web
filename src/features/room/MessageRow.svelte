@@ -142,7 +142,7 @@
           {:else if kind.type === 'poll'}
             <PollView poll={kind.poll} canVote={!!message.eventId} own={message.own && !compact} onvote={(ids) => actions.vote(message, ids)} />
           {:else if kind.type === 'image' || kind.type === 'video' || kind.type === 'videoNote' || kind.type === 'sticker'}
-            <MediaPreview kind={kind.type} attachment={kind.attachment} {media} onopen={() => actions.openMedia(message)} />
+            <MediaPreview kind={kind.type} attachment={kind.attachment} {media} own={message.own} onopen={() => actions.openMedia(message)} />
             {#if kind.attachment.caption}<span class="caption text"><LinkedText text={kind.attachment.caption} /></span>{/if}
           {:else if kind.type === 'voice'}
             <VoiceMessage attachment={kind.attachment} {media} />

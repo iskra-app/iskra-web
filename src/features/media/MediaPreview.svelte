@@ -2,12 +2,16 @@
   Фото, видео, «кружочек», стикер — в ленте. Место под картинку отведено до загрузки
   по размерам из события (`info.w/h`): лента не прыгает, когда картинка приходит.
   Нажатие — просмотрщик (стикер не открывается: смотреть в нём нечего).
+  Автозагрузка выключена (настройки «Фото и видео») — на месте картинки рамка той же формы,
+  и нажатие сначала загружает. Своё и стикеры — всегда.
 -->
 <script lang="ts">
   import type { MediaLoader } from '../../core/media/media';
   import type { Attachment } from '../../core/timeline/message';
   import { t } from '../../i18n/index.svelte.ts';
   import { aspect, ratio } from './files';
+  import { preferences } from '../app/preferences.svelte.ts';
+  import { allowsAutoDownload } from './mediaSettings';
   import { untrack } from 'svelte';
 
   interface Props {
@@ -15,11 +19,16 @@
     attachment: Attachment;
     media: MediaLoader;
     onopen?: () => void;
+    /** Своё — уже здесь: автозагрузка его не касается. */
+    own?: boolean;
   }
-  let { kind, attachment, media, onopen }: Props = $props();
+  let { kind, attachment, media, onopen, own = false }: Props = $props();
 
   let url = $state<string | undefined>();
   let failed = $state(false);
+  /** Попросили загрузить сами. */
+  let requested = $state(false);
+  const allowed = $derived(kind === 'sticker' || own || requested || allowsAutoDownload(preferences.autoDownload));
 
   const round = $derived(kind === 'videoNote');
   const shape = $derived(round ? 1 : ratio(attachment.width, attachment.height));
@@ -38,6 +47,7 @@
 
   $effect(() => {
     const key = identity;
+    if (!allowed) return;
     const target = untrack(() => attachment);
     const dpr = typeof window === 'undefined' ? 1 : window.devicePixelRatio || 1;
     url = undefined;
@@ -70,6 +80,11 @@
 
 {#if kind === 'sticker'}
   <span class="media sticker" use:aspect={shape}>{@render picture()}</span>
+{:else if !allowed}
+  <button type="button" class="media waiting" class:round use:aspect={shape} aria-label={`${label}: ${t('media.download')}`} title={t('media.download')} onclick={() => (requested = true)}>
+    <span class="download" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v12M6 11l6 6 6-6M5 20h14" /></svg></span>
+    {#if video && attachment.duration}<span class="duration">{duration(attachment.duration)}</span>{/if}
+  </button>
 {:else}
   <button type="button" class="media" class:round class:loading={!url && !failed} use:aspect={shape} aria-label={label} title={t('message.media.openFullScreen')} onclick={onopen}>
     {@render picture()}
@@ -127,7 +142,11 @@
     font-size: var(--font-size-caption);
     color: var(--color-text-secondary);
   }
-  .play {
+  .waiting {
+    cursor: pointer;
+  }
+  .play,
+  .download {
     position: absolute;
     inset: 50% auto auto 50%;
     translate: -50% -50%;
@@ -138,6 +157,10 @@
     border-radius: var(--radius-circle);
     background: rgb(0 0 0 / 0.5);
     color: white;
+  }
+  .download svg {
+    width: var(--size-icon);
+    height: var(--size-icon);
   }
   .play svg {
     width: var(--size-icon);

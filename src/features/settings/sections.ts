@@ -7,6 +7,7 @@ export const settingsTitles: Record<SettingsSection, TextKey> = {
   appearance: 'settings.appearance',
   notifications: 'settings.notifications',
   security: 'settings.security',
+  media: 'settings.media',
   storage: 'settings.storage',
   about: 'settings.about',
 };

@@ -26,6 +26,7 @@
   import AccentSwatches from './AccentSwatches.svelte';
   import WallpaperPicker from './WallpaperPicker.svelte';
   import { settingsTitles } from './sections';
+  import { autoDownloads, compressions, type MediaAutoDownload } from '../media/mediaSettings';
   import { Photo, pixelsFor } from '../rooms/faces.svelte.ts';
 
   let { session, section }: { session: UserSession; section?: SettingsSection } = $props();
@@ -43,6 +44,7 @@
     { section: 'appearance', icon: 'appearance' },
     { section: 'notifications', icon: 'bell' },
     { section: 'security', icon: 'shield' },
+    { section: 'media', icon: 'photo' },
     { section: 'storage', icon: 'storage' },
     { section: 'about', icon: 'info' },
   ];
@@ -112,6 +114,14 @@
     { name: 'invitations', label: 'notifications.invitations' },
     { name: 'calls', label: 'notifications.calls' },
   ];
+
+  // ————— Фото и видео —————
+
+  const autoDownloadHelp: Record<MediaAutoDownload, TextKey> = {
+    always: 'media.autoDownload.alwaysHelp',
+    wifi: 'media.autoDownload.wifiHelpWeb',
+    never: 'media.autoDownload.neverHelp',
+  };
 
   // ————— Безопасность: код восстановления —————
 
@@ -420,6 +430,36 @@
         </button>
       {/each}
     </div>
+  {:else if section === 'media'}
+    <h3 id="auto-download-title">{t('media.autoDownload')}</h3>
+    <div class="options" role="radiogroup" aria-labelledby="auto-download-title">
+      {#each autoDownloads as choice (choice)}
+        <button type="button" role="radio" aria-checked={preferences.autoDownload === choice} onclick={() => (preferences.autoDownload = choice)}>
+          {t(`media.autoDownload.${choice}`)}
+        </button>
+      {/each}
+    </div>
+    <p class="secondary">{t(autoDownloadHelp[preferences.autoDownload])}</p>
+    <label class="switch">
+      <span>{t('media.stripMetadata')}</span>
+      <input type="checkbox" role="switch" bind:checked={preferences.stripMetadata} />
+    </label>
+    <label class="switch">
+      <span>{t('media.compressPhotos')}</span>
+      <input type="checkbox" role="switch" bind:checked={preferences.compress} />
+    </label>
+    <!-- Появляется вместе с переключателем, от которого зависит, — а не стоит серым. -->
+    {#if preferences.compress}
+      <h3 id="compression-title">{t('media.compression')}</h3>
+      <div class="options" role="radiogroup" aria-labelledby="compression-title">
+        {#each compressions as level (level)}
+          <button type="button" role="radio" aria-checked={preferences.compression === level} onclick={() => (preferences.compression = level)}>
+            {t(`media.compressionPhoto.${level}`)}
+          </button>
+        {/each}
+      </div>
+    {/if}
+    <p class="secondary">{t('media.videoAsIsWeb')}</p>
   {:else if section === 'storage'}
     {#if persisted !== null}
       <p>{persisted ? t('storage.persisted') : t('storage.notPersisted')}</p>

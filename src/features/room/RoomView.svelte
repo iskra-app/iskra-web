@@ -316,7 +316,8 @@
       return false;
     });
     if (fitting.length === files.length) notice = '';
-    const prepared = await Promise.all(fitting.map(prepareFile));
+    const settings = { stripMetadata: preferences.stripMetadata, compress: preferences.compress, compression: preferences.compression };
+    const prepared = await Promise.all(fitting.map((file) => prepareFile(file, settings)));
     attachments = [...attachments, ...prepared];
   }
 
