@@ -118,7 +118,7 @@
   --timing-deletion: 220ms;
   --timing-recording-pulse: 600ms; /* точка записи дышит — как RecordingStrip нативной */
   /* Блок входа появляется из глубины: чуть крупнее, размытый и прозрачный — и садится на место. */
-  --timing-entrance: 600ms;
+  --timing-entrance: 800ms;
   --ease-entrance: cubic-bezier(0.2, 0.8, 0.2, 1);
   --scale-entrance: 1.2;
   --blur-entrance: 12px;
