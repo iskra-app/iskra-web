@@ -126,7 +126,9 @@ export class VideoNoteRecorder {
     // У вебкамеры стороны нет — она смотрит на человека, как фронтальная.
     this.facing = settings?.facingMode === 'environment' ? 'environment' : 'user';
     this.video.srcObject = stream;
-    await this.video.play().catch(() => {});
+    // Не ждать: `play()` камеры, не отдавшей ни кадра, не разрешается и не отказывает, и
+    // подготовка висела бы без слов (так было в WebKit). Рисование и так ждёт размеров кадра.
+    void this.video.play().catch(() => {});
   }
 
   private async listCameras(): Promise<void> {
