@@ -81,6 +81,7 @@ export async function signInToDemo(page: Page): Promise<string | null> {
  * ни ошибки, ни «занято». Enter — такой же путь человека и не зависит от координат кнопки.
  */
 export async function submitAddress(page: Page, address: string): Promise<void> {
+  await page.locator('main.sign-in > .content').evaluate((el) => Promise.all(el.getAnimations().map((a) => a.finished)));
   const field = page.getByRole('textbox', { name: 'Адрес аккаунта' });
   await field.fill(address);
   // Кнопка становится активной после ввода — значит, Svelte уже видит адрес.
