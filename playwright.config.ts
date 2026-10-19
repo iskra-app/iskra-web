@@ -21,7 +21,7 @@ const desktop = { viewport: { width: 1440, height: 900 }, hasTouch: false };
 const browsers = {
   chromium: { ...devices['Desktop Chrome'], ...(chromiumPath ? { launchOptions: { executablePath: chromiumPath } } : {}) },
   firefox: devices['Desktop Firefox'],
-  webkit: devices['Desktop Safari'],
+  webkit: { ...devices['Desktop Safari'], reducedMotion: 'reduce' },
 } as const;
 
 export default defineConfig({
