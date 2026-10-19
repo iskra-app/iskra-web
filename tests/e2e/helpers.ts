@@ -72,7 +72,19 @@ export async function signInToDemo(page: Page): Promise<string | null> {
   await enterDemoCredentials(page);
   const code = await passRecoveryStep(page);
   await expect(page.getByRole('heading', { name: 'Чаты', level: 1 })).toBeVisible({ timeout: 20_000 });
+  // Вошли — движение обратно: дальше анимации окон и ленты проверяются как есть.
+  await page.emulateMedia({ reducedMotion: null });
   return code;
+}
+
+/**
+ * WebKit под Linux в CI (программная отрисовка) на появлении блока входа — scale и blur —
+ * иногда перестаёт выдавать кадры вовсе: анимация не доигрывает, `requestAnimationFrame`
+ * молчит, и Playwright ждёт «устойчивости» кнопки до таймаута. Размытие — часть вида, его не
+ * трогаем; экран входа в WebKit открываем с «уменьшить движение» — там анимации нет.
+ */
+async function calmEntrance(page: Page): Promise<void> {
+  if (page.context().browser()?.browserType().name() === 'webkit') await page.emulateMedia({ reducedMotion: 'reduce' });
 }
 
 /**
@@ -93,6 +105,7 @@ export async function submitAddress(page: Page, address: string): Promise<void> 
  * его здесь, одним местом, а не в каждом тесте (подробности — ниже, у повтора).
  */
 export async function openApp(page: Page): Promise<void> {
+  await calmEntrance(page);
   const log = recordConsole(page);
   // Не ждём `load`: приложению он не нужен, а Firefox в CI изредка его так и не присылает.
   try {

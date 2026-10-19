@@ -54,7 +54,8 @@ test('вторая вкладка получает «уже открыта», и
   await signInToDemo(page);
 
   const second = await context.newPage();
-  await second.goto('/', { waitUntil: 'domcontentloaded' });
+  // Через `openApp`: Firefox изредка теряет переход, и там на это есть повтор.
+  await openApp(second);
   await expect(second.getByRole('heading', { name: 'Iskra уже открыта в другом окне' })).toBeVisible({ timeout: 20_000 });
 
   await second.getByRole('button', { name: 'Открыть здесь' }).click();
