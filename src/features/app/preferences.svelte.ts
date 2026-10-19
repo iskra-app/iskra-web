@@ -7,6 +7,7 @@
  */
 import { clampListWidth, LIST_IDEAL } from '../../design/columns';
 import { RECENT_LIMIT } from '../room/emojiCatalog';
+import { defaultQuickReaction } from '../room/reactions';
 import { autoDownloads, compressions, type MediaAutoDownload, type MediaCompression } from '../media/mediaSettings';
 import { i18n, locales, preferredLocale, type Locale } from '../../i18n/index.svelte.ts';
 
@@ -43,6 +44,7 @@ const keys = {
   font: 'appearance.font',
   language: 'language',
   recentEmoji: 'reactions.recent',
+  quickReaction: 'reactions.quick',
   layout: 'messages.layout',
   wallpaper: 'appearance.wallpaper',
   wallpaperDimming: 'appearance.wallpaperDimming',
@@ -80,6 +82,11 @@ function dimming(value: string | null): number {
   return Number.isFinite(n) ? Math.min(MAX_DIMMING, Math.max(0, n)) : DEFAULT_DIMMING;
 }
 
+/** Одна эмодзи — не пустая и не абзац; иначе умолчание. */
+function emojiOr(value: string | null, fallback: string): string {
+  return value && value.length <= 32 && !/\s/.test(value) ? value : fallback;
+}
+
 /** Через пробел, как у нативной; мусор и лишнее — отброшены. */
 function recentList(value: string | null): string[] {
   return (value ?? '').split(' ').filter((e) => e && e.length <= 32).slice(0, RECENT_LIMIT);
@@ -105,6 +112,8 @@ class Preferences {
   hideMembershipChanges = $state<boolean>(read(keys.hideMembershipChanges) === 'true');
   /** Enter переносит строку, отправляет `Ctrl/⌘ Enter` — для тех, кто пишет абзацами. */
   sendWithModEnter = $state<boolean>(read(keys.sendWithModEnter) === 'true');
+  /** Что ставит двойное касание сообщения — любая эмодзи, ключ нативной (`QuickReaction`). */
+  quickReaction = $state<string>(emojiOr(read(keys.quickReaction), defaultQuickReaction));
   /** Недавние реакции — наверху панели «Больше эмодзи» (`RecentEmoji` нативной, тот же ключ). */
   recentEmoji = $state.raw<string[]>(recentList(read(keys.recentEmoji)));
 
@@ -120,6 +129,7 @@ class Preferences {
       $effect(() => write(keys.wallpaper, this.wallpaper));
       $effect(() => write(keys.wallpaperDimming, String(this.wallpaperDimming)));
       $effect(() => write(keys.recentEmoji, this.recentEmoji.join(' ')));
+      $effect(() => write(keys.quickReaction, this.quickReaction));
       $effect(() => write(keys.stripMetadata, String(this.stripMetadata)));
       $effect(() => write(keys.compress, String(this.compress)));
       $effect(() => write(keys.compression, this.compression));

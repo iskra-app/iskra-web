@@ -381,3 +381,45 @@ test('«Чаты»: отправлять по Ctrl/⌘ Enter — Enter пере�
   await expect(field).toHaveValue('');
   await expect(page.getByRole('log').getByRole('article').filter({ hasText: 'вторая' })).toBeVisible();
 });
+
+test('«Реакции»: быстрая реакция — из шести или из всего каталога; её ставят двойное касание и кнопка у пузыря', async ({ page }, info) => {
+  const problems = watchForProblems(page);
+  await signInToDemo(page);
+  await openSettings(page, 'Реакции');
+  const quick = page.getByRole('radiogroup', { name: 'Быстрая реакция' });
+  await expect(quick.getByRole('radio', { name: '❤️' })).toHaveAttribute('aria-checked', 'true');
+  await quick.getByRole('radio', { name: '👍' }).click();
+  await expect(quick.getByRole('radio', { name: '👍' })).toHaveAttribute('aria-checked', 'true');
+
+  await openRoom(page, /^Выходные/);
+  const bubble = page.getByRole('log').getByRole('article').filter({ hasText: 'Кто что берёт на пикник?' });
+  if (isPhone(info.project.name)) {
+    // Двойное касание — пальцем: у мыши свои правила (двойной щелчок выделяет слово).
+    // По координатам: `tap()` ждёт готовности элемента, и второе касание опаздывало бы за 300 мс.
+    const text = bubble.getByText('Кто что берёт на пикник?');
+    // В середину: у верха ленты пузырь закрыла бы плашка закреплённого.
+    await text.evaluate((element) => element.scrollIntoView({ block: 'center' }));
+    // Дождаться, пока экран доедет (смена экранов — с движением): иначе координаты — на полпути.
+    await text.click({ trial: true });
+    const box = (await text.boundingBox())!;
+    const [x, y] = [box.x + box.width / 2, box.y + box.height / 2];
+    await page.touchscreen.tap(x, y);
+    await page.touchscreen.tap(x, y);
+  } else {
+    // Кнопка у пузыря по наведению — в доступности она рядом со статьёй, а не в ней.
+    await bubble.hover();
+    await page.getByRole('log').getByRole('button', { name: 'Реакция 👍' }).first().click();
+  }
+  // Реакций в демо до этого ни у кого не было: «👍 1» — та, что поставили сейчас, и своя.
+  await expect(page.getByRole('log').getByRole('list', { name: 'Реакции' }).getByRole('button', { name: '👍 1', pressed: true })).toBeVisible({ timeout: 10_000 });
+
+  // Не из шести — из каталога: встаёт в ряд последней и подсвечена.
+  await openSettings(page, 'Реакции');
+  await page.getByRole('button', { name: 'Больше эмодзи' }).click();
+  const panel = page.getByRole('dialog', { name: 'Больше эмодзи' });
+  await panel.getByRole('button', { name: 'Еда и напитки' }).click();
+  await panel.getByRole('menuitemcheckbox', { name: 'Реакция 🍕' }).click();
+  await expect(panel).toBeHidden();
+  await expect(quick.getByRole('radio', { name: '🍕' })).toHaveAttribute('aria-checked', 'true');
+  expect(problems).toEqual([]);
+});

@@ -26,6 +26,7 @@
   import AccentSwatches from './AccentSwatches.svelte';
   import WallpaperPicker from './WallpaperPicker.svelte';
   import { settingsTitles } from './sections';
+  import QuickReactionPicker from './QuickReactionPicker.svelte';
   import { isMac } from '../../design/hotkeys';
   import { viewport } from '../../design/viewport.svelte.ts';
   import { autoDownloads, compressions, type MediaAutoDownload } from '../media/mediaSettings';
@@ -44,6 +45,7 @@
   /** Строки списка — в порядке нативной Искры; профиль — карточкой над ними. */
   const rows: Array<{ section: SettingsSection; icon: IconName }> = [
     { section: 'appearance', icon: 'appearance' },
+    { section: 'reactions', icon: 'reaction' },
     { section: 'chats', icon: 'chats' },
     { section: 'notifications', icon: 'bell' },
     { section: 'security', icon: 'shield' },
@@ -438,6 +440,10 @@
         </button>
       {/each}
     </div>
+  {:else if section === 'reactions'}
+    <h3 id="quick-reaction-title">{t('reactions.quick')}</h3>
+    <QuickReactionPicker labelledby="quick-reaction-title" />
+    <p class="secondary">{t('reactions.quickHelp')}</p>
   {:else if section === 'chats'}
     <h3>{t('chats.serviceSection')}</h3>
     <label class="switch">

@@ -32,7 +32,6 @@
   import VoiceMessage from '../media/VoiceMessage.svelte';
   import MediaPreview from '../media/MediaPreview.svelte';
   import type { MediaLoader } from '../../core/media/media';
-  import { doubleTapReaction } from './reactions';
   import { attachmentLabel, serviceText } from './text';
 
   interface Props {
@@ -73,7 +72,7 @@
   }
 
   const gestures = $derived({
-    ondoubletap: () => interactive && actions.react(message, doubleTapReaction),
+    ondoubletap: () => interactive && actions.react(message, preferences.quickReaction),
     onswipe: () => interactive && actions.canReply && actions.reply(message),
     onlongpress: (at: { x: number; y: number }) => interactive && actions.openMenu(message, at, true),
   });
@@ -177,7 +176,7 @@
           <!-- Панель по наведению. В порядке табуляции — только «ещё»: остальное есть в меню,
                а три остановки на каждом из сотен сообщений сделали бы Tab бесполезным. -->
           <div class="hover-bar">
-            <button type="button" tabindex="-1" aria-label={t('message.menu.react', { emoji: doubleTapReaction })} title={t('message.menu.react', { emoji: doubleTapReaction })} onclick={() => actions.react(message, doubleTapReaction)}>{doubleTapReaction}</button>
+            <button type="button" tabindex="-1" aria-label={t('message.menu.react', { emoji: preferences.quickReaction })} title={t('message.menu.react', { emoji: preferences.quickReaction })} onclick={() => actions.react(message, preferences.quickReaction)}>{preferences.quickReaction}</button>
             {#if actions.canReply}
               <button type="button" tabindex="-1" aria-label={t('message.menu.reply')} title={t('message.menu.reply')} onclick={() => actions.reply(message)}>
                 <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10 7L4 12l6 5M4 12h11a5 5 0 0 1 5 5v1" /></svg>
