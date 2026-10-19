@@ -5,6 +5,7 @@
  * нативной Искры), в пределах одного дня и не через служебную строку. Внутри серии
  * имя и лицо не повторяются, а зазор тоньше сетки.
  */
+import { foldAlbums } from './album';
 import { isService, type Message, type ServiceEvent } from './message';
 
 export const RUN_WINDOW_MS = 5 * 60 * 1000;
@@ -87,9 +88,11 @@ export function layout(all: readonly Message[], unreadFrom?: string, hiding: Ser
   // Спрятанная строка могла быть первой непрочитанной — тогда полоса встаёт над следующей.
   const firstUnread = unreadFrom === undefined ? -1 : all.findIndex((m) => m.key === unreadFrom);
   if (firstUnread >= 0) unreadFrom = all.slice(firstUnread).find((m) => !hides(m, hiding))?.key;
-  const messages = all.filter((m) => !hides(m, hiding));
-  const unreadAt = unreadFrom === undefined ? -1 : messages.findIndex((m) => m.key === unreadFrom);
-  const withDivider = unreadAt >= 0 && earned(messages, unreadAt);
+  const visible = all.filter((m) => !hides(m, hiding));
+  const unreadAt = unreadFrom === undefined ? -1 : visible.findIndex((m) => m.key === unreadFrom);
+  const withDivider = unreadAt >= 0 && earned(visible, unreadAt);
+  // Альбомы — до серий: альбом в серии — одна строка. Полоса «непрочитанные» его рвёт.
+  const messages = foldAlbums(visible, withDivider ? unreadFrom : undefined);
   const items: TimelineItem[] = [];
   let previous: Message | undefined;
   let lastMessageItem: Extract<TimelineItem, { kind: 'message' }> | undefined;

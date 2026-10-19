@@ -27,6 +27,7 @@
   import SelectionBar from './SelectionBar.svelte';
   import ForwardDialog from './ForwardDialog.svelte';
   import { canForward } from '../../core/timeline/forward';
+  import { membersOf } from '../../core/timeline/album';
   import { inTimelineOrder, selectionTranscript } from '../../core/timeline/selection';
   import { SvelteSet } from 'svelte/reactivity';
   import MessageMenu from './MessageMenu.svelte';
@@ -83,10 +84,12 @@
     selectionTranscript(chosen, (ts) => new Intl.DateTimeFormat(i18n.locale, { dateStyle: 'short', timeStyle: 'short' }).format(ts)),
   );
 
+  /** Альбом выбирается, пересылается и удаляется целиком — всеми своими фото. */
   function toggleSelected(message: Message) {
     if (!selection) return;
-    if (selection.has(message.key)) selection.delete(message.key);
-    else selection.add(message.key);
+    const keys = membersOf(message).map((m) => m.key);
+    if (selection.has(message.key)) for (const key of keys) selection.delete(key);
+    else for (const key of keys) selection.add(key);
   }
 
   function copySelection() {
@@ -398,8 +401,8 @@
     react: (message, key) => store?.react(message, key),
     vote: (message, ids) => store?.vote(message, ids),
     endPoll: (message) => (endingPoll = message),
-    select: (message) => (selection = new SvelteSet([message.key])),
-    forward: (message) => (forwarding = [message]),
+    select: (message) => (selection = new SvelteSet(membersOf(message).map((m) => m.key))),
+    forward: (message) => (forwarding = membersOf(message)),
     pin: (message) => store?.pin(message),
     unpin: (message) => store?.unpin(message),
     remove: (message) => (deleting = message),
@@ -567,7 +570,7 @@
   destructive
   onclose={() => (deleting = null)}
   onconfirm={() => {
-    if (deleting) store?.remove(deleting);
+    if (deleting) for (const message of membersOf(deleting)) store?.remove(message);
     deleting = null;
   }}
 />

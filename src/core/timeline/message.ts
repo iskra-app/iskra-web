@@ -135,6 +135,11 @@ export interface Message {
   canEdit: boolean;
   /** Своё — или право модератора удалять чужое. */
   canDelete: boolean;
+  /**
+   * Альбом (`album.ts`): эта строка — первое из фото и видео, отправленных вместе, а здесь все
+   * они по порядку, включая её саму. Нет — обычное сообщение.
+   */
+  album?: Message[];
 }
 
 export const isService = (m: Message): boolean => m.kind.type === 'service';

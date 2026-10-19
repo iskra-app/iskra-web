@@ -220,7 +220,10 @@
    */
   export async function reveal(eventId: string): Promise<void> {
     if (!(await store.reveal(eventId))) return;
-    const key = store.messages.find((m) => m.eventId === eventId)?.key;
+    // Фото внутри альбома своей строки не имеет — строка альбома та, что у первого.
+    const key = store.items.find(
+      (item) => item.kind === 'message' && (item.message.album ?? [item.message]).some((m) => m.eventId === eventId),
+    )?.key;
     if (!key) return;
     // Лента пересобирается раз в кадр — строки может ещё не быть в DOM. Подождать несколько.
     let element: HTMLElement | null = null;

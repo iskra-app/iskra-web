@@ -21,8 +21,10 @@
     onopen?: () => void;
     /** Своё — уже здесь: автозагрузка его не касается. */
     own?: boolean;
+    /** Плитка альбома: заполняет отведённое место, без своей формы и скругления. */
+    tile?: boolean;
   }
-  let { kind, attachment, media, onopen, own = false }: Props = $props();
+  let { kind, attachment, media, onopen, own = false, tile = false }: Props = $props();
 
   let url = $state<string | undefined>();
   let failed = $state(false);
@@ -81,12 +83,12 @@
 {#if kind === 'sticker'}
   <span class="media sticker" use:aspect={shape}>{@render picture()}</span>
 {:else if !allowed}
-  <button type="button" class="media waiting" class:round use:aspect={shape} aria-label={`${label}: ${t('media.download')}`} title={t('media.download')} onclick={() => (requested = true)}>
+  <button type="button" class="media waiting" class:round class:tile use:aspect={shape} aria-label={`${label}: ${t('media.download')}`} title={t('media.download')} onclick={() => (requested = true)}>
     <span class="download" aria-hidden="true"><svg viewBox={ICON_VIEWBOX}><path d={icons.download} /></svg></span>
     {#if video && attachment.duration}<span class="duration">{duration(attachment.duration)}</span>{/if}
   </button>
 {:else}
-  <button type="button" class="media" class:round class:loading={!url && !failed} use:aspect={shape} aria-label={label} title={t('message.media.openFullScreen')} onclick={onopen}>
+  <button type="button" class="media" class:round class:tile class:loading={!url && !failed} use:aspect={shape} aria-label={label} title={t('message.media.openFullScreen')} onclick={onopen}>
     {@render picture()}
   </button>
 {/if}
@@ -106,6 +108,12 @@
     background: var(--color-incoming-bubble);
     overflow: hidden;
     cursor: zoom-in;
+  }
+  .tile {
+    width: 100%;
+    height: 100%;
+    aspect-ratio: auto;
+    border-radius: 0;
   }
   .sticker {
     width: var(--size-sticker);

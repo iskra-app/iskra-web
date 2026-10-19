@@ -125,6 +125,20 @@ function stamp(roomId: string, events: DemoEvent[], now: number, endsMinutesAgo:
   }));
 }
 
+function photo(sender: string, id: string, w: number, h: number, caption?: string): DemoEvent {
+  return {
+    type: 'm.room.message',
+    sender,
+    content: {
+      msgtype: 'm.image',
+      body: caption ?? `${id}.svg`,
+      ...(caption ? { filename: `${id}.svg` } : {}),
+      url: `mxc://${DEMO_SERVER}/${id}`,
+      info: { w, h, mimetype: 'image/svg+xml' },
+    },
+  };
+}
+
 export function buildDemoWorld(now: number): { rooms: DemoRoom[]; invites: DemoInvite[] } {
   const { alice, anya, boris, vera } = demoUsers;
 
@@ -249,11 +263,18 @@ export function buildDemoWorld(now: number): { rooms: DemoRoom[]; invites: DemoI
         formatted_body:
           '<p><b>Повестка</b> — <a href="https://example.org/agenda">полностью здесь</a></p><ul><li>лифт</li><li>двор</li></ul><img src="mxc://demo.iskra.invalid/plan" alt="схема двора"><script>alert(1)</script>',
       }),
+      // Альбом: три фото подряд, с разницей в секунды, — одним пузырём (`album.ts`).
+      photo(boris, 'yard', 900, 900, 'Двор сейчас'),
+      photo(boris, 'forest', 800, 1000),
+      photo(boris, 'lake', 1200, 800),
       text(vera, 'Лифт опять не работает'),
     ],
     now,
     60 * 5,
     30,
+  ).map((event, index, all) =>
+    // Отправлены разом: через четыре секунды друг за другом, а не через полчаса, как прочее.
+    index > 2 && index < 5 ? { ...event, origin_server_ts: all[2]!.origin_server_ts! + (index - 2) * 4_000 } : event,
   );
 
   const history = demoRooms.history;
