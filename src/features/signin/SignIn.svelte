@@ -270,6 +270,7 @@
     gap: var(--space-generous);
     margin-block: auto;
     animation: entrance var(--timing-entrance) var(--ease-entrance) both;
+    will-change: transform, opacity, filter;
   }
   @keyframes entrance {
     from {
