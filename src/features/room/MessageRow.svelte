@@ -58,11 +58,26 @@
   /** Картинка во весь пузырь: отступы пузыря — тоньше, фон — у самой картинки. */
   const visual = $derived(kind.type === 'image' || kind.type === 'video' || kind.type === 'videoNote' || kind.type === 'sticker');
 
+  const selected = () => (window.getSelection()?.toString() ?? '') !== '';
+
+  /**
+   * Было ли выделение до правого щелчка. Safari на Mac выделяет слово под курсором сам, ещё до
+   * `contextmenu`, — и по выделению «сейчас» наше меню там не открывалось бы никогда.
+   */
+  let selectedBefore: boolean | null = null;
+  function onpointerdown(event: PointerEvent) {
+    selectedBefore = event.button === 2 ? selected() : null;
+  }
+
   function oncontextmenu(event: MouseEvent) {
     if (!interactive) return;
     const target = event.target as Element | null;
-    if (target?.closest('a') || (window.getSelection()?.toString() ?? '') !== '') return;
+    const hadSelection = selectedBefore ?? selected();
+    selectedBefore = null;
+    if (target?.closest('a') || hadSelection) return;
     event.preventDefault();
+    // Слово, выделенное браузером на правый щелчок, — не выбор человека: снять.
+    if (selected()) window.getSelection()?.removeAllRanges();
     actions.openMenu(message, { x: event.clientX, y: event.clientY }, !viewport.finePointer);
   }
 
@@ -106,6 +121,7 @@
         class:notice={kind.type === 'notice'}
         class:muted={kind.type === 'deleted' || kind.type === 'unreadable' || kind.type === 'unsupported'}
         {oncontextmenu}
+        {onpointerdown}
         use:touchGestures={gestures}
       >
         <!-- Кто говорит — скринридеру, в начале каждого сообщения (`spokenLabel` нативной Искры):
