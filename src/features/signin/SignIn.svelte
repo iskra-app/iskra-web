@@ -274,7 +274,6 @@
   @keyframes entrance {
     from {
       opacity: 0;
-      filter: blur(var(--blur-entrance));
       transform: scale(var(--scale-entrance));
     }
   }
