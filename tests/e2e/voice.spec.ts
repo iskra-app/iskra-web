@@ -166,6 +166,19 @@ test('голосовое: удержание — отпустил и отпра�
 });
 
 test('голосовое в ленте: волна и длительность из события, «▶» — играет, пауза — встаёт', async ({ page }) => {
+  // События плеера — в консоль: упавший тест её печатает, и видно, почему звук встал.
+  await page.addInitScript(() => {
+    for (const type of ['play', 'playing', 'pause', 'ended', 'error', 'waiting', 'stalled', 'emptied']) {
+      document.addEventListener(
+        type,
+        (event) => {
+          const media = event.target as HTMLMediaElement;
+          console.log(`[media] ${type} t=${media.currentTime.toFixed(2)} d=${media.duration} error=${media.error?.code ?? '-'} ${media.error?.message ?? ''}`);
+        },
+        true,
+      );
+    }
+  });
   const problems = watchForProblems(page);
   await signInToDemo(page);
   await openChat(page);
