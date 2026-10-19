@@ -98,7 +98,9 @@
     if (!player) return;
     claimSpeaker(listener);
     await player.play().catch((error: unknown) => {
-      playing = false;
+      // У плеера, а не вслепую: отказ прежнего `play()` (пауза раньше звука) Firefox может
+      // принести, когда следующее нажатие уже играет.
+      playing = !player.paused;
       // Паузу нажали раньше, чем звук пошёл, — это не сбой.
       if (!(error instanceof DOMException && error.name === 'AbortError')) problem = 'failed';
     });
