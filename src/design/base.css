@@ -1,0 +1,184 @@
+@import './tokens.css';
+@import './accent.css';
+@import './wallpaper.css';
+@import './titlebar.css';
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  height: 100%;
+}
+
+body {
+  background: var(--color-background);
+  color: var(--color-text);
+  font-family: var(--font-body);
+  font-size: var(--font-size-body);
+  line-height: var(--line-height-body);
+  -webkit-font-smoothing: antialiased;
+  /* Никакого pull-to-refresh браузера поверх ленты. */
+  overscroll-behavior: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+#app {
+  height: 100%;
+}
+
+button,
+input,
+textarea,
+select {
+  font: inherit;
+  color: inherit;
+}
+
+:focus {
+  outline: none;
+}
+
+:focus-visible {
+  outline: 2px solid var(--color-focus);
+  outline-offset: 2px;
+}
+
+/*
+ * Видимые полосы прокрутки на десктопе — тонкие, но настоящие. Спрятанная полоса
+ * на телефоне — норма; на десктопе это отнятый способ понять, где ты в разговоре.
+ */
+@media (hover: hover) and (pointer: fine) {
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: var(--color-separator) transparent;
+  }
+}
+
+/*
+ * Окна, меню и листы появляются и уходят (`data-motion` на `<dialog>`). Открытие — пружиной
+ * меню Telegram, закрытие — ровным ease-in-out: положенное не бросают. Чистый CSS, без
+ * скриптов: `@starting-style` даёт точку, откуда открываться, `overlay` и `display` с
+ * `allow-discrete` держат закрывающееся окно в верхнем слое, пока оно не догорит. Где
+ * браузер этого не знает, окно просто появляется и исчезает, как раньше.
+ */
+dialog[data-motion] {
+  transition:
+    opacity var(--timing-menu-close) var(--ease-menu-close),
+    transform var(--timing-menu-close) var(--ease-menu-close),
+    overlay var(--timing-menu-close) allow-discrete,
+    display var(--timing-menu-close) allow-discrete;
+}
+dialog[data-motion][open] {
+  transition-duration: var(--timing-menu-open);
+  transition-timing-function: var(--ease-menu-open);
+}
+dialog[data-motion='pop']:not([open]) {
+  opacity: 0;
+  transform: scale(var(--motion-scale-from));
+}
+/* У точки — растёт из угла, у которого открыт (`transform-origin` ставит `Menu`). */
+dialog[data-motion='menu']:not([open]) {
+  opacity: 0;
+  transform: scale(var(--motion-menu-scale-from));
+}
+/* Лист — выезжает снизу. */
+dialog[data-motion='sheet']:not([open]) {
+  transform: translateY(100%);
+}
+@starting-style {
+  dialog[data-motion='pop'][open] {
+    opacity: 0;
+    transform: scale(var(--motion-scale-from));
+  }
+  dialog[data-motion='menu'][open] {
+    opacity: 0;
+    transform: scale(var(--motion-menu-scale-from));
+  }
+  dialog[data-motion='sheet'][open] {
+    transform: translateY(100%);
+  }
+}
+dialog[data-motion]::backdrop {
+  opacity: 0;
+  transition:
+    opacity var(--timing-menu-close) var(--ease-menu-close),
+    overlay var(--timing-menu-close) allow-discrete,
+    display var(--timing-menu-close) allow-discrete;
+}
+dialog[data-motion][open]::backdrop {
+  opacity: 1;
+}
+@starting-style {
+  dialog[data-motion][open]::backdrop {
+    opacity: 0;
+  }
+}
+
+/*
+ * Смена экрана на телефоне (стек): чат въезжает справа поверх списка, назад — уезжает вправо.
+ * View Transitions запускает роутер (`features/app/screenMotion.ts`), направление — `data-nav`.
+ */
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation-duration: var(--timing-screen);
+  animation-timing-function: var(--ease-screen);
+}
+:root[data-nav='forward']::view-transition-new(root) {
+  animation-name: screen-in-from-end;
+}
+:root[data-nav='forward']::view-transition-old(root) {
+  animation-name: screen-out-to-start;
+}
+:root[data-nav='back']::view-transition-new(root) {
+  animation-name: screen-in-from-start;
+}
+:root[data-nav='back']::view-transition-old(root) {
+  animation-name: screen-out-to-end;
+  z-index: 1;
+}
+@keyframes screen-in-from-end {
+  from {
+    transform: translateX(100%);
+  }
+}
+@keyframes screen-out-to-start {
+  to {
+    transform: translateX(-30%);
+    opacity: 0.6;
+  }
+}
+@keyframes screen-in-from-start {
+  from {
+    transform: translateX(-30%);
+    opacity: 0.6;
+  }
+}
+@keyframes screen-out-to-end {
+  to {
+    transform: translateX(100%);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}

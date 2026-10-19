@@ -1,0 +1,252 @@
+/*
+ * Токены — `Theme.swift` нативной Искры (zhuravlevb/iskra, ветка dev), переведённый
+ * в CSS custom properties. Числа — оттуда же; здесь они в rem (1rem = 16px), чтобы
+ * `Ctrl +` в браузере увеличивал Искру целиком и честно.
+ *
+ * Всё кратно 4 px (0.25rem). Два исключения — те же, что в Theme.swift, и по той же
+ * причине: `--space-within-run` (2 px) и `--size-recording-dot` (10 px). Сетка — для
+ * того, что выравнивается друг с другом; эти двое не выравниваются ни с чем.
+ *
+ * Ни одного голого `padding: 12px` в компонентах — только эти переменные.
+ *
+ * К числам Theme.swift добавлено то, чего в нативной Искре не было: ширины колонок,
+ * максимальная ширина ленты, зоны нажатия для пальца и для мыши. Точки перелома
+ * (640 и 1100 px) в custom properties жить не могут — media query их не читает, —
+ * поэтому они записаны числами в `breakpoints.ts`.
+ */
+
+:root {
+  /* Theme.Spacing */
+  --space-tight: 0.25rem; /* 4 */
+  --space-close: 0.5rem; /* 8 */
+  --space-normal: 0.75rem; /* 12 */
+  --space-roomy: 1rem; /* 16 */
+  --space-generous: 1.5rem; /* 24 */
+  --space-between-senders: 0.75rem; /* 12 */
+  --space-within-run: 0.125rem; /* 2 — не кратно 4 сознательно, см. Theme.swift */
+
+  /* Theme.Radius */
+  --radius-bubble: 1.5rem; /* 24 */
+  --radius-picture: 1.25rem; /* 20 */
+  --radius-card: 1rem; /* 16 */
+  --radius-control: 0.75rem; /* 12 */
+  --radius-menu: 1.75rem; /* 28 */
+  --radius-circle: 9999px;
+  --radius-checkbox: 0.25rem; /* 4 — квадратик выбора */
+
+  /* Theme.Border */
+  --border-hairline: 1px;
+  --border-thick: 0.125rem; /* 2 — обводка кружка и квадратика выбора */
+
+  /* Theme.Backdrop */
+  --backdrop-blur: 24px;
+  --backdrop-wash: 0.12;
+  --backdrop-plate: 0.45;
+  --backdrop-menu-scrim: 0.4;
+
+  /* Theme.Size */
+  --size-avatar: 2.5rem; /* 40 */
+  --size-avatar-small: 1.75rem; /* 28 */
+  --size-avatar-toolbar: 2.25rem; /* 36 */
+  --size-avatar-large: 4rem; /* 64 */
+  --size-avatar-profile: 6rem; /* 96 */
+  --size-room-avatar: 3.5rem; /* 56 — Theme.Size.roomAvatar; под мышью меньше, см. ниже */
+  --size-unread-badge: 1.25rem; /* 20 — Theme.Size.unreadBadge: высота значка и ширина «@» */
+  --size-navigation-bar: 2.75rem; /* 44 */
+  --size-sign-in-column: 26.25rem; /* 420 */
+  --size-menu-width: 15rem; /* 240 */
+  --size-recording-dot: 0.625rem; /* 10 — точка, а не сетка */
+  --size-waveform: 1.5rem; /* 24 — Theme.Size.waveform: высота волны голосового */
+  --size-voice-waveform: 10rem; /* 160 — сорок столбиков волны в пузыре голосового */
+  --size-voice-button: 1.75rem; /* 28 — Theme.Size.voiceButton: «▶» в пузыре; нажимается на 44 */
+  --size-video-note-camera: 27.5rem; /* 440 — Theme.Size.videoNoteCamera: кружок камеры */
+  --size-video-note-hint: 18.75rem; /* 300 — Theme.Size.videoNoteHint */
+  --size-recording-send: 4.5rem; /* 72 — Theme.Size.recordingSend: спуск под камерой */
+  --size-video-note-ring: 0.25rem; /* 4 — кольцо прогресса вокруг кружка */
+  --size-video-note-camera-fit: 60dvh; /* кружок не выше, чем оставляют спуск и подсказка */
+  --size-icon: 1.25rem; /* 20 — значок рядом с текстом */
+  --size-icon-button: 1.5rem; /* 24 — значок в кнопке-иконке */
+  --size-sign-in-mark: 3.5rem; /* 56 — Theme.Size.signInMark */
+  --size-media-max-width: 20rem; /* 320 — фото в ленте */
+  --size-media-max-height: 25rem; /* 400 — высокое фото не занимает весь экран */
+  --size-sticker: 10rem; /* 160 */
+  --size-poll: 16.5rem; /* 264 — Theme.Size.poll: ширина постоянная, полосы — сравнение */
+  --size-poll-bar: 0.25rem; /* 4 — Theme.Size.pollBar */
+  --size-forward-grid: 20rem; /* 320 — три ряда лиц «Переслать в…», дальше прокрутка */
+  --forward-columns: 4; /* лица по четыре в ряд, как лист Telegram */
+  --size-mention-row: 3.5rem; /* 56 — лицо и по 8 сверху и снизу */
+  --size-mention-list: 16.25rem; /* 260 — четыре с половиной строки «@»: половина говорит, что есть ещё */
+  --size-reaction-cell: 2.75rem; /* 44 — Theme.Size.reactionCell: эмодзи в панели */
+  --size-emoji-panel: 16.75rem; /* 268 — Theme.Size.emojiPanel: высота панели «Больше эмодзи» */
+  --size-emoji-panel-width: 22.5rem; /* 360 — Theme.Size.emojiPanelWidth: полторы ширины меню */
+  --size-emoji-header: 1.75rem; /* 28 — Theme.Size.emojiHeader: заголовок раздела */
+  --emoji-recent-columns: 6; /* недавние — по шесть, под ряд быстрых реакций */
+  --size-video-note: 12.5rem; /* 200 — «кружочек» */
+  --size-attachment-tile: 4.5rem; /* 72 — вложение в лотке над полем */
+  --size-wallpaper-tile-width: 3.5rem; /* 56 — плитка обоев: вытянута, как экран */
+  --size-wallpaper-tile-height: 5rem; /* 80 */
+  --size-gallery-tile: 6rem; /* 96 — наименьшая клетка сетки «Фото и видео», как у RoomMediaGrid */
+
+  /* Колонки. Список чатов — Theme.Size.sidebarMinimum/Ideal/Maximum. */
+  --column-list-min: 17.5rem; /* 280 */
+  --column-list-ideal: 20rem; /* 320 */
+  --column-list-max: 25rem; /* 400 */
+  --column-panel: 22.5rem; /* 360 — правая панель «О чате» */
+  --column-timeline-max: 47.5rem; /* 760 — строку в 200 символов читать нельзя */
+  --column-app-max: 120rem; /* 1920 — дальше поля, а не строки */
+
+  /* Время — Theme.Timing */
+  --timing-chrome: 200ms;
+  --timing-arrival: 320ms; /* Theme.Timing.arrival */
+  --timing-reaction: 250ms;
+  --timing-deletion: 300ms;
+  --timing-recording-pulse: 600ms; /* точка записи дышит — как RecordingStrip нативной */
+
+  /* Движение — `Theme.Timing` нативной Искры. Пружина меню — Telegram'овская, число в число
+     (`menuOpens`: response 0.265, damping 0.775), разложенная в точки для `linear()`: CSS своей
+     пружины не знает. Легко перелетает на 2 % и садится — то, что поднимают, имеет вес. */
+  --timing-menu-open: 420ms;
+  --ease-menu-open: linear(0, 0.069, 0.222, 0.4, 0.569, 0.711, 0.822, 0.903, 0.957, 0.991, 1.01, 1.019, 1.021, 1.02, 1.016, 1.013, 1.009, 1.006, 1.004, 1.002, 1.001, 1);
+  /* Закрытие — без пружины: положенное не бросают (`menuCloses`, 0.2 с ease-in-out). */
+  --timing-menu-close: 200ms;
+  --ease-menu-close: ease-in-out;
+  /* Пункты меню проявляются почти сразу, когда стекло уже почти раскрылось (`menuListShows`, `menuFills`). */
+  --timing-menu-list: 50ms;
+  --delay-menu-fills: 150ms;
+  /* Смена экрана на телефоне — пуш, как в навигации iOS. */
+  --timing-screen: 350ms;
+  --ease-screen: cubic-bezier(0.2, 0.8, 0.2, 1);
+  /* Приход и уход всего остального: плавный выход в покой. */
+  --ease-out: cubic-bezier(0.2, 0, 0, 1);
+  /* Насколько сдвигается появляющееся — меньше сетки: видно движение, а не прыжок. */
+  --motion-rise: 0.5rem; /* 8 */
+  --motion-scale-from: 0.96;
+  --motion-held-scale: 1.2; /* кнопка записи под пальцем — видно, что держит */
+  --motion-menu-scale-from: 0.8; /* меню растёт из угла заметнее окна */
+
+  /* Шрифт — Inter по умолчанию, из своих файлов (`fonts/inter.css`); системный — по выбору
+     (`data-font='system'` на <html>). Никаких загружаемых шрифтов с чужих CDN. */
+  --font-system: system-ui, -apple-system, 'Segoe UI', Roboto, 'Noto Sans', Ubuntu, Cantarell,
+    'Helvetica Neue', Arial, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji', 'Noto Color Emoji';
+  /* Inter — перед системным: чего в нём нет (эмодзи), берётся из системных. */
+  --font-body: 'Inter', var(--font-system);
+  /* Код восстановления: моноширинный, чтобы «0» и «O», «l» и «1» не спорили. */
+  --font-code: ui-monospace, 'SF Mono', Menlo, Consolas, 'Liberation Mono', monospace;
+  --font-size-body: 1rem;
+  --font-size-caption: 0.8125rem; /* 13 */
+  --font-size-title: 1.25rem; /* 20 */
+  --font-size-large-title: 1.75rem; /* 28 */
+  --line-height-body: 1.35;
+
+  /*
+   * Плотность — от указателя, а не от ширины. Не две темы, а один набор токенов
+   * с двумя значениями. По умолчанию — палец (так безопаснее для неизвестного ввода).
+   */
+  --tap-target: 3rem; /* 48 — палец */
+  --size-watermark: 8rem; /* 128 — искра на пустом месте чата */
+  --row-room: 4.5rem; /* 72 = лицо 56 + 2 × 8 */
+  --timeline-gutter: var(--space-roomy);
+  /* Пузырь: одна строка текста + вертикальные отступы должна остаться ниже 2 × радиуса,
+     иначе капсула превращается в «почти капсулу» (см. Theme.Radius.bubble). */
+  --bubble-pad-y: var(--space-normal);
+  --bubble-pad-x: var(--space-roomy);
+  --bubble-width-fraction: 90%;
+  --size-message-avatar: var(--size-avatar-small);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  :root {
+    --tap-target: 2.25rem; /* 36 — мышь */
+    --row-room: 3.5rem; /* 56 = лицо 40 + 2 × 8 */
+    --size-room-avatar: 2.5rem; /* 40 — под мышью строка ниже, лицо тоже */
+    --timeline-gutter: var(--space-normal);
+    --bubble-pad-y: var(--space-close);
+    --bubble-pad-x: var(--space-normal);
+  }
+}
+
+/*
+ * Цвета. Светлая и тёмная тема — от `prefers-color-scheme`, с ручным выбором через
+ * `data-theme` на <html>. Системные цвета Apple, потому что их берёт SwiftUI.
+ */
+:root {
+  color-scheme: light;
+  --color-background: #ffffff;
+  --color-surface: #f2f2f7;
+  --color-text: #000000;
+  --color-text-secondary: rgb(60 60 67 / 0.6);
+  --color-separator: rgb(60 60 67 / 0.29);
+  --color-glass: rgb(255 255 255 / 0.72);
+  --color-glass-opaque: #f9f9f9;
+  /* Нарисованная «фотография» в примере мордочек — оранжевый в розовый, как в нативной. */
+  --color-photo-from: #ff9500;
+  --color-photo-to: #ff2d55;
+  /* Color.primary.opacity(0.08) — incomingBubble */
+  --color-incoming-bubble: rgb(0 0 0 / 0.08);
+  /* На обоях пузыри непрозрачные: восемь процентов чёрного поверх чужого отпуска — это отпуск
+     со словами поверх (`incomingBubbleOnWallpaper` / `ownBubbleOnWallpaper` нативной Искры). */
+  --color-incoming-bubble-on-wallpaper: #fcfcfc;
+  --color-mono-bubble-on-wallpaper: #dedede;
+  --color-own-reaction: rgb(0 0 0 / 0.16);
+  --color-danger: #ff3b30;
+  /* Предупреждение, а не ошибка: «Из России может быть недоступен» — systemOrange. */
+  --color-warning: #ff9500;
+  --color-on-danger: #ffffff;
+  /* Камера «кружочка» — одна и та же в обеих темах: под ней всегда тёмное размытие комнаты
+     (`Theme.Backdrop.dim` и `.plate` нативной). */
+  --color-camera-scrim: rgb(0 0 0 / 0.45);
+  --color-camera-plate: rgb(0 0 0 / 0.45);
+  --color-on-camera: #ffffff;
+  /* Значок беззвучного чата — сплошной серый, не полупрозрачность: точка в десять пикселей
+     из девяти процентов цвета текста — это пятно. */
+  --color-muted-badge: #8e8e93;
+  --color-on-muted-badge: #ffffff;
+  --color-selected: rgb(0 0 0 / 0.06);
+  --color-focus: var(--accent);
+  /* Искра на пустом месте, где чата ещё не выбрали: видна, но ничего не говорит. */
+  --color-watermark: rgb(0 0 0 / 0.06);
+}
+
+:root[data-theme='dark'] {
+  color-scheme: dark;
+  --color-background: #000000;
+  --color-surface: #1c1c1e;
+  --color-text: #ffffff;
+  --color-text-secondary: rgb(235 235 245 / 0.6);
+  --color-separator: rgb(84 84 88 / 0.6);
+  --color-glass: rgb(28 28 30 / 0.72);
+  --color-glass-opaque: #1c1c1e;
+  --color-incoming-bubble: rgb(255 255 255 / 0.08);
+  --color-own-reaction: rgb(255 255 255 / 0.16);
+  --color-danger: #ff453a;
+  --color-warning: #ff9f0a;
+  --color-selected: rgb(255 255 255 / 0.1);
+  --color-watermark: rgb(255 255 255 / 0.07);
+  --color-incoming-bubble-on-wallpaper: #2b2b2b;
+  --color-mono-bubble-on-wallpaper: #4d4d4d;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) {
+    color-scheme: dark;
+    --color-background: #000000;
+    --color-surface: #1c1c1e;
+    --color-text: #ffffff;
+    --color-text-secondary: rgb(235 235 245 / 0.6);
+    --color-separator: rgb(84 84 88 / 0.6);
+    --color-glass: rgb(28 28 30 / 0.72);
+    --color-glass-opaque: #1c1c1e;
+    --color-incoming-bubble: rgb(255 255 255 / 0.08);
+    --color-own-reaction: rgb(255 255 255 / 0.16);
+    --color-danger: #ff453a;
+  --color-warning: #ff9f0a;
+    --color-selected: rgb(255 255 255 / 0.1);
+    --color-watermark: rgb(255 255 255 / 0.07);
+    --color-incoming-bubble-on-wallpaper: #2b2b2b;
+    --color-mono-bubble-on-wallpaper: #4d4d4d;
+  }
+}
+
+:root[data-font='system'] {
+  --font-body: var(--font-system);
+}

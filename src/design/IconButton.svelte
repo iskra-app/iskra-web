@@ -1,0 +1,61 @@
+<!--
+  Кнопка-иконка. Подпись обязательна: она же `aria-label` и тултип — у каждой
+  иконки-кнопки подпись из тех же переводов.
+-->
+<script lang="ts">
+  import type { Snippet } from 'svelte';
+  interface Props {
+    label: string;
+    /** Сочетание клавиш для тултипа, уже в виде для этой платформы: «Ctrl K» или «⌘K». */
+    shortcut?: string;
+    pressed?: boolean;
+    disabled?: boolean;
+    onclick: () => void;
+    children: Snippet;
+  }
+  let { label, shortcut, pressed, disabled = false, onclick, children }: Props = $props();
+</script>
+
+<button
+  type="button"
+  class="icon-button"
+  aria-label={label}
+  aria-pressed={pressed}
+  {disabled}
+  title={shortcut ? `${label} (${shortcut})` : label}
+  {onclick}
+>
+  {@render children()}
+</button>
+
+<style>
+  .icon-button:disabled {
+    color: var(--color-text-secondary);
+    cursor: default;
+  }
+  .icon-button {
+    display: inline-grid;
+    place-items: center;
+    min-width: var(--tap-target);
+    min-height: var(--tap-target);
+    padding: 0;
+    border: none;
+    border-radius: var(--radius-circle);
+    background: transparent;
+    color: var(--accent);
+    cursor: pointer;
+  }
+  /* Наведение — только там, где указатель умеет наводиться: на телефоне тап оставлял бы «залипшую» подсветку. */
+  @media (hover: hover) {
+    .icon-button:hover {
+      background: var(--color-incoming-bubble);
+    }
+  }
+  .icon-button[aria-pressed='true'] {
+    background: var(--color-own-reaction);
+  }
+  .icon-button :global(svg) {
+    width: var(--size-icon-button);
+    height: var(--size-icon-button);
+  }
+</style>

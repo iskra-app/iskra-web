@@ -1,0 +1,173 @@
+name: CI
+
+on:
+  push:
+    branches: [main, dev]
+  pull_request:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm lint
+      - run: pnpm check
+      - run: pnpm test
+      - run: pnpm build
+
+  e2e:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        engine: [chromium, firefox, webkit]
+    steps:
+      - uses: actions/checkout@v5
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm exec playwright install --with-deps ${{ matrix.engine }}
+      # У раннера нет звуковой карты, и Firefox, в отличие от Chromium и WebKit, без неё звук
+      # не играет: голосовое обрывается с `OnMediaSinkAudioError`. PulseAudio даёт пустой выход.
+      - name: Пустой звуковой выход для Firefox
+        if: matrix.engine == 'firefox'
+        run: |
+          sudo apt-get install -y --no-install-recommends pulseaudio
+          pulseaudio --start --exit-idle-time=-1
+          pactl info | grep 'Default Sink'
+      - run: pnpm e2e
+        env:
+          PW_ENGINES: ${{ matrix.engine }}
+      # Артефакты из CI достать не всегда можно — снимок страницы на момент падения
+      # (дерево доступности) печатается прямо в лог.
+      - name: Снимки упавших тестов
+        if: failure()
+        run: |
+          for f in test-results/*/error-context.md; do
+            [ -f "$f" ] || continue
+            echo "::group::$f"
+            sed -n '/^# Page snapshot/,$p' "$f" | head -150
+            echo "::endgroup::"
+          done
+      - uses: actions/upload-artifact@v5
+        if: failure()
+        with:
+          name: playwright-${{ matrix.engine }}
+          path: test-results/
+
+  # Ночная сборка на GitHub Pages: каждый зелёный пуш в dev, по адресу
+  # https://nightly.web.iskra.wtf/ (свой домен в настройках Pages, поэтому база — корень). Pages не дают своих заголовков — CSP уходит
+  # тегом <meta> (без frame-ancestors и COOP; см. security-headers.ts). Для боевого адреса
+  # это не годится, для «попробовать dev» — да.
+  nightly:
+    needs: [check, e2e]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/dev'
+    # Pages ещё не включены (или недоступны для приватного репозитория на бесплатном
+    # плане) — это не повод красить CI: провал виден в самой job.
+    continue-on-error: true
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+    concurrency:
+      group: pages
+      cancel-in-progress: true
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v5
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm build
+        env:
+          ISKRA_BASE: /
+          ISKRA_META_CSP: '1'
+      # Имя с номером попытки: повтор job в том же запуске иначе находит два артефакта
+      # github-pages (от первой попытки и от этой), и deploy-pages отказывается выбирать.
+      - uses: actions/upload-pages-artifact@v4
+        with:
+          path: dist
+          name: github-pages-${{ github.run_attempt }}
+      - id: deploy
+        uses: actions/deploy-pages@v4
+        with:
+          artifact_name: github-pages-${{ github.run_attempt }}
+
+  # Боевой адрес https://web.iskra.wtf/ — каждый зелёный пуш в main, на российский VPS с nginx
+  # (зарубежные хостинги статики из России блокируют или режут). Заголовки — настоящие, из
+  # security-headers.ts: сборка кладёт их в headers.nginx, конфиг nginx — в deploy/.
+  # Каждая сборка — своя папка releases/<коммит>; current переключается одной ссылкой, и если
+  # nginx -t не принял новые заголовки, ссылка возвращается на прежнюю. Как поднять сервер —
+  # deploy/README.md. Пока он не поднят (нет переменной DEPLOY_HOST), job пропускается.
+  deploy:
+    needs: [check, e2e]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main' && vars.DEPLOY_HOST != ''
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    concurrency:
+      group: production
+      cancel-in-progress: false
+    environment:
+      name: production
+      url: https://web.iskra.wtf/
+    env:
+      TARGET: ${{ vars.DEPLOY_USER }}@${{ vars.DEPLOY_HOST }}
+      RELEASE: ${{ github.sha }}
+    steps:
+      - uses: actions/checkout@v5
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm build
+      # Заголовки — рядом с сайтом, а не в нём; _headers nginx не нужен.
+      - name: Папка релиза
+        run: |
+          mkdir release
+          mv dist/headers.nginx release/
+          rm dist/_headers
+          mv dist release/site
+      - name: Ключ SSH
+        env:
+          SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          KNOWN_HOSTS: ${{ vars.DEPLOY_KNOWN_HOSTS }}
+        run: |
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$SSH_KEY" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          printf '%s\n' "$KNOWN_HOSTS" > ~/.ssh/known_hosts
+      - name: Загрузка
+        run: rsync -rlt --delete release/ "$TARGET:/srv/iskra-web/releases/$RELEASE/"
+      - name: Переключение
+        run: |
+          ssh "$TARGET" RELEASE="$RELEASE" sh -s <<'SCRIPT'
+          set -eu
+          cd /srv/iskra-web
+          prev=$(readlink current || true)
+          ln -sfn "releases/$RELEASE" current.new && mv -Tf current.new current
+          if ! sudo -n /usr/sbin/nginx -t; then
+            if [ -n "$prev" ]; then ln -sfn "$prev" current.new && mv -Tf current.new current; fi
+            exit 1
+          fi
+          sudo -n /usr/sbin/nginx -s reload
+          # Пять последних релизов — на откат руками.
+          ls -1t releases | tail -n +6 | while read -r old; do rm -rf "releases/$old"; done
+          SCRIPT
