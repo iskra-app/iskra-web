@@ -15,6 +15,13 @@ body {
   height: 100%;
 }
 
+/* По-японски и по-китайски пробелов между словами нет — переносить по фразам, а не посреди
+   слова (где браузер это умеет). */
+:lang(ja),
+:lang(zh) {
+  word-break: auto-phrase;
+}
+
 body {
   background: var(--color-background);
   color: var(--color-text);

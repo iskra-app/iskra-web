@@ -4,7 +4,7 @@ import { describe, expect, it } from 'vitest';
 import { parse } from 'svelte/compiler';
 import ru from '../../src/i18n/ru.json';
 import en from '../../src/i18n/en.json';
-import { preferredLocale, translate, translatePlural } from '../../src/i18n/index.svelte.ts';
+import { catalogs, locales, preferredLocale, translate, translatePlural } from '../../src/i18n/index.svelte.ts';
 
 const isPlural = (value: unknown): value is Record<string, string> =>
   typeof value === 'object' && value !== null;
@@ -42,6 +42,20 @@ describe('переводы', () => {
     }
   });
 
+  it('остальные языки нативной — тот же набор ключей, те же подстановки, у плюралей есть other', () => {
+    const placeholders = (value: unknown) =>
+      [...JSON.stringify(value).matchAll(/\{(\w+)\}/g)].map((m) => m[1]).sort();
+    for (const locale of locales) {
+      const catalog = catalogs[locale] as Record<string, unknown>;
+      expect(Object.keys(catalog).sort(), locale).toEqual(Object.keys(ru).sort());
+      for (const key of Object.keys(ru) as Array<keyof typeof ru>) {
+        expect(isPlural(catalog[key]), `${locale} ${key}`).toBe(isPlural(ru[key]));
+        expect(new Set(placeholders(catalog[key])), `${locale} ${key}`).toEqual(new Set(placeholders(en[key])));
+        if (isPlural(catalog[key])) expect(catalog[key], `${locale} ${key}`).toHaveProperty('other');
+      }
+    }
+  });
+
   it('русские плюрали склоняются', () => {
     const forms = [1, 2, 5, 11, 21, 22, 25].map((n) => translatePlural('ru', 'roomList.mentions', n));
     expect(forms).toEqual([
@@ -56,9 +70,14 @@ describe('переводы', () => {
   });
 
   it('язык — первый из navigator.languages, который у нас есть', () => {
-    expect(preferredLocale(['de-DE', 'ru-RU', 'en'])).toBe('ru');
+    expect(preferredLocale(['uk-UA', 'ru-RU', 'en'])).toBe('ru');
     expect(preferredLocale(['en-GB'])).toBe('en');
-    expect(preferredLocale(['fr'])).toBe('en');
+    expect(preferredLocale(['fr'])).toBe('fr');
+    expect(preferredLocale(['pt-BR'])).toBe('en');
+    expect(preferredLocale(['zh-CN'])).toBe('zh');
+    // Традиционного китайского у нас нет — не подсовывать упрощённый.
+    expect(preferredLocale(['zh-TW', 'en'])).toBe('en');
+    expect(preferredLocale(['zh-Hant-HK'])).toBe('en');
     expect(preferredLocale([])).toBe('en');
     expect(translate('en', 'roomList.title')).toBe('Chats');
   });

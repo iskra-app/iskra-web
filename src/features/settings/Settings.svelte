@@ -21,7 +21,7 @@
   import { app } from '../../core/session/app.svelte.ts';
   import type { UserSession } from '../../core/session/userSession.svelte.ts';
   import { isPersisted, requestPersistence } from '../../core/storage/persistence';
-  import { i18n, t, type TextKey } from '../../i18n/index.svelte.ts';
+  import { i18n, locales, t, type TextKey } from '../../i18n/index.svelte.ts';
   import { faceModes, fonts, preferences, type Appearance, type FaceMode, type Font, type LanguageChoice } from '../app/preferences.svelte.ts';
   import { fileSize } from '../media/files';
   import RecoveryCode from '../recovery/RecoveryCode.svelte';
@@ -231,10 +231,10 @@
     creaturesAlways: { label: 'onboarding.faces.faces', help: 'onboarding.faces.facesHelp' },
   };
   const fontLabel = (font: Font): TextKey => `appearance.font.${font}`;
+  /** Каждый язык — своим именем: ищут свой, а не перевод его названия на чужой. */
   const languages: Array<{ value: LanguageChoice; label: TextKey }> = [
     { value: 'system', label: 'language.system' },
-    { value: 'ru', label: 'language.ru' },
-    { value: 'en', label: 'language.en' },
+    ...locales.map((locale) => ({ value: locale, label: `language.${locale}` as const })),
   ];
 
   // ————— Об Iskra —————

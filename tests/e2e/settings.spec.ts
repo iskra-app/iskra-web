@@ -146,6 +146,11 @@ test('настройки по разделам: имя, язык, тема, шр
 
   await page.getByRole('radio', { name: 'English' }).click();
   await expect(page.getByRole('heading', { name: 'Appearance', level: 1 })).toBeVisible();
+  // Языки нативной — каждый своим именем; китайский — с письменностью в `lang`.
+  await page.getByRole('radio', { name: '简体中文' }).click();
+  await expect(page.locator('html')).toHaveAttribute('lang', 'zh-Hans');
+  await page.getByRole('radio', { name: 'Deutsch' }).click();
+  await expect(page.getByRole('heading', { name: 'Darstellung', level: 1 })).toBeVisible();
   await page.getByRole('radio', { name: 'Русский' }).click();
   await expect(page.getByRole('heading', { name: 'Внешний вид', level: 1 })).toBeVisible();
 
