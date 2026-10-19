@@ -33,6 +33,7 @@ import { canForward, forwardContent } from '../timeline/forward';
 import type { Message } from '../timeline/message';
 import { RecoveryStore } from '../encryption/recovery.svelte.ts';
 import { SecretStorageKeyHolder } from '../encryption/secretStorageKey';
+import { IdentityChangesStore } from '../encryption/identityChanges.svelte.ts';
 import { VerificationStore } from '../encryption/verification.svelte.ts';
 import { deleteDatabase } from '../storage/idb';
 import { fromBase64 } from '../storage/secretBox';
@@ -128,6 +129,11 @@ export class UserSession {
   /** Лента комнаты. Живёт, пока открыт чат: тот, кто открыл, её и `destroy()`. */
   timeline(roomId: string): TimelineStore {
     return new TimelineStore(this.client, roomId, uploadClientFor(this.client, this.account.method === 'demo' ? fetchFor(true) : undefined));
+  }
+
+  /** Кто в комнате сменил ключи. Живёт, пока открыт чат, — как и лента. */
+  identityChanges(roomId: string): IdentityChangesStore {
+    return new IdentityChangesStore(this.client, roomId);
   }
 
   /**

@@ -1,5 +1,5 @@
 <!--
-  Открытый чат: полоса закреплённого, лента, «печатает…», композер. Лента создаётся при
+  Открытый чат: полоса о смене ключей, полоса закреплённого, лента, «печатает…», композер. Лента создаётся при
   открытии и уничтожается при уходе — стор живёт ровно столько, сколько чат на экране.
 
   Здесь же сходятся действия над сообщением (`MessageActions`): ответ и правка — в
@@ -31,6 +31,8 @@
   import { SvelteSet } from 'svelte/reactivity';
   import MessageMenu from './MessageMenu.svelte';
   import PinnedStrip from './PinnedStrip.svelte';
+  import IdentityBanner from './IdentityBanner.svelte';
+  import type { IdentityChangesStore } from '../../core/encryption/identityChanges.svelte.ts';
   import Timeline from './Timeline.svelte';
   import WallpaperBackdrop from './WallpaperBackdrop.svelte';
   import { distance } from './distance';
@@ -161,6 +163,28 @@
     void roomId;
     composer?.focus();
   });
+
+  /** Кто здесь сменил ключи — живёт, пока открыт чат, как и лента. */
+  let identities = $state<IdentityChangesStore | null>(null);
+  $effect(() => {
+    const created = session.identityChanges(roomId);
+    identities = created;
+    return () => {
+      created.destroy();
+      if (identities === created) identities = null;
+    };
+  });
+  const identityChange = $derived(identities?.changes[0]);
+
+  async function acknowledgeIdentity() {
+    const change = identityChange;
+    if (!change || !identities) return;
+    try {
+      await identities.acknowledge(change);
+    } catch {
+      notice = t('room.identity.failed');
+    }
+  }
 
   const room = $derived(session.rooms.get(roomId));
   /** Собеседник личного чата, если вы его заблокировали: в группе один заблокированный писать не мешает. */
@@ -438,6 +462,12 @@
   <WallpaperBackdrop />
   {#if dropping}
     <div class="drop" aria-hidden="true"><span>{t('room.dropToAttach')}</span></div>
+  {/if}
+  <!-- Над закреплённым: это о том, кто прочтёт написанное здесь, — важнее того, что закрепили. -->
+  {#if identityChange}
+    {#key identityChange.userId}
+      <IdentityBanner change={identityChange} onacknowledge={() => void acknowledgeIdentity()} />
+    {/key}
   {/if}
   {#if store && store.pinnedIds.length}
     <PinnedStrip

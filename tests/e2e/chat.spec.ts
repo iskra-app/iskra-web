@@ -472,3 +472,27 @@ test('заблокировали собеседника — вместо пол�
   await banner.getByRole('button', { name: 'Разблокировать' }).click();
   await expect(page.getByRole('textbox', { name: 'Сообщение' })).toBeVisible();
 });
+
+test('полоса «новые ключи»: собеседник сменил ключи — сказано над лентой; «Понятно» убирает её насовсем', async ({ page }) => {
+  const problems = watchForProblems(page);
+  await signInToDemo(page);
+  await openRoom(page, /^Аня/);
+  const banner = page.getByRole('status').filter({ hasText: 'Аня: новые ключи шифрования' });
+  await expect(banner).toHaveCount(0);
+  // В демо Аня «входит с нового телефона» в ответ на первое сообщение ей.
+  await page.getByRole('textbox', { name: 'Сообщение' }).fill('Ты тут?');
+  await page.getByRole('button', { name: 'Отправить' }).click();
+  await expect(banner).toBeVisible({ timeout: 20_000 });
+  await expect(banner).toContainText('после входа на новом телефоне');
+  // Пока не ответили — вопрос остаётся и после перезагрузки: его помнит крипто, а не экран.
+  await page.reload({ waitUntil: 'domcontentloaded' });
+  await expect(banner).toBeVisible({ timeout: 20_000 });
+  await banner.getByRole('button', { name: 'Понятно' }).click();
+  await expect(banner).toHaveCount(0);
+  // Новые ключи запомнены как ожидаемые: после перезагрузки полоса не возвращается.
+  await page.reload({ waitUntil: 'domcontentloaded' });
+  await expect(page.getByRole('log').getByRole('article').filter({ hasText: 'Возьми плед' })).toBeVisible({ timeout: 20_000 });
+  await page.waitForTimeout(1_000);
+  await expect(banner).toHaveCount(0);
+  expect(problems).toEqual([]);
+});

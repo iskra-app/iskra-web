@@ -12,6 +12,7 @@
  * Настоящего аккаунта он не трогает никогда: адрес — в зоне `.invalid`, которая по
  * RFC 2606 не резолвится, и ни один запрос отсюда в сеть не уходит.
  */
+import { anyaIdentities } from './identities';
 import { emptyAccount, mergeSignatures, type DemoAccountState, type DemoStorage } from './account';
 import { demoMediaLibrary, demoMxc, type DemoMedia } from './media';
 import {
@@ -85,6 +86,8 @@ export class DemoHomeserver {
   private readonly storage: DemoStorage | undefined;
   /** Данные аккаунта, изменённые с прошлой синхронизации. */
   private pendingAccountData: Array<{ type: string; content: unknown }> = [];
+  /** Чьи ключи сменились с прошлой синхронизации — `device_lists.changed`. */
+  private pendingKeyChanges: string[] = [];
   /** Что отдать следующей синхронизацией: вход по приглашению, выход, отметки о прочтении. */
   private pending: Array<Record<string, unknown>> = [];
   private wake: (() => void) | undefined;
@@ -314,10 +317,11 @@ export class DemoHomeserver {
       for (const [id, device] of Object.entries(this.account.devices)) if (device.keys) device_keys[demoUsers.alice]![id] = device.keys;
     }
     const byUser = (key: string) => (aboutAlice && this.account.crossSigning[key] ? { [demoUsers.alice]: this.account.crossSigning[key] } : {});
+    const anya = asked.includes(demoUsers.anya) ? anyaIdentities[this.account.anyaNewKeys ? 1 : 0]! : undefined;
     return json(200, {
       device_keys,
-      master_keys: byUser('master_key'),
-      self_signing_keys: byUser('self_signing_key'),
+      master_keys: { ...byUser('master_key'), ...(anya ? { [demoUsers.anya]: anya.master_key } : {}) },
+      self_signing_keys: { ...byUser('self_signing_key'), ...(anya ? { [demoUsers.anya]: anya.self_signing_key } : {}) },
       user_signing_keys: byUser('user_signing_key'),
       failures: {},
     });
@@ -574,7 +578,7 @@ export class DemoHomeserver {
     if (since) {
       // Нового ничего нет — держим длинный опрос, как настоящий сервер, но недолго;
       // появилось (вошли по приглашению, прочитали) — отвечаем сразу.
-      if (this.pending.length === 0 && this.pendingAccountData.length === 0) {
+      if (this.pending.length === 0 && this.pendingAccountData.length === 0 && this.pendingKeyChanges.length === 0) {
         const timeout = Number(url.searchParams.get('timeout') ?? 0);
         await Promise.race([
           delay(Math.min(timeout, LONG_POLL_CAP_MS), signal),
@@ -647,10 +651,12 @@ export class DemoHomeserver {
       else join[roomId] = mergeJoin(join[roomId] as Record<string, unknown> | undefined, change['body'] as Record<string, unknown>);
     }
     const accountData = this.pendingAccountData.splice(0);
+    const keyChanges = this.pendingKeyChanges.splice(0);
     return {
       next_batch: `s${++this.batch}`,
       rooms: { join, invite: {}, leave },
       ...(accountData.length ? { account_data: { events: accountData } } : {}),
+      ...(keyChanges.length ? { device_lists: { changed: keyChanges, left: [] } } : {}),
     };
   }
 
@@ -744,7 +750,21 @@ export class DemoHomeserver {
     };
     this.append(roomId, event, txnId);
     if (type === 'm.room.message' && roomId === demoRooms.weekend) this.veraTypes(roomId);
+    if (roomId === demoRooms.anya && !this.account.anyaNewKeys) this.anyaChangesKeys();
     return json(200, { event_id: eventId });
+  }
+
+  /**
+   * На первое сообщение Алисы Аня будто входит с нового телефона: у неё вторая личность
+   * (`identities.ts`), и следующая синхронизация говорит об этом в `device_lists`. Так в демо
+   * видно полосу «новые ключи шифрования». Сообщения в этом чате зашифрованы — сервер их не
+   * читает, поэтому повод — само сообщение, а не слово в нём.
+   */
+  private anyaChangesKeys(): void {
+    this.account.anyaNewKeys = true;
+    this.save();
+    this.pendingKeyChanges.push(demoUsers.anya);
+    this.wake?.();
   }
 
   /** Событие Алисы — в историю и в следующую синхронизацию, с её `transaction_id`. */
