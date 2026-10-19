@@ -82,10 +82,13 @@
     color: var(--color-text);
     box-shadow: 0 var(--space-close) var(--space-generous) rgb(0 0 0 / 0.25);
   }
-  dialog[open] {
-    display: flex;
+  /* Колонка — и у догорающего после закрытия окна (см. `Dialog`). */
+  dialog {
     flex-direction: column;
     gap: var(--space-normal);
+  }
+  dialog[open] {
+    display: flex;
   }
   dialog::backdrop {
     background: var(--color-scrim);

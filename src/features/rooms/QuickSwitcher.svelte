@@ -114,9 +114,12 @@
     box-shadow: 0 var(--space-close) var(--space-generous) rgb(0 0 0 / 0.3);
     overflow: hidden;
   }
+  /* Колонка — и у догорающего после закрытия окна (см. `Dialog`). */
+  .switcher {
+    flex-direction: column;
+  }
   .switcher[open] {
     display: flex;
-    flex-direction: column;
   }
   .switcher::backdrop {
     background: var(--color-scrim);

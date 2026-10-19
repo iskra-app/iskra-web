@@ -51,10 +51,14 @@
     box-shadow: 0 var(--space-close) var(--space-generous) rgb(0 0 0 / 0.25);
     overflow-y: auto;
   }
-  dialog[open] {
-    display: flex;
+  /* Колонка — у окна всегда, а не только открытого: закрывающееся ещё догорает (`display` с
+     `allow-discrete` в `base.css`), `[open]` с него уже снят — и содержимое вставало в ряд. */
+  dialog {
     flex-direction: column;
     gap: var(--space-normal);
+  }
+  dialog[open] {
+    display: flex;
   }
   dialog::backdrop {
     background: var(--color-scrim);
