@@ -109,18 +109,19 @@ test('настройки по разделам: имя, язык, тема, шр
   await signInToDemo(page);
   await openSettings(page);
   const back = page.getByRole('button', { name: 'Назад' });
-  // Профиль — карточкой над разделами, «Изменить» ведёт на его страницу.
-  await page.getByRole('link', { name: /Изменить$/ }).click();
+  // Профиль — шапкой над разделами, «Изменить» — карандаш в шапке экрана.
+  await page.getByRole('button', { name: 'Изменить' }).click();
   await expect(page.getByRole('heading', { name: 'Ваш профиль', level: 1 })).toBeVisible();
 
   const name = page.getByRole('textbox', { name: 'Имя' });
   await name.fill('Алиса Петровна');
   await page.getByRole('button', { name: 'Сохранить' }).click();
-  await expect(page.getByText('Алиса Петровна', { exact: true })).toBeVisible({ timeout: 10_000 });
+  await expect(page.getByRole('button', { name: 'Сохранить' })).toBeDisabled({ timeout: 10_000 });
 
-  // «Назад» из раздела — к списку разделов, не к чатам.
+  // «Назад» из раздела — к списку разделов, не к чатам; новое имя — в шапке.
   await back.click();
   await expect(page.getByRole('heading', { name: 'Настройки', level: 1 })).toBeVisible();
+  await expect(page.getByText('Алиса Петровна', { exact: true })).toBeVisible({ timeout: 10_000 });
   await page.getByRole('link', { name: 'Безопасность' }).click();
   await expect(page.getByText('Это устройство', { exact: true })).toBeVisible();
   await expect(page.getByRole('region', { name: 'Заблокированные' })).toBeVisible();
@@ -472,5 +473,27 @@ test('«Папки»: подсказка — и вкладка над списк
   await page.getByRole('dialog', { name: 'Папка' }).getByRole('button', { name: 'Удалить папку' }).click();
   await page.getByRole('dialog', { name: 'Удалить папку «Дача»?' }).getByRole('button', { name: 'Удалить папку' }).click();
   await expect(page.getByRole('button', { name: /^Дача\s*\d+$/ })).toHaveCount(0);
+  expect(problems).toEqual([]);
+});
+
+test('«Об Iskra» — как в нативной: версия, сборка, устройство, ссылки; «Лицензии» — с текстами', async ({ page }) => {
+  const problems = watchForProblems(page);
+  await signInToDemo(page);
+  await openSettings(page, 'Об Iskra');
+  for (const label of ['Версия', 'Сборка', 'Устройство']) await expect(page.getByRole('listitem').filter({ hasText: label })).toBeVisible();
+  await expect(page.getByRole('link', { name: /Исходный код/ })).toHaveAttribute('href', 'https://github.com/iskra-app/iskra-web');
+  await expect(page.getByText(/GNU GPL версии 3/)).toBeVisible();
+
+  await page.getByRole('link', { name: 'Лицензии' }).click();
+  await expect(page.getByRole('heading', { name: 'Лицензии', level: 1 })).toBeVisible();
+  await page.getByRole('button', { name: /^Iskra Web/ }).click();
+  await expect(page.getByRole('dialog', { name: 'Iskra Web' })).toContainText('GNU GENERAL PUBLIC LICENSE');
+  await page.getByRole('dialog', { name: 'Iskra Web' }).getByRole('button', { name: 'Готово' }).click();
+  await page.getByRole('button', { name: /^matrix-js-sdk/ }).click();
+  await expect(page.getByRole('dialog', { name: 'matrix-js-sdk' })).toContainText('Apache License');
+  await page.keyboard.press('Escape');
+  // «Назад» из лицензий — в «Об Iskra», а не в список разделов.
+  await page.getByRole('button', { name: 'Назад' }).click();
+  await expect(page.getByRole('heading', { name: 'Об Iskra', level: 1 })).toBeVisible();
   expect(problems).toEqual([]);
 });

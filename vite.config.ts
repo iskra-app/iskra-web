@@ -51,9 +51,18 @@ function buildId(): string {
   }
 }
 
+/** Версия — дата коммита сборки (`2026.10.19`): своих номеров у веба нет, а дата говорит сама. */
+function versionOf(): string {
+  try {
+    return execSync('git log -1 --format=%cs', { stdio: ['ignore', 'pipe', 'ignore'] }).toString().trim().replaceAll('-', '.');
+  } catch {
+    return 'dev';
+  }
+}
+
 export default defineConfig({
   base,
-  define: { __ISKRA_BUILD__: JSON.stringify(buildId()) },
+  define: { __ISKRA_BUILD__: JSON.stringify(buildId()), __ISKRA_VERSION__: JSON.stringify(versionOf()) },
   plugins: [
     svelte(),
     VitePWA({

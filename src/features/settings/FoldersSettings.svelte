@@ -104,7 +104,10 @@
   li + li {
     border-block-start: var(--border-hairline) solid var(--color-separator);
   }
+  /* Сеткой: `PlainButton` тянется на всю ширину, а колонка `auto` его держит. */
   .suggestion {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
     padding: var(--space-tight) var(--space-tight) var(--space-tight) var(--space-roomy);
   }
   .open {

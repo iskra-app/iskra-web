@@ -5,7 +5,7 @@
 <script lang="ts">
   import Columns from '../../design/Columns.svelte';
   import Bar from '../../design/Bar.svelte';
-  import EmptyState from '../../design/EmptyState.svelte';
+  import SparkGlyph from '../../design/SparkGlyph.svelte';
   import IconButton from '../../design/IconButton.svelte';
   import Icon from '../../design/Icon.svelte';
   import { viewport } from '../../design/viewport.svelte.ts';
@@ -28,7 +28,7 @@
   import HotkeyHelp from './HotkeyHelp.svelte';
   import NewChatDialog from '../rooms/NewChatDialog.svelte';
   import Settings from '../settings/Settings.svelte';
-  import { settingsTitles } from '../settings/sections';
+  import { settingsParent, settingsTitles } from '../settings/sections';
   import RoomPanel from '../room/RoomPanel.svelte';
   import LockedHistoryStrip from '../recovery/LockedHistoryStrip.svelte';
   import type { TimelineStore } from '../../core/timeline/timelineStore.svelte.ts';
@@ -194,16 +194,27 @@
           {#snippet leading()}
             <!-- Из раздела — к списку разделов; из списка — к чатам, если они не рядом. -->
             {#if settingsSection}
-              <IconButton label={t('settings.back')} onclick={() => router.go({ name: 'settings' })}><Icon name="back" /></IconButton>
+              <IconButton label={t('settings.back')} onclick={() => router.go({ name: 'settings', section: settingsParent[settingsSection] })}><Icon name="back" /></IconButton>
             {:else if viewport.layout === 'stack'}
               <IconButton label={t('settings.back')} onclick={() => router.go({ name: 'home' })}><Icon name="back" /></IconButton>
+            {/if}
+          {/snippet}
+          {#snippet trailing()}
+            <!-- Карандаш, как в нативной: единственное на экране, что ваше, а не приложения. -->
+            {#if !settingsSection}
+              <IconButton label={t('account.edit')} onclick={() => router.go({ name: 'settings', section: 'profile' })}><Icon name="compose" /></IconButton>
             {/if}
           {/snippet}
         </Bar>
         <Settings {session} section={router.route.section} />
       </div>
     {:else}
-      <EmptyState title={t('room.noRoomSelectedTitle')} message={t('room.noRoomSelectedMessage')} />
+      <!-- Чат не выбран — не надпись-инструкция, а искра: видна, но ничего не просит. Для
+           скринридера — те же слова, что были на экране. -->
+      <div class="watermark">
+        <span class="visually-hidden">{t('room.noRoomSelectedTitle')}</span>
+        <span class="spark"><SparkGlyph /></span>
+      </div>
     {/if}
   {/snippet}
 
@@ -289,5 +300,14 @@
     display: flex;
     flex-direction: column;
     height: 100%;
+  }
+  .watermark {
+    display: grid;
+    place-items: center;
+    height: 100%;
+  }
+  .spark {
+    width: var(--size-watermark);
+    color: var(--color-watermark);
   }
 </style>

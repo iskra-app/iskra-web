@@ -143,6 +143,7 @@
    * с двумя значениями. По умолчанию — палец (так безопаснее для неизвестного ввода).
    */
   --tap-target: 3rem; /* 48 — палец */
+  --size-watermark: 8rem; /* 128 — искра на пустом месте чата */
   --row-room: 4.5rem; /* 72 = лицо 56 + 2 × 8 */
   --timeline-gutter: var(--space-roomy);
   /* Пузырь: одна строка текста + вертикальные отступы должна остаться ниже 2 × радиуса,
@@ -202,6 +203,8 @@
   --color-on-muted-badge: #ffffff;
   --color-selected: rgb(0 0 0 / 0.06);
   --color-focus: var(--accent);
+  /* Искра на пустом месте, где чата ещё не выбрали: видна, но ничего не говорит. */
+  --color-watermark: rgb(0 0 0 / 0.06);
 }
 
 :root[data-theme='dark'] {
@@ -218,6 +221,7 @@
   --color-danger: #ff453a;
   --color-warning: #ff9f0a;
   --color-selected: rgb(255 255 255 / 0.1);
+  --color-watermark: rgb(255 255 255 / 0.07);
   --color-incoming-bubble-on-wallpaper: #2b2b2b;
   --color-mono-bubble-on-wallpaper: #4d4d4d;
 }
@@ -237,6 +241,7 @@
     --color-danger: #ff453a;
   --color-warning: #ff9f0a;
     --color-selected: rgb(255 255 255 / 0.1);
+    --color-watermark: rgb(255 255 255 / 0.07);
     --color-incoming-bubble-on-wallpaper: #2b2b2b;
     --color-mono-bubble-on-wallpaper: #4d4d4d;
   }

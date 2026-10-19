@@ -8,6 +8,7 @@
 <script lang="ts">
   import { onMount, tick } from 'svelte';
   import Avatar from '../../design/Avatar.svelte';
+  import { asset } from '../../design/asset';
   import ConfirmDialog from '../../design/ConfirmDialog.svelte';
   import Dialog from '../../design/Dialog.svelte';
   import PlainButton from '../../design/PlainButton.svelte';
@@ -27,6 +28,7 @@
   import WallpaperPicker from './WallpaperPicker.svelte';
   import { settingsTitles } from './sections';
   import QuickReactionPicker from './QuickReactionPicker.svelte';
+  import { builtOn, describeDevice, iskraLicence, type Licence } from './licences';
   import FoldersSettings from './FoldersSettings.svelte';
   import { isMac } from '../../design/hotkeys';
   import { viewport } from '../../design/viewport.svelte.ts';
@@ -160,6 +162,11 @@
   const accountPage = $derived(session.accountPage());
   /** Сайт — как `AboutView` нативной Искры: адрес показывается как есть, не переводится. */
   const website = { href: 'https://iskra.wtf', label: 'iskra.wtf' };
+  const source = { href: 'https://github.com/iskra-app/iskra-web', label: 'github.com/iskra-app/iskra-web' };
+  const links: Array<{ title: TextKey; href: string; label: string }> = [
+    { title: 'about.website', ...website },
+    { title: 'about.sourceCode', ...source },
+  ];
 
   // ————— Заблокированные —————
 
@@ -234,27 +241,36 @@
   // ————— Об Iskra —————
 
   const build = __ISKRA_BUILD__;
-  let copied = $state(false);
-  async function copyBuild() {
-    const text = [`Iskra Web ${build}`, navigator.userAgent, `${i18n.locale} · ${session.method}`].join('\n');
-    await navigator.clipboard?.writeText(text).catch(() => {});
-    copied = true;
-    setTimeout(() => (copied = false), 2000);
+  const version = __ISKRA_VERSION__;
+  const device = describeDevice();
+
+  /** Открытый текст лицензии — грузится, когда открыли. */
+  let reading = $state<{ licence: Licence; text: string } | null>(null);
+  async function read(licence: Licence) {
+    reading = { licence, text: await licence.text() };
   }
 
   let confirmingSignOut = $state(false);
 </script>
 
+{#snippet licenceRow(licence: Licence)}
+  <li>
+    <button type="button" class="row-button" onclick={() => void read(licence)}>
+      <span class="row-label">{licence.name}<span class="row-detail">{licence.kind}</span></span>
+      <span class="chevron"><Icon name="forward" /></span>
+    </button>
+  </li>
+{/snippet}
+
 <div class="settings" bind:this={page}>
   {#if !section}
-    <a class="card profile" href={hrefOf('profile')}>
-      <span class="avatar"><Avatar name={me.name} seed={me.id} photo={photo.url} mode={preferences.faces} /></span>
-      <span class="who">
-        <strong>{me.name}</strong>
-        <span class="secondary">{me.id}</span>
-      </span>
-      <span class="edit">{t('account.edit')}</span>
-    </a>
+    <!-- Шапка профиля, как `ProfileHeader` нативной: лицо, имя, Matrix ID — по центру.
+         «Изменить» — карандашом в шапке экрана (`Shell`). -->
+    <div class="profile-header">
+      <span class="avatar big"><Avatar name={me.name} seed={me.id} photo={photo.url} mode={preferences.faces} /></span>
+      <strong class="profile-name">{me.name}</strong>
+      <span class="secondary selectable">{me.id}</span>
+    </div>
     <nav aria-label={t('settings.title')}>
       <ul class="rows">
         {#each rows as row (row.section)}
@@ -270,28 +286,33 @@
     </nav>
     <PlainButton danger onclick={() => (confirmingSignOut = true)}>{t('account.signOut')}</PlainButton>
   {:else if section === 'profile'}
-    <div class="profile">
-      <span class="avatar"><Avatar name={me.name} seed={me.id} photo={photo.url} mode={preferences.faces} /></span>
-      <span class="who">
-        <strong>{me.name}</strong>
-        <span class="secondary">{me.id}</span>
-      </span>
-    </div>
-    <div class="buttons">
-      <PlainButton disabled={offline} onclick={() => picker?.click()}>{t('account.changePicture')}</PlainButton>
-      {#if me.avatarUrl}
-        <PlainButton danger disabled={offline} onclick={() => void setPhoto(null)}>{t('account.removePicture')}</PlainButton>
-      {/if}
+    <!-- `ProfileEditView` нативной: фото, имя с предупреждением, Matrix ID — только прочесть. -->
+    <div class="profile-header">
+      <span class="avatar big"><Avatar name={me.name} seed={me.id} photo={photo.url} mode={preferences.faces} /></span>
+      <div class="buttons">
+        <PlainButton disabled={offline} onclick={() => picker?.click()}>{t('account.changePicture')}</PlainButton>
+        {#if me.avatarUrl}
+          <PlainButton danger disabled={offline} onclick={() => void setPhoto(null)}>{t('account.removePicture')}</PlainButton>
+        {/if}
+      </div>
       <input bind:this={picker} type="file" accept="image/*" hidden onchange={picked} />
     </div>
-    <form class="stack" onsubmit={saveName}>
-      <TextField bind:value={name} label={t('account.nameHeader')} showLabel placeholder={t('account.namePlaceholder')} disabled={offline} />
-      <PrimaryButton type="submit" busy={savingName} disabled={offline || !name.trim() || name.trim() === me.name}>{t('room.manage.save')}</PrimaryButton>
-    </form>
-    {#if offline}<p class="secondary">{t('account.editOffline')}</p>{/if}
-    {#if profileProblem}
-      <p class="problem" role="alert">{t(profileProblem === 'name' ? 'account.nameFailed' : 'account.pictureFailed')}</p>
-    {/if}
+    <section aria-labelledby="name-title">
+      <h3 id="name-title">{t('account.nameHeader')}</h3>
+      <form class="stack" onsubmit={saveName}>
+        <TextField bind:value={name} label={t('account.nameHeader')} placeholder={t('account.namePlaceholder')} disabled={offline} />
+        <PrimaryButton type="submit" busy={savingName} disabled={offline || !name.trim() || name.trim() === me.name}>{t('room.manage.save')}</PrimaryButton>
+      </form>
+      <p class="secondary">{offline ? t('account.editOffline') : t('account.nameChangeNotice')}</p>
+      {#if profileProblem}
+        <p class="problem" role="alert">{t(profileProblem === 'name' ? 'account.nameFailed' : 'account.pictureFailed')}</p>
+      {/if}
+    </section>
+    <section aria-labelledby="username-title">
+      <h3 id="username-title">{t('account.usernameHeader')}</h3>
+      <p class="readonly selectable">{me.id}</p>
+      <p class="secondary">{t('account.usernameFixed')}</p>
+    </section>
   {:else if section === 'notifications'}
     {#if rules.current}
       {@const current = rules.current}
@@ -335,16 +356,18 @@
       <p class="problem" role="alert">{t(`notificationRules.${rules.failure}`)}</p>
     {/if}
   {:else if section === 'security'}
+    <!-- `SecurityView` нативной: сначала — защищена ли переписка, потом устройства и
+         заблокированные, последним — новый код: единственное здесь, чего не отменить. -->
     {#if recovery}
       <section aria-labelledby="encryption-title">
-        <h2 id="encryption-title">{t('settings.encryption')}</h2>
+        <h3 id="encryption-title">{t('settings.encryption')}</h3>
         {#if recovery.protection === 'on'}
-          <p>{t('settings.deviceVerified')}</p>
-          <h3>{t('settings.recoveryCode')}</h3>
-          <PlainButton busy={recovery.working} onclick={() => (confirmNewCode = true)}>{t('settings.newCode')}</PlainButton>
+          <p class="state"><span class="ok" aria-hidden="true">✓</span>{t('encryption.on')}</p>
+          <p class="secondary">{t('encryption.onHelp')}</p>
         {:else}
-          <p>{t('settings.deviceNotVerified')}</p>
+          <p class="state"><span class="warn" aria-hidden="true">!</span>{t('encryption.off')}</p>
           <PrimaryButton onclick={() => app.openRecovery()}>{t('recovery.choose.title')}</PrimaryButton>
+          <p class="secondary">{t('encryption.offHelp')}</p>
         {/if}
         {#if recovery.failure}
           <p class="problem" role="alert">{t(`account.${recovery.failure}`)}</p>
@@ -353,7 +376,7 @@
     {/if}
 
     <section aria-labelledby="devices-title">
-      <h2 id="devices-title">{t('settings.devices')}</h2>
+      <h3 id="devices-title">{t('settings.devices')}</h3>
       {#if devices}
         <ul class="list">
           {#each devices as device (device.id)}
@@ -373,7 +396,7 @@
     </section>
 
     <section aria-labelledby="blocked-title">
-      <h2 id="blocked-title">{t('settings.blocked')}</h2>
+      <h3 id="blocked-title">{t('settings.blocked')}</h3>
       {#if blocked.ids.length}
         <ul class="list">
           {#each blocked.ids as userId (userId)}
@@ -392,7 +415,26 @@
       {/if}
     </section>
 
+    {#if recovery?.protection === 'on'}
+      <section aria-labelledby="new-code-title">
+        <h3 id="new-code-title" class="visually-hidden">{t('settings.recoveryCode')}</h3>
+        <PlainButton danger busy={recovery.working} onclick={() => (confirmNewCode = true)}>{t('encryption.newKey')}</PlainButton>
+        <p class="secondary">{t('encryption.newKeyHelp')}</p>
+      </section>
+    {/if}
+
   {:else if section === 'appearance'}
+    <!-- Порядок `AppearanceView` нативной: вид ленты, тема, цвет, обои; дальше — то, что есть
+         только здесь: шрифт, мордочки, язык (в iOS язык — в настройках системы). -->
+    <label class="switch">
+      <span>{t('appearance.compact')}</span>
+      <input
+        type="checkbox"
+        role="switch"
+        checked={preferences.layout === 'compact'}
+        onchange={(event) => (preferences.layout = event.currentTarget.checked ? 'compact' : 'bubbles')}
+      />
+    </label>
     <h3 id="theme-title">{t('appearance.theme')}</h3>
     <div class="options" role="radiogroup" aria-labelledby="theme-title">
       {#each themes as theme (theme.value)}
@@ -403,15 +445,6 @@
     </div>
     <h3 id="accent-title">{t('appearance.accent')}</h3>
     <AccentSwatches labelledby="accent-title" />
-    <label class="switch">
-      <span>{t('appearance.compact')}</span>
-      <input
-        type="checkbox"
-        role="switch"
-        checked={preferences.layout === 'compact'}
-        onchange={(event) => (preferences.layout = event.currentTarget.checked ? 'compact' : 'bubbles')}
-      />
-    </label>
     <h3 id="wallpaper-title">{t('appearance.wallpaper')}</h3>
     <WallpaperPicker labelledby="wallpaper-title" />
     <h3 id="font-title">{t('appearance.font')}</h3>
@@ -499,41 +532,74 @@
     {/if}
     <p class="secondary">{t('media.videoAsIsWeb')}</p>
   {:else if section === 'storage'}
+    <!-- `StorageView` нативной: сначала — сколько всего, потом что с этим сделать. -->
+    <dl>
+      <dt>{t('storage.total')}</dt>
+      <dd>{usage ? t('storage.used', { used: fileSize(usage.used, i18n.locale), quota: fileSize(usage.quota, i18n.locale) }) : t('storage.measuring')}</dd>
+    </dl>
     {#if persisted !== null}
       <p>{persisted ? t('storage.persisted') : t('storage.notPersisted')}</p>
       {#if !persisted}
         <PlainButton onclick={() => void askPersistence()}>{t('storage.persist')}</PlainButton>
       {/if}
     {/if}
-    <dl>
-      <dt>{t('storage.total')}</dt>
-      <dd>{usage ? t('storage.used', { used: fileSize(usage.used, i18n.locale), quota: fileSize(usage.quota, i18n.locale) }) : t('storage.measuring')}</dd>
-    </dl>
     <h3>{t('storage.cache')}</h3>
+    <PlainButton danger busy={clearing} onclick={() => (confirmClear = true)}>{clearing ? t('storage.clearing') : t('storage.clear')}</PlainButton>
     <p class="secondary">{t('storage.cacheWeb')}</p>
-    <PlainButton busy={clearing} onclick={() => (confirmClear = true)}>{clearing ? t('storage.clearing') : t('storage.clear')}</PlainButton>
     {#if clearFailed}<p class="problem" role="alert">{t('storage.failed')}</p>{/if}
   {:else if section === 'about'}
-    <p>{t('about.webTagline')}</p>
-    <dl>
-      <dt>{t('about.build')}</dt>
-      <dd>{build}</dd>
-    </dl>
-    <PlainButton onclick={() => void copyBuild()}>{copied ? t('about.copied') : t('about.copy')}</PlainButton>
-    <dl>
-      <dt>{t('about.website')}</dt>
-      <dd><a class="link" href={website.href} target="_blank" rel="noopener noreferrer">{website.label}</a></dd>
-    </dl>
-    <h3>{t('about.builtOn')}</h3>
-    <dl>
-      <dt>{t('about.sdkWeb')}</dt>
-      <dd>{t('about.sdkWebLicence')}</dd>
-      <dt>{t('about.protocol')}</dt>
-      <dd>{t('about.protocolExplained')}</dd>
-    </dl>
-    <p class="secondary">{t('about.cryptographyWeb')}</p>
+    <!-- `AboutView` нативной, строка в строку: значок, имя и строка о себе; версия, сборка,
+         устройство; сайт, исходный код и лицензии; внизу — чьё это и на каких условиях. -->
+    <div class="profile-header">
+      <img class="app-icon" src={asset('icons/icon-192.png')} alt="" />
+      <strong class="profile-name">{t('about.appNameWeb')}</strong>
+      <span class="secondary">{t('about.webTagline')}</span>
+    </div>
+    <ul class="list">
+      <li class="pair"><span>{t('about.version')}</span><span class="secondary selectable">{version}</span></li>
+      <li class="pair"><span>{t('about.build')}</span><span class="secondary selectable">{build}</span></li>
+      <li class="pair"><span>{t('about.device')}</span><span class="secondary selectable">{device}</span></li>
+    </ul>
+    <section aria-label={t('about.title')}>
+      <ul class="rows">
+        {#each links as link (link.href)}
+          <li>
+            <a href={link.href} target="_blank" rel="noopener noreferrer">
+              <span class="row-label">{t(link.title)}<span class="row-detail">{link.label}</span></span>
+              <span class="chevron"><Icon name="external" /></span>
+            </a>
+          </li>
+        {/each}
+        <li>
+          <a href={hrefOf('licences')}>
+            <span class="row-label">{t('about.licences')}</span>
+            <span class="chevron"><Icon name="forward" /></span>
+          </a>
+        </li>
+      </ul>
+      <p class="secondary">{t('about.copyright')}</p>
+      <p class="secondary">{t('about.freeSoftwareWeb')}</p>
+    </section>
+  {:else if section === 'licences'}
+    <!-- `LicensesView` нативной: своя лицензия, потом — на чём всё построено; строка открывает текст. -->
+    <ul class="rows">
+      {@render licenceRow(iskraLicence)}
+    </ul>
+    <h3 id="built-on-title">{t('licences.builtOn')}</h3>
+    <ul class="rows" aria-labelledby="built-on-title">
+      {#each builtOn as licence (licence.name)}
+        {@render licenceRow(licence)}
+      {/each}
+    </ul>
   {/if}
 </div>
+
+<Dialog open={reading !== null} title={reading?.licence.name ?? ''} onclose={() => (reading = null)}>
+  {#if reading}
+    <pre class="licence">{reading.text}</pre>
+    <PlainButton onclick={() => (reading = null)}>{t('folders.done')}</PlainButton>
+  {/if}
+</Dialog>
 
 <ConfirmDialog
   open={confirmNewCode}
@@ -577,6 +643,78 @@
 />
 
 <style>
+  .row-button {
+    width: 100%;
+    border: none;
+    background: transparent;
+    font: inherit;
+    text-align: start;
+    cursor: pointer;
+  }
+  .row-detail {
+    display: block;
+    color: var(--color-text-secondary);
+    font-size: var(--font-size-caption);
+  }
+  .list li.pair {
+    display: flex;
+    flex-direction: row;
+    justify-content: space-between;
+    gap: var(--space-normal);
+  }
+  .licence {
+    max-height: var(--size-media-max-height);
+    margin: 0;
+    overflow: auto;
+    font-size: var(--font-size-caption);
+    white-space: pre-wrap;
+  }
+  .profile-header {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: var(--space-tight);
+    padding-block: var(--space-roomy);
+    text-align: center;
+  }
+  .big {
+    --avatar-size: var(--size-avatar-profile);
+    margin-block-end: var(--space-close);
+  }
+  .app-icon {
+    width: var(--size-avatar-profile);
+    height: var(--size-avatar-profile);
+    margin-block-end: var(--space-close);
+    border-radius: var(--radius-card);
+  }
+  .profile-name {
+    font-size: var(--font-size-title);
+    overflow-wrap: anywhere;
+  }
+  .selectable {
+    overflow-wrap: anywhere;
+    user-select: text;
+  }
+  .readonly {
+    margin: 0;
+    padding: var(--space-close) var(--space-normal);
+    border-radius: var(--radius-card);
+    background: var(--color-surface);
+    color: var(--color-text-secondary);
+  }
+  .state {
+    display: flex;
+    align-items: center;
+    gap: var(--space-close);
+  }
+  .ok {
+    color: var(--accent);
+    font-weight: 700;
+  }
+  .warn {
+    color: var(--color-warning);
+    font-weight: 700;
+  }
   .settings {
     display: flex;
     flex-direction: column;
@@ -588,31 +726,29 @@
     padding: var(--space-roomy) var(--timeline-gutter) max(var(--space-generous), env(safe-area-inset-bottom));
     overflow-y: auto;
   }
+  /* Страница прокручивается сама: без этого flex ужимал бы группы, и они срезали низ. */
+  .settings > :global(*),
+  section > :global(*) {
+    flex-shrink: 0;
+  }
   section + section {
     margin-block-start: var(--space-generous);
   }
   /* Список разделов — строки-ссылки, как `Form` нативной: значок акцентом, шеврон. */
-  .card,
   .rows {
     border-radius: var(--radius-card);
     background: var(--color-surface);
   }
-  .card {
-    padding: var(--space-normal) var(--space-roomy);
-    color: inherit;
-    text-decoration: none;
-  }
-  .edit {
-    margin-inline-start: auto;
-    color: var(--accent);
-  }
+
+
   .rows {
     margin: 0;
     padding: 0;
     list-style: none;
     overflow: hidden;
   }
-  .rows a {
+  .rows a,
+  .row-button {
     display: flex;
     align-items: center;
     gap: var(--space-normal);
@@ -621,15 +757,17 @@
     color: inherit;
     text-decoration: none;
   }
-  .rows li + li a {
+  .rows li + li a,
+  .rows li + li .row-button {
     border-block-start: var(--border-hairline) solid var(--color-separator);
   }
-  .card:hover,
-  .rows a:hover {
+  .rows a:hover,
+  .row-button:hover {
     background: var(--color-incoming-bubble);
   }
   /* Кольцо фокуса — внутрь: снаружи его срезал бы `overflow` списка. */
-  .rows a:focus-visible {
+  .rows a:focus-visible,
+  .row-button:focus-visible {
     outline-offset: calc(-1 * var(--space-tight));
   }
   .row-icon {
@@ -653,10 +791,7 @@
     gap: var(--space-normal);
     scroll-margin-top: var(--space-roomy);
   }
-  h2 {
-    margin: 0;
-    font-size: var(--font-size-title);
-  }
+
   h3 {
     margin: var(--space-close) 0 0;
     font-size: var(--font-size-caption);
@@ -681,20 +816,11 @@
     color: var(--color-danger);
     font-size: var(--font-size-caption);
   }
-  .profile {
-    display: flex;
-    align-items: center;
-    gap: var(--space-normal);
-  }
+
   .avatar {
     --avatar-size: var(--size-avatar-large);
   }
-  .who {
-    display: flex;
-    flex-direction: column;
-    min-width: 0;
-    overflow-wrap: anywhere;
-  }
+
   .buttons {
     display: grid;
     grid-auto-flow: column;

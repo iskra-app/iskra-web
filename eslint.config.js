@@ -25,8 +25,8 @@ export default ts.config(
   ...ts.configs.recommended,
   ...svelte.configs['flat/recommended'],
   {
-    // `__ISKRA_BUILD__` — хэш коммита сборки, подставляет `define` в `vite.config.ts`.
-    languageOptions: { globals: { ...globals.browser, ...globals.node, __ISKRA_BUILD__: 'readonly' } },
+    // `__ISKRA_BUILD__` — хэш коммита сборки, `__ISKRA_VERSION__` — его дата; подставляет `define` в `vite.config.ts`.
+    languageOptions: { globals: { ...globals.browser, ...globals.node, __ISKRA_BUILD__: 'readonly', __ISKRA_VERSION__: 'readonly' } },
   },
   {
     files: ['**/*.svelte', '**/*.svelte.ts'],
