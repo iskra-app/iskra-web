@@ -6,6 +6,7 @@
   Здесь только то, что работает: чего ещё нет (пуши, звонки), того и в настройках нет.
 -->
 <script lang="ts">
+  import { build, channel, version, website } from '../app/channel';
   import { onMount, tick } from 'svelte';
   import Avatar from '../../design/Avatar.svelte';
   import { asset } from '../../design/asset';
@@ -160,8 +161,7 @@
     );
   });
   const accountPage = $derived(session.accountPage());
-  /** Сайт — как `AboutView` нативной Искры: адрес показывается как есть, не переводится. */
-  const website = { href: 'https://iskra.wtf', label: 'iskra.wtf' };
+  /** Ссылки — как `AboutView` нативной Искры: адрес показывается как есть, не переводится. */
   const source = { href: 'https://github.com/iskra-app/iskra-web', label: 'github.com/iskra-app/iskra-web' };
   const links: Array<{ title: TextKey; href: string; label: string }> = [
     { title: 'about.website', ...website },
@@ -240,8 +240,8 @@
 
   // ————— Об Iskra —————
 
-  const build = __ISKRA_BUILD__;
-  const version = __ISKRA_VERSION__;
+  /** В ночной — с пометкой: по версии без неё ночную от стабильной не отличить. */
+  const shownVersion = $derived(channel === 'nightly' ? `${version} (${t('signIn.nightlyBadgeWeb')})` : version);
   const device = describeDevice();
 
   /** Открытый текст лицензии — грузится, когда открыли. */
@@ -556,7 +556,7 @@
       <span class="secondary">{t('about.webTagline')}</span>
     </div>
     <ul class="list">
-      <li class="pair"><span>{t('about.version')}</span><span class="secondary selectable">{version}</span></li>
+      <li class="pair"><span>{t('about.version')}</span><span class="secondary selectable">{shownVersion}</span></li>
       <li class="pair"><span>{t('about.build')}</span><span class="secondary selectable">{build}</span></li>
       <li class="pair"><span>{t('about.device')}</span><span class="secondary selectable">{device}</span></li>
     </ul>

@@ -119,7 +119,7 @@
     flex-direction: column;
   }
   .switcher::backdrop {
-    background: rgb(0 0 0 / var(--backdrop-menu-scrim));
+    background: var(--color-scrim);
   }
   input {
     min-height: var(--size-navigation-bar);

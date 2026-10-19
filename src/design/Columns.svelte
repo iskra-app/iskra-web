@@ -231,7 +231,7 @@
     position: absolute;
     inset: 0;
     z-index: 10;
-    background: rgb(0 0 0 / var(--backdrop-menu-scrim));
+    background: var(--color-scrim);
   }
 
   .panel.sheet {

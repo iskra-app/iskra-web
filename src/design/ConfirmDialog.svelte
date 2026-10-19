@@ -47,7 +47,7 @@
     box-shadow: 0 var(--space-close) var(--space-generous) rgb(0 0 0 / 0.25);
   }
   dialog::backdrop {
-    background: rgb(0 0 0 / var(--backdrop-menu-scrim));
+    background: var(--color-scrim);
   }
   h2 {
     margin: 0 0 var(--space-close);

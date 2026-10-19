@@ -13,6 +13,7 @@
   возвращается уже к адресу, поэтому фраза стоит под двумя кнопками.
 -->
 <script lang="ts">
+  import { build, channel, otherChannelUrl, version, website } from '../app/channel';
   import { asset } from '../../design/asset';
   import PrimaryButton from '../../design/PrimaryButton.svelte';
   import PlainButton from '../../design/PlainButton.svelte';
@@ -209,6 +210,14 @@
       </div>
     {/if}
   {/if}
+  <!-- Какая это сборка, ссылка на другую (с ночной на стабильную, со стабильной на ночную)
+       и сайт Искры — в любой. -->
+  <footer class="build">
+    {#if channel === 'nightly'}<span class="badge">{t('signIn.nightlyBadgeWeb')}</span>{/if}
+    <span>{t('signIn.versionWeb', { version, build })}</span>
+    <a href={otherChannelUrl}>{channel === 'nightly' ? t('signIn.openStableWeb') : t('signIn.openNightlyWeb')}</a>
+    <a href={website.href} target="_blank" rel="noopener noreferrer">{website.label}</a>
+  </footer>
 </main>
 
 <ServerPicker
@@ -300,5 +309,26 @@
   .change {
     padding: 0;
     color: var(--accent);
+  }
+  .build {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    align-items: center;
+    gap: var(--space-tight) var(--space-close);
+    margin-block-start: auto;
+    color: var(--color-text-secondary);
+    font-size: var(--font-size-caption);
+    text-align: center;
+  }
+  .build a {
+    color: var(--accent);
+  }
+  .badge {
+    padding: 0 var(--space-close);
+    border-radius: var(--radius-circle);
+    background: var(--color-warning);
+    color: var(--color-on-danger);
+    font-weight: 600;
   }
 </style>
