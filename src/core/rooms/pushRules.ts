@@ -60,3 +60,114 @@ export function alertsRules(
     add: { kind: 'override', ruleId: roomId, body: { actions: [], conditions: [{ kind: 'event_match', key: 'room_id', pattern: roomId }] } },
   };
 }
+
+/**
+ * Уведомления всего аккаунта — до того, как у комнаты появилось своё мнение (как
+ * `NotificationRulesStore` нативной Искры). Это push rules на сервере: они едут за аккаунтом
+ * во все клиенты, а правило комнаты главнее умолчания.
+ *
+ * Умолчаний в Matrix четыре — личный или нет, зашифрованный или нет, — а человек отвечает на
+ * два вопроса: личные чаты и группы. Читается зашифрованная половина пары (приватный чат в
+ * Iskra зашифрован), пишутся обе — и правило опроса той же стороны, если оно есть.
+ *
+ * «Выключены» умолчанием не бывают: правило по умолчанию без `notify` — это и есть «только
+ * упоминания», упоминания решает своё правило выше.
+ */
+export type DefaultAlerts = 'all' | 'mentions';
+
+export type AccountSwitch = 'mentionsMe' | 'roomMentions' | 'invitations' | 'calls';
+
+export interface AccountAlerts {
+  direct: DefaultAlerts;
+  groups: DefaultAlerts;
+  mentionsMe: boolean;
+  roomMentions: boolean;
+  invitations: boolean;
+  calls: boolean;
+}
+
+type RuleKind = 'override' | 'content' | 'underride';
+type RuleRef = { kind: RuleKind; ruleId: string };
+
+const defaultRules: Record<'direct' | 'groups', { read: RuleRef; write: RuleRef[] }> = {
+  direct: {
+    read: { kind: 'underride', ruleId: '.m.rule.encrypted_room_one_to_one' },
+    write: [
+      { kind: 'underride', ruleId: '.m.rule.encrypted_room_one_to_one' },
+      { kind: 'underride', ruleId: '.m.rule.room_one_to_one' },
+      { kind: 'underride', ruleId: '.m.rule.poll_start_one_to_one' },
+    ],
+  },
+  groups: {
+    read: { kind: 'underride', ruleId: '.m.rule.encrypted' },
+    write: [
+      { kind: 'underride', ruleId: '.m.rule.encrypted' },
+      { kind: 'underride', ruleId: '.m.rule.message' },
+      { kind: 'underride', ruleId: '.m.rule.poll_start' },
+    ],
+  },
+};
+
+/** Первое — то, что читается; остальные — устаревшие правила того же смысла, пишутся вместе. */
+const switchRules: Record<AccountSwitch, RuleRef[]> = {
+  mentionsMe: [
+    { kind: 'override', ruleId: '.m.rule.is_user_mention' },
+    { kind: 'override', ruleId: '.m.rule.contains_display_name' },
+    { kind: 'content', ruleId: '.m.rule.contains_user_name' },
+  ],
+  roomMentions: [
+    { kind: 'override', ruleId: '.m.rule.is_room_mention' },
+    { kind: 'override', ruleId: '.m.rule.roomnotif' },
+  ],
+  invitations: [{ kind: 'override', ruleId: '.m.rule.invite_for_me' }],
+  calls: [{ kind: 'underride', ruleId: '.m.rule.call' }],
+};
+
+function find(rules: IPushRules | undefined, ref: RuleRef) {
+  return rules?.global?.[ref.kind]?.find((rule) => rule.rule_id === ref.ruleId);
+}
+
+const notifies = (rule: ReturnType<typeof find>) => !!rule?.enabled && rule.actions.some((a) => a === 'notify');
+
+/** Что сейчас в силе. Правила нет — значит, сервер его не знает, и в силе «да», как у Matrix. */
+export function accountAlerts(rules: IPushRules | undefined): AccountAlerts {
+  const flag = (name: AccountSwitch) => {
+    const rule = switchRules[name].map((ref) => find(rules, ref)).find((r) => r !== undefined);
+    return rule ? notifies(rule) : true;
+  };
+  const byDefault = (side: 'direct' | 'groups'): DefaultAlerts => {
+    const rule = find(rules, defaultRules[side].read) ?? find(rules, defaultRules[side].write[1]!);
+    return !rule || notifies(rule) ? 'all' : 'mentions';
+  };
+  return {
+    direct: byDefault('direct'),
+    groups: byDefault('groups'),
+    mentionsMe: flag('mentionsMe'),
+    roomMentions: flag('roomMentions'),
+    invitations: flag('invitations'),
+    calls: flag('calls'),
+  };
+}
+
+export type RuleWrite =
+  | { kind: RuleKind; ruleId: string; actions: unknown[] }
+  | { kind: RuleKind; ruleId: string; enabled: boolean };
+
+/**
+ * Что записать, чтобы умолчание стало `alerts`. Только правила, которые у сервера есть:
+ * встроенное правило не заводят, а меняют. «Все» в личных — со звуком, как у Matrix из коробки.
+ */
+export function defaultAlertsWrites(rules: IPushRules | undefined, side: 'direct' | 'groups', alerts: DefaultAlerts): RuleWrite[] {
+  const actions = alerts === 'mentions' ? [] : side === 'direct' ? ['notify', { set_tweak: 'sound', value: 'default' }] : ['notify'];
+  return defaultRules[side].write.filter((ref) => find(rules, ref)).flatMap((ref) => {
+    const writes: RuleWrite[] = [{ ...ref, actions }];
+    // Выключенное правило «всех» не дало бы — включить.
+    if (alerts === 'all' && !find(rules, ref)!.enabled) writes.push({ ...ref, enabled: true });
+    return writes;
+  });
+}
+
+/** Что записать, чтобы переключатель встал в `on`: правило включается или выключается целиком. */
+export function switchWrites(rules: IPushRules | undefined, name: AccountSwitch, on: boolean): RuleWrite[] {
+  return switchRules[name].filter((ref) => find(rules, ref)).map((ref) => ({ ...ref, enabled: on }));
+}

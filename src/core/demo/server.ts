@@ -125,6 +125,7 @@ export class DemoHomeserver {
       ['GET', re(`${c}/v3/pushrules/?`), () => json(200, this.rules)],
       ['PUT', re(`${c}/v3/pushrules/global/(override|room|sender|content|underride)/([^/]+)`), (r) => this.putPushRule(r)],
       ['DELETE', re(`${c}/v3/pushrules/global/(override|room|sender|content|underride)/([^/]+)`), (r) => this.deletePushRule(r)],
+      ['PUT', re(`${c}/v3/pushrules/global/(override|room|sender|content|underride)/([^/]+)/(actions|enabled)`), (r) => this.changePushRule(r)],
       ['POST', re(`${c}/v3/createRoom`), (r) => this.createRoom(r)],
       ['POST', re(`${c}/v3/rooms/([^/]+)/invite`), (r) => this.membership(r, 'invite')],
       ['POST', re(`${c}/v3/rooms/([^/]+)/kick`), (r) => this.membership(r, 'leave')],
@@ -462,6 +463,17 @@ export class DemoHomeserver {
             actions: [],
           },
           {
+            rule_id: '.m.rule.invite_for_me',
+            default: true,
+            enabled: true,
+            conditions: [
+              { kind: 'event_match', key: 'type', pattern: 'm.room.member' },
+              { kind: 'event_match', key: 'content.membership', pattern: 'invite' },
+              { kind: 'event_match', key: 'state_key', pattern: demoUsers.alice },
+            ],
+            actions: ['notify', { set_tweak: 'sound', value: 'default' }],
+          },
+          {
             rule_id: '.m.rule.is_user_mention',
             default: true,
             enabled: true,
@@ -473,6 +485,23 @@ export class DemoHomeserver {
         room: [],
         sender: [],
         underride: [
+          {
+            rule_id: '.m.rule.call',
+            default: true,
+            enabled: true,
+            conditions: [{ kind: 'event_match', key: 'type', pattern: 'm.call.invite' }],
+            actions: ['notify', { set_tweak: 'sound', value: 'ring' }],
+          },
+          {
+            rule_id: '.m.rule.encrypted_room_one_to_one',
+            default: true,
+            enabled: true,
+            conditions: [
+              { kind: 'room_member_count', is: '2' },
+              { kind: 'event_match', key: 'type', pattern: 'm.room.encrypted' },
+            ],
+            actions: ['notify', { set_tweak: 'sound', value: 'default' }],
+          },
           {
             rule_id: '.m.rule.room_one_to_one',
             default: true,
@@ -488,6 +517,13 @@ export class DemoHomeserver {
             default: true,
             enabled: true,
             conditions: [{ kind: 'event_match', key: 'type', pattern: 'm.room.message' }],
+            actions: ['notify'],
+          },
+          {
+            rule_id: '.m.rule.encrypted',
+            default: true,
+            enabled: true,
+            conditions: [{ kind: 'event_match', key: 'type', pattern: 'm.room.encrypted' }],
             actions: ['notify'],
           },
         ],
@@ -786,6 +822,16 @@ export class DemoHomeserver {
     const before = global[kind]!.length;
     global[kind] = global[kind]!.filter((r) => r.rule_id !== ruleId);
     if (global[kind]!.length === before) return json(404, { errcode: 'M_NOT_FOUND', error: 'Push rule not found' });
+    this.rulesChanged();
+    return json(200, {});
+  }
+
+  /** Встроенное правило не заводят и не удаляют — только включают и меняют действия. */
+  private changePushRule({ params, body }: DemoRequest): Response {
+    const [kind, ruleId, field] = params as [string, string, 'actions' | 'enabled'];
+    const rule = (this.rules.global as Record<string, Array<Record<string, unknown>>>)[kind]!.find((r) => r.rule_id === ruleId);
+    if (!rule) return json(404, { errcode: 'M_NOT_FOUND', error: 'Push rule not found' });
+    rule[field] = (body as Record<string, unknown> | undefined)?.[field];
     this.rulesChanged();
     return json(200, {});
   }

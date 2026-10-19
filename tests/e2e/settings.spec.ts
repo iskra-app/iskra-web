@@ -295,3 +295,30 @@ test('компактный вид: без пузырей, имя — у кажд
   const own = log.getByRole('article').filter({ hasText: 'Поеду! Во сколько?' });
   await expect.poll(() => own.evaluate((e) => getComputedStyle(e).backgroundColor)).toBe('rgba(0, 0, 0, 0)');
 });
+
+test('уведомления аккаунта: группы — только упоминания, приглашения выключены; открыл заново — так же', async ({ page }) => {
+  const problems = watchForProblems(page);
+  await signInToDemo(page);
+  await page.getByRole('button', { name: 'Настройки' }).click();
+  const section = page.getByRole('region', { name: 'Уведомления' });
+  const groups = section.getByRole('radiogroup', { name: 'Группы' });
+  await expect(groups.getByRole('radio', { name: 'Все сообщения' })).toHaveAttribute('aria-checked', 'true');
+  // Умолчание «выключены» не бывает: без notify оно и есть «только упоминания».
+  await expect(groups.getByRole('radio', { name: 'Выключены' })).toHaveCount(0);
+  await groups.getByRole('radio', { name: 'Только упоминания' }).click();
+  await expect(groups.getByRole('radio', { name: 'Только упоминания' })).toHaveAttribute('aria-checked', 'true');
+  await expect(section.getByRole('radiogroup', { name: 'Личные чаты' }).getByRole('radio', { name: 'Все сообщения' })).toHaveAttribute('aria-checked', 'true');
+
+  const invitations = section.getByRole('switch', { name: 'Приглашения в чаты' });
+  await expect(invitations).toBeChecked();
+  await invitations.click();
+  await expect(invitations).not.toBeChecked();
+  await expect(section.getByRole('switch', { name: 'Когда меня упоминают' })).toBeChecked();
+
+  // Правила — на сервере: раздел, открытый заново, перечитывает их оттуда.
+  await page.goto(page.url().replace(/#.*$/, '#/'));
+  await page.getByRole('button', { name: 'Настройки' }).click();
+  await expect(section.getByRole('radiogroup', { name: 'Группы' }).getByRole('radio', { name: 'Только упоминания' })).toHaveAttribute('aria-checked', 'true');
+  await expect(section.getByRole('switch', { name: 'Приглашения в чаты' })).not.toBeChecked();
+  expect(problems).toEqual([]);
+});

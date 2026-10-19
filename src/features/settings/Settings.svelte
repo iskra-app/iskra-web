@@ -13,6 +13,7 @@
   import PrimaryButton from '../../design/PrimaryButton.svelte';
   import TextField from '../../design/TextField.svelte';
   import type { SettingsSection } from '../../core/navigation/route';
+  import type { AccountSwitch, DefaultAlerts } from '../../core/rooms/pushRules';
   import { app } from '../../core/session/app.svelte.ts';
   import type { UserSession } from '../../core/session/userSession.svelte.ts';
   import { isPersisted, requestPersistence } from '../../core/storage/persistence';
@@ -76,6 +77,27 @@
     if (picker) picker.value = '';
     if (file?.type.startsWith('image/')) void setPhoto(file);
   }
+
+  // ————— Уведомления —————
+
+  const rules = $derived(session.notificationRules);
+  onMount(() => void session.notificationRules.load());
+  const defaultChoices: Array<{ value: DefaultAlerts; label: TextKey }> = [
+    { value: 'all', label: 'room.manage.alertsAll' },
+    { value: 'mentions', label: 'room.manage.alertsMentions' },
+  ];
+  const sides: Array<{ side: 'direct' | 'groups'; label: TextKey }> = [
+    { side: 'direct', label: 'notifications.direct' },
+    { side: 'groups', label: 'notifications.groups' },
+  ];
+  const mentionSwitches: Array<{ name: AccountSwitch; label: TextKey }> = [
+    { name: 'mentionsMe', label: 'notifications.mentionsMe' },
+    { name: 'roomMentions', label: 'notifications.roomMentions' },
+  ];
+  const otherSwitches: Array<{ name: AccountSwitch; label: TextKey }> = [
+    { name: 'invitations', label: 'notifications.invitations' },
+    { name: 'calls', label: 'notifications.calls' },
+  ];
 
   // ————— Безопасность: код восстановления —————
 
@@ -208,6 +230,51 @@
     {#if offline}<p class="secondary">{t('account.editOffline')}</p>{/if}
     {#if profileProblem}
       <p class="problem" role="alert">{t(profileProblem === 'name' ? 'account.nameFailed' : 'account.pictureFailed')}</p>
+    {/if}
+  </section>
+
+  <section id="settings-notifications" aria-labelledby="notifications-title">
+    <h2 id="notifications-title">{t('settings.notifications')}</h2>
+    {#if rules.current}
+      {@const current = rules.current}
+      <h3>{t('notifications.defaults')}</h3>
+      {#each sides as { side, label } (side)}
+        <h4 id="alerts-{side}">{t(label)}</h4>
+        <div class="options" role="radiogroup" aria-labelledby="alerts-{side}">
+          {#each defaultChoices as choice (choice.value)}
+            <button
+              type="button"
+              role="radio"
+              aria-checked={current[side] === choice.value}
+              disabled={offline}
+              onclick={() => void rules.setDefault(side, choice.value)}
+            >
+              {t(choice.label)}
+            </button>
+          {/each}
+        </div>
+      {/each}
+      <p class="secondary">{t('notifications.defaultsFooter')}</p>
+      <h3>{t('notifications.mentions')}</h3>
+      {#each mentionSwitches as { name, label } (name)}
+        <label class="switch">
+          <span>{t(label)}</span>
+          <input type="checkbox" role="switch" checked={current[name]} disabled={offline} onchange={(event) => void rules.setSwitch(name, event.currentTarget.checked)} />
+        </label>
+      {/each}
+      <h3>{t('notifications.other')}</h3>
+      {#each otherSwitches as { name, label } (name)}
+        <label class="switch">
+          <span>{t(label)}</span>
+          <input type="checkbox" role="switch" checked={current[name]} disabled={offline} onchange={(event) => void rules.setSwitch(name, event.currentTarget.checked)} />
+        </label>
+      {/each}
+      <p class="secondary">{t('notifications.otherFooter')}</p>
+    {:else if rules.loadFailed}
+      <p class="secondary">{t('notifications.failed')}</p>
+    {/if}
+    {#if rules.failure}
+      <p class="problem" role="alert">{t(`notificationRules.${rules.failure}`)}</p>
     {/if}
   </section>
 
@@ -437,6 +504,11 @@
     text-transform: uppercase;
     letter-spacing: 0.04em;
   }
+  h4 {
+    margin: 0;
+    font: inherit;
+    font-weight: 600;
+  }
   p {
     margin: 0;
   }
@@ -519,6 +591,10 @@
     font: inherit;
     text-align: start;
     cursor: pointer;
+  }
+  .options button:disabled {
+    color: var(--color-text-secondary);
+    cursor: default;
   }
   .options button[data-font='system'] {
     font-family: var(--font-system);
