@@ -56,9 +56,21 @@ export interface RoomSummary {
   isLowPriority: boolean;
 
   preview?: Preview;
+  /**
+   * Кто написал последнее, если не я, — группа ставит его отдельной строкой над словами, как
+   * Telegram: «приду в семь» без того, чьё оно, ничего не говорит.
+   */
+  lastSender?: string;
+  /** Докуда дошло моё последнее; `undefined` — последнее не моё. */
+  lastMark?: LastMark;
+  /** Кто-то, кроме меня, сейчас печатает. */
+  typing: boolean;
   /** Мс с эпохи — по нему сортировка. */
   lastActivity: number;
 }
+
+/** Отметка своего последнего сообщения в строке — те же, что у пузыря в ленте. */
+export type LastMark = 'sending' | 'sent' | 'read' | 'failed';
 
 export const hasUnread = (room: RoomSummary): boolean =>
   room.unreadCount > 0 || room.hasUnreadMessages || room.isMarkedUnread;

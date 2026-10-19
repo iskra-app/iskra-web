@@ -11,10 +11,12 @@ import {
   EventType,
   MatrixEventEvent,
   RoomEvent,
+  RoomMemberEvent,
   RoomStateEvent,
   type MatrixClient,
   type MatrixEvent,
   type Room,
+  type RoomMember,
   type RoomState,
 } from 'matrix-js-sdk';
 import { badgeCount, organize, type Organized } from './organize';
@@ -101,6 +103,8 @@ export class RoomListStore {
       this.markAll();
     });
     this.on(RoomEvent.LocalEchoUpdated, (_event: MatrixEvent, room: Room) => markRoom(room));
+    // «печатает…» на месте превью — и снова превью, когда перестали.
+    this.on(RoomMemberEvent.Typing, (_event: MatrixEvent, member: RoomMember) => this.mark(member.roomId));
     this.on(RoomEvent.Redaction, (_event: MatrixEvent, room: Room) => markRoom(room));
     this.on(RoomStateEvent.Events, (_event: MatrixEvent, state: RoomState) => this.mark(state.roomId));
     this.on(MatrixEventEvent.Decrypted, (event: MatrixEvent) => {

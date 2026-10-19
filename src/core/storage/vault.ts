@@ -84,6 +84,23 @@ function publicPart({ key: _key, sealed: _sealed, ...account }: StoredAccount): 
   return account;
 }
 
+/** Таблица аккаунта целиком, расшифрованная: чат → текст. Не расшифровалось — этой строки нет. */
+function readAll(userId: string, store: string): Promise<Record<string, string>> {
+  return withDb(async (db) => {
+    const [account, rows] = await Promise.all([
+      transact(db, ACCOUNTS, 'readonly', (s) => s.get(userId) as IDBRequest<StoredAccount | undefined>),
+      transact(db, store, 'readonly', (s) => s.getAll(draftsOf(userId)) as IDBRequest<StoredDraft[]>),
+    ]);
+    const texts: Record<string, string> = {};
+    if (!account) return texts;
+    for (const row of rows) {
+      const text = await unseal<string>(account.key, row.sealed).catch(() => '');
+      if (text) texts[row.roomId] = text;
+    }
+    return texts;
+  });
+}
+
 export const vault = {
   /** Сохраняет новый аккаунт и заводит ему ключи. Прежняя запись с тем же ID заменяется. */
   async add(account: NewAccount): Promise<{ account: Account; secrets: AccountSecrets }> {
@@ -164,20 +181,13 @@ export const vault = {
   },
 
   /** Локальные имена аккаунта: чат → имя. Не расшифровалось — этого имени нет. */
-  async localNames(userId: string): Promise<Record<string, string>> {
-    return withDb(async (db) => {
-      const [account, rows] = await Promise.all([
-        transact(db, ACCOUNTS, 'readonly', (s) => s.get(userId) as IDBRequest<StoredAccount | undefined>),
-        transact(db, LOCAL_NAMES, 'readonly', (s) => s.getAll(draftsOf(userId)) as IDBRequest<StoredDraft[]>),
-      ]);
-      const names: Record<string, string> = {};
-      if (!account) return names;
-      for (const row of rows) {
-        const name = await unseal<string>(account.key, row.sealed).catch(() => '');
-        if (name) names[row.roomId] = name;
-      }
-      return names;
-    });
+  localNames(userId: string): Promise<Record<string, string>> {
+    return readAll(userId, LOCAL_NAMES);
+  },
+
+  /** Все черновики аккаунта: чат → текст, — для строк списка. */
+  drafts(userId: string): Promise<Record<string, string>> {
+    return readAll(userId, DRAFTS);
   },
 
   /** Пустое имя — имени нет: запись удаляется. */

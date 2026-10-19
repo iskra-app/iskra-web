@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
-import { isPhone, signInToDemo, watchForProblems } from './helpers';
+import { isPhone, openRoom, signInToDemo, watchForProblems } from './helpers';
 
 test('список чатов из демо: имена, превью, значки, заголовок вкладки', async ({ page }) => {
   const problems = watchForProblems(page);
@@ -43,7 +43,7 @@ test('чат открывается из списка, его имя — в ша
 
 test('архив и пространство открываются на месте списка', async ({ page }) => {
   await signInToDemo(page);
-  await page.getByRole('button', { name: 'Архив (1)' }).click();
+  await page.getByRole('button', { name: 'Архив', exact: true }).click();
   await expect(page.getByRole('link', { name: /^Старый проект/ })).toBeVisible();
   await page.getByRole('button', { name: 'Назад' }).first().click();
   await expect(page.getByRole('link', { name: /^Выходные/ })).toBeVisible();
@@ -134,7 +134,7 @@ test('действия строки: прочитано и непрочитан�
   actions = await rowActions(page, /^Выходные/, phone);
   await actions.item('В архив').click();
   await expect(weekend).toHaveCount(0);
-  await page.getByRole('button', { name: 'Архив (2)' }).click();
+  await page.getByRole('button', { name: 'Архив', exact: true }).click();
   actions = await rowActions(page, /^Выходные/, phone);
   await actions.item('Из архива').click();
   await expect(weekend).toHaveCount(0);
@@ -212,5 +212,29 @@ test('«В папку» из меню строки: галочка — чат в
   await page.getByRole('dialog', { name: 'Аня' }).getByRole('checkbox', { name: 'Личные' }).uncheck();
   await page.getByRole('dialog', { name: 'Аня' }).getByRole('button', { name: 'Готово' }).click();
   await expect(page.getByRole('link', { name: /^Аня/ })).toHaveCount(0);
+  expect(problems).toEqual([]);
+});
+
+test('строка — как в нативной: в группе автор над словами; черновик на месте сообщения; своё — с отметкой', async ({ page }) => {
+  const problems = watchForProblems(page);
+  await signInToDemo(page);
+  const weekend = page.getByRole('link', { name: /^Выходные/ });
+  await expect(weekend).toHaveAccessibleName(/Вера: Алиса, ты с нами\?/);
+  await expect(weekend.locator('.sender')).toHaveText('Вера');
+
+  // Черновик: начали писать и ушли — в строке он, курсивом, вместо последнего сообщения.
+  await openRoom(page, /^Выходные/);
+  await page.getByRole('textbox', { name: 'Сообщение' }).fill('Буду к обеду');
+  await page.getByRole('textbox', { name: 'Сообщение' }).press('Escape');
+  await expect(weekend).toContainText('Черновик: Буду к обеду');
+
+  // Своё последнее — с отметкой доставки у времени.
+  await openRoom(page, /^Аня/);
+  await page.getByRole('textbox', { name: 'Сообщение' }).fill('Уже еду');
+  await page.getByRole('button', { name: 'Отправить' }).click();
+  await page.getByRole('textbox', { name: 'Сообщение' }).press('Escape');
+  const anya = page.getByRole('link', { name: /^Аня/ });
+  await expect(anya).toContainText('Уже еду');
+  await expect(anya.getByRole('img', { name: /^(Отправлено|Прочитано)$/ })).toBeVisible();
   expect(problems).toEqual([]);
 });

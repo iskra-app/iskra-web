@@ -186,6 +186,12 @@ export class UserSession {
     return this.uploadLimitValue;
   }
 
+  /**
+   * Черновики аккаунта — для строк списка: «Черновик: …» на месте последнего сообщения, как в
+   * нативной. Живут здесь, а не в сводке комнаты: SDK о них не знает и не скажет, что поменялось.
+   */
+  drafts = $state.raw<Record<string, string>>({});
+
   /** Черновик чата — под ключом аккаунта (`vault`). Не прочитался — пусто, а не ошибка. */
   async draft(roomId: string): Promise<string> {
     return vault.draft(this.userId, roomId).catch(() => '');
@@ -193,6 +199,13 @@ export class UserSession {
 
   /** Пустой — стереть. Не записался — не повод мешать человеку печатать. */
   async saveDraft(roomId: string, text: string): Promise<void> {
+    const trimmed = text.trim() ? text : '';
+    if ((this.drafts[roomId] ?? '') !== trimmed) {
+      const next = { ...this.drafts };
+      if (trimmed) next[roomId] = trimmed;
+      else delete next[roomId];
+      this.drafts = next;
+    }
     await vault.saveDraft(this.userId, roomId, text).catch(() => {});
   }
 
@@ -366,6 +379,7 @@ export class UserSession {
     session.listen(events);
     // До синхронизации: иначе список на миг покажет `anna_1987`, а потом «Маму».
     await session.localNames.load();
+    session.drafts = await vault.drafts(account.userId).catch(() => ({}));
     await client.startClient({
       initialSyncLimit: 20,
       lazyLoadMembers: true,

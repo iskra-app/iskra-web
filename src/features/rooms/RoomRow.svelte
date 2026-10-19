@@ -51,13 +51,17 @@
   }
 
   const number = $derived(new Intl.NumberFormat(i18n.locale));
+  /** Черновик — на месте последнего сообщения; в открытом чате он и так перед глазами. */
+  const draft = $derived(selected ? undefined : session.drafts[room.id]?.replace(/\s+/g, ' ').trim());
+  /** В группе — кто сказал, отдельной строкой над словами; в личном чате это и так понятно. */
+  const sender = $derived(room.kind === 'group' ? room.lastSender : undefined);
 </script>
 
 <a
   class="row"
   href={formatRoute({ name: 'room', roomId: room.id })}
   aria-current={selected ? 'page' : undefined}
-  aria-label={rowLabel(room)}
+  aria-label={rowLabel(room, draft)}
   data-room-id={room.id}
   {oncontextmenu}
   {onkeydown}
@@ -79,12 +83,33 @@
       {#if room.isFavourite}
         <svg class="pin" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 3h6l-1 6 4 4H6l4-4-1-6zM12 13v8" /></svg>
       {/if}
+      {#if room.lastMark && !room.typing}
+        <span class="mark" data-mark={room.lastMark}>
+          {#if room.lastMark === 'sending'}
+            <svg viewBox="0 0 24 24" role="img" aria-label={t('message.delivery.sending')}><circle cx="12" cy="12" r="8" /><path d="M12 8v4l3 2" /></svg>
+          {:else if room.lastMark === 'read'}
+            <svg viewBox="0 0 24 24" role="img" aria-label={t('message.delivery.read')}><path d="M2 12s3.5-6 10-6 10 6 10 6-3.5 6-10 6S2 12 2 12z" /><circle cx="12" cy="12" r="2.5" /></svg>
+          {:else if room.lastMark === 'sent'}
+            <svg viewBox="0 0 24 24" role="img" aria-label={t('message.delivery.sent')}><path d="M5 12.5l4.5 4.5L19 7.5" /></svg>
+          {:else}
+            <svg viewBox="0 0 24 24" role="img" aria-label={t('message.delivery.failed')}><circle cx="12" cy="12" r="9" /><path d="M12 7.5v5.5M12 16.5v.01" /></svg>
+          {/if}
+        </span>
+      {/if}
       {#if room.lastActivity}
         <time class="time">{roomTimestamp(room.lastActivity, now, i18n.locale, t('room.yesterday'))}</time>
       {/if}
     </span>
     <span class="line top">
-      <span class="preview">{previewText(room.preview)}</span>
+      {#if room.typing}
+        <span class="preview typing">{t('room.typing')}</span>
+      {:else if draft}
+        <span class="preview draft">{t('roomList.draft', { text: draft })}</span>
+      {:else}
+        <span class="preview"
+          >{#if sender}<span class="sender">{sender}</span><span class="colon">: </span><br class="break" />{/if}{previewText(room.preview)}</span
+        >
+      {/if}
       {#if hasUnread(room) || room.mentionCount > 0}
         <UnreadBadge
           count={room.unreadCount}
@@ -149,6 +174,26 @@
   .spacer {
     flex: 1;
   }
+  .mark {
+    display: flex;
+    flex: none;
+    color: var(--accent);
+  }
+  .mark[data-mark='sending'] {
+    color: var(--color-text-secondary);
+  }
+  .mark[data-mark='failed'] {
+    color: var(--color-danger);
+  }
+  .mark svg {
+    width: var(--font-size-caption);
+    height: var(--font-size-caption);
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 2;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+  }
   .lock,
   .pin {
     flex: none;
@@ -185,12 +230,31 @@
     color: var(--color-text-secondary);
     overflow-wrap: anywhere;
   }
-  /* Под мышью строка ниже — одна строка превью, и место под вторую не держим. */
+  .sender {
+    color: var(--color-text);
+  }
+  .colon {
+    display: none;
+  }
+  .typing {
+    color: var(--accent);
+  }
+  .draft {
+    font-style: italic;
+  }
+  /* Под мышью строка ниже — одна строка превью, и место под вторую не держим; автор — тогда
+     в той же строке, через двоеточие, как в боковой панели нативной. */
   @media (hover: hover) and (pointer: fine) {
     .preview {
       -webkit-line-clamp: 1;
       line-clamp: 1;
       min-height: calc(1em * var(--line-height-body));
+    }
+    .colon {
+      display: inline;
+    }
+    .break {
+      display: none;
     }
   }
 </style>

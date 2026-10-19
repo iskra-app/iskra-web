@@ -174,7 +174,8 @@
   {:else}
     {#if view.kind === 'all' && !folder && organized.archived.length > 0}
       <button type="button" class="archive" onclick={() => (view = { kind: 'archive' })}>
-        {t('roomList.archive.entry', { count: organized.archived.length })}
+        <Icon name="archive" />
+        <span>{t('roomList.archive.title')}</span>
       </button>
     {/if}
     {#each shown as room (room.id)}
@@ -235,8 +236,11 @@
     font-size: var(--font-size-body);
     font-weight: 600;
   }
+  /* Значок и «Архив», без числа — как `archiveEntry` нативной: архив — полка, а не счётчик. */
   .archive {
-    display: block;
+    display: flex;
+    align-items: center;
+    gap: var(--space-close);
     width: calc(100% - 2 * var(--space-tight));
     min-height: var(--tap-target);
     margin: var(--space-close) var(--space-tight);
@@ -245,8 +249,13 @@
     border-radius: var(--radius-control);
     background: transparent;
     color: var(--color-text-secondary);
+    font-weight: 500;
     text-align: start;
     cursor: pointer;
+  }
+  .archive :global(svg) {
+    width: var(--size-icon);
+    height: var(--size-icon);
   }
   /* Наведение — только там, где указатель умеет наводиться: на телефоне тап оставлял бы «залипшую» подсветку. */
   @media (hover: hover) {

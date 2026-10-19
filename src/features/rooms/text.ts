@@ -17,12 +17,14 @@ export function previewText(preview: Preview | undefined): string {
  * Одна фраза на строку — чтобы скринридер читал мысль, а не кучу обрывков. И оба числа,
  * если есть оба: «12 непрочитанных, 1 упоминание вас», а не одно вместо другого.
  */
-export function rowLabel(room: RoomSummary): string {
+export function rowLabel(room: RoomSummary, draft?: string): string {
   const parts = [roomName(room)];
   if (room.encrypted) parts.push(t('roomList.privateChat'));
   if (room.isFavourite) parts.push(t('roomList.pinned'));
   const preview = previewText(room.preview);
-  if (preview) parts.push(preview);
+  if (room.typing) parts.push(t('room.typing'));
+  else if (draft) parts.push(t('roomList.draft', { text: draft }));
+  else if (preview) parts.push(room.kind === 'group' && room.lastSender ? `${room.lastSender}: ${preview}` : preview);
   if (room.unreadCount > 0) parts.push(plural('roomList.unread', room.unreadCount));
   else if (hasUnread(room)) parts.push(t('roomList.hasUnread'));
   if (room.mentionCount > 0) parts.push(plural('roomList.mentions', room.mentionCount));

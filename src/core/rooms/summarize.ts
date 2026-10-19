@@ -2,9 +2,9 @@
  * `Room` из SDK → `RoomSummary`. Чистая функция от комнаты и контекста — тесты гоняют её
  * по демо-серверу под настоящим `matrix-js-sdk`.
  */
-import { EventType, KnownMembership, NotificationCountType, type Room, type RoomMember } from 'matrix-js-sdk';
+import { EventStatus, EventType, KnownMembership, NotificationCountType, type MatrixEvent, type Room, type RoomMember } from 'matrix-js-sdk';
 import { isPreviewable, previewOf } from './preview';
-import type { RoomFace, RoomKind, RoomSummary } from './types';
+import type { LastMark, RoomFace, RoomKind, RoomSummary } from './types';
 
 export interface SummaryContext {
   ownUserId: string;
@@ -62,7 +62,7 @@ export function summarize(room: Room, context: SummaryContext): RoomSummary | un
 
   let preview: RoomSummary['preview'];
   let lastActivity = 0;
-  let lastEvent;
+  let lastEvent: MatrixEvent | undefined;
   const events = room.getLiveTimeline().getEvents();
   for (let i = events.length - 1; i >= 0; i--) {
     const event = events[i]!;
@@ -74,6 +74,24 @@ export function summarize(room: Room, context: SummaryContext): RoomSummary | un
     break;
   }
   if (!lastActivity) lastActivity = room.getLastActiveTimestamp() > 0 ? room.getLastActiveTimestamp() : 0;
+
+  // Моё последнее — сначала то, что ещё не ушло: SDK держит его вне ленты, в её конце.
+  let lastMark: LastMark | undefined;
+  let lastSender: string | undefined;
+  const pending = pendingOf(room).filter(isPreviewable).at(-1);
+  if (pending) {
+    preview = previewOf(pending) ?? preview;
+    lastActivity = Math.max(lastActivity, pending.getTs());
+    lastMark = pending.status === EventStatus.NOT_SENT ? 'failed' : 'sending';
+  } else if (lastEvent && lastEvent.getSender() === me) {
+    // Прочитано — если хоть кто-то из остальных дочитал до него, как у пузыря в ленте.
+    const id = lastEvent.getId();
+    lastMark = id && others.some((m) => m.membership === KnownMembership.Join && room.hasUserReadEvent(m.userId, id)) ? 'read' : 'sent';
+  } else if (lastEvent) {
+    const sender = room.getMember(lastEvent.getSender() ?? '');
+    lastSender = sender ? displayName(sender) : (lastEvent.getSender() ?? undefined);
+  }
+  const typing = !invited && room.getMembers().some((m) => m.typing && m.userId !== me);
 
   // Непрочитанное без уведомлений: у беззвучного чата сервер не считает, но новое есть.
   const hasUnreadMessages =
@@ -100,6 +118,9 @@ export function summarize(room: Room, context: SummaryContext): RoomSummary | un
     isFavourite: 'm.favourite' in room.tags,
     isLowPriority: 'm.lowpriority' in room.tags,
     ...(preview ? { preview } : {}),
+    ...(lastSender ? { lastSender } : {}),
+    ...(lastMark ? { lastMark } : {}),
+    typing,
     lastActivity,
   };
 }
@@ -144,4 +165,13 @@ export function spaceChildren(space: Room): string[] {
     })
     .map((event) => event.getStateKey()!)
     .filter(Boolean);
+}
+
+/** Не ушедшие. Без `pendingEventOrdering: detached` SDK бросает — тогда их нет. */
+function pendingOf(room: Room): MatrixEvent[] {
+  try {
+    return room.getPendingEvents();
+  } catch {
+    return [];
+  }
 }
