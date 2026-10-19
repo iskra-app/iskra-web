@@ -140,7 +140,7 @@
   "folders.title": "Folders",
   "hotkey.attach": "Attach a file",
   "hotkey.editLast": "In an empty message box, edit your last message",
-  "hotkey.escape": "Close what’s on top; in a chat, go to the newest and mark it read",
+  "hotkey.escape": "Close what’s on top; in a chat, drop the reply or selection, then close the chat",
   "hotkey.help": "This list",
   "hotkey.messageEdges": "On a message — first and last loaded",
   "hotkey.messageMenu": "On a message — its menu",

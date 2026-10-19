@@ -218,15 +218,12 @@ test('мышь: панель по наведению; справка по кла
   await page.keyboard.press('Escape');
   await expect(help).toBeHidden();
 
-  // `Esc`, когда закрывать нечего: вниз, к последнему.
+  // `Esc`, когда закрывать нечего: чат закрывается, как в нативной на Mac.
   await openRoom(page, /^Длинная история/);
-  await expect(bubble(page, 'Сообщение номер 400')).toBeInViewport();
-  await page.getByRole('log').evaluate((log) => log.parentElement!.scrollBy({ top: -300 }));
-  const toBottom = page.getByRole('button', { name: 'Вниз, к последнему сообщению' });
-  await expect(toBottom).toBeVisible();
+  await page.getByRole('log').click();
   await page.keyboard.press('Escape');
-  await expect(toBottom).toBeHidden();
-  await expect(bubble(page, 'Сообщение номер 400')).toBeInViewport();
+  await expect(page.getByRole('log')).toHaveCount(0);
+  await expect(page).not.toHaveURL(/#\/room\//);
 });
 
 test('телефон: меню листом снизу', async ({ page }, info) => {

@@ -171,13 +171,14 @@ test('«Непрочитанные сообщения»: полоса над н�
   expect(order[0]).toBeLessThan(order[1]!);
   expect(order[1]).toBeLessThan(order[2]!);
 
-  // Дочитали и ушли — маркер переехал в конец; вернулись — полосы нет.
+  // Дочитали и ушли по `Esc` — маркер переехал в конец; вернулись — полосы нет.
+  await log.evaluate((element) => element.parentElement!.scrollTo({ top: element.parentElement!.scrollHeight }));
+  await expect(log.getByText('Возьми плед, там ветрено')).toBeInViewport();
   await page.getByRole('textbox', { name: 'Сообщение' }).press('Escape');
-  // На телефоне чат занимает весь экран — к списку через «Назад».
-  const back = page.getByRole('button', { name: 'Назад' });
-  if (await back.isVisible()) await back.click();
+  await expect(page.getByRole('log')).toHaveCount(0);
   await openRoom(page, /^Выходные/);
-  if (await back.isVisible()) await back.click();
+  await page.getByRole('textbox', { name: 'Сообщение' }).press('Escape');
+  await expect(page.getByRole('log')).toHaveCount(0);
   await openRoom(page, /^Аня/);
   await expect(page.getByRole('log')).toContainText('Возьми плед, там ветрено');
   await expect(page.getByRole('log').getByRole('heading', { name: 'Непрочитанные сообщения' })).toHaveCount(0);

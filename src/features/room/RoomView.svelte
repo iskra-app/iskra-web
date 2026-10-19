@@ -423,13 +423,15 @@
   }
 
   /** `Esc` в чате, когда закрывать нечего: вниз и прочитано. */
-  export function escape(): void {
-    // Сначала — выйти из выбора: это то, что сейчас на экране.
-    if (selection) {
-      selection = null;
-      return;
-    }
-    timeline?.toBottom();
+  /**
+   * `Esc`, которое не забрали меню, окна и полоса ответа над полем (у них своё): выйти из
+   * выбора, если он есть, — и `true`. `false` — закрывать здесь нечего, закрывается сам чат,
+   * как в нативной Искре на Mac.
+   */
+  export function escape(): boolean {
+    if (!selection) return false;
+    selection = null;
+    return true;
   }
 
   /** Из панели «О чате»: к закреплённому сообщению. */

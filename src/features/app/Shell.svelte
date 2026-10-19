@@ -99,8 +99,9 @@
         // Открытое окно или меню закрывается само (`<dialog>`); это — когда закрывать нечего.
         if (document.querySelector('dialog[open]')) return;
         if (panelOpen) panelOpen = false;
-        else if (roomId) roomView?.escape();
-        else return;
+        else if (roomId) {
+          if (!roomView?.escape()) closeRoom();
+        } else return;
         break;
       case 'attach':
         if (!roomId) return;
