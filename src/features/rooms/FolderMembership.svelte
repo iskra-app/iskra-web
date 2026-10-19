@@ -37,6 +37,7 @@
               <span class="name">{folder.name}</span>
               <input
                 type="checkbox"
+                role="switch"
                 checked={contains(folder, current)}
                 disabled={offline}
                 onchange={(event) => void store.setMembership(current.id, folder.id, event.currentTarget.checked)}
@@ -78,11 +79,6 @@
     min-height: var(--tap-target);
     padding: var(--space-tight) var(--space-normal);
     cursor: pointer;
-  }
-  .folder input {
-    width: var(--size-icon);
-    height: var(--size-icon);
-    accent-color: var(--accent);
   }
   .name {
     flex: 1;

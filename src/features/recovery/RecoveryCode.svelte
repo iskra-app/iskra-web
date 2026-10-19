@@ -64,8 +64,8 @@
   <p class="warning">{t('recovery.save.warning')}</p>
 
   <label class="confirm">
-    <input type="checkbox" bind:checked={confirmed} />
     <span>{t('recovery.save.confirm')}</span>
+    <input type="checkbox" role="switch" bind:checked={confirmed} />
   </label>
 
   <PrimaryButton wide disabled={!confirmed} onclick={onsaved}>{t('encryption.saved')}</PrimaryButton>
@@ -111,13 +111,9 @@
   .confirm {
     display: flex;
     align-items: center;
+    justify-content: space-between;
     gap: var(--space-close);
     min-height: var(--tap-target);
     cursor: pointer;
-  }
-  .confirm input {
-    width: var(--size-icon);
-    height: var(--size-icon);
-    accent-color: var(--accent);
   }
 </style>

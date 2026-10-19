@@ -119,20 +119,23 @@ test('выйти из чата — с вопросом, и чата больше
 test('новая комната и новый чат — создаются и сразу открываются', async ({ page }) => {
   await signInToDemo(page);
   await page.getByRole('button', { name: 'Новый чат или комната' }).click();
-  const dialog = page.getByRole('dialog', { name: 'Новый чат или комната' });
-  await dialog.getByRole('tab', { name: 'Новая комната' }).click();
-  await expect(dialog).toContainText('поэтому шифрования в ней нет');
-  await dialog.getByRole('textbox', { name: 'Название' }).fill('Книги');
-  await dialog.getByRole('button', { name: 'Создать' }).click();
+  const dialog = page.getByRole('dialog', { name: 'Новый чат' });
+  await dialog.getByRole('button', { name: 'Создать комнату' }).click();
+  await expect(page.getByRole('dialog', { name: 'Новая комната' })).toContainText('поэтому шифрования в ней нет');
+  const roomPage = page.getByRole('dialog', { name: 'Новая комната' });
+  await expect(roomPage).toContainText('Комната будет с шифрованием');
+  await roomPage.getByRole('textbox', { name: 'Название' }).fill('Книги');
+  await roomPage.getByRole('textbox', { name: 'Описание' }).fill('Что читаем');
+  await roomPage.getByRole('button', { name: 'Создать' }).click();
   await expect(page.getByRole('heading', { name: 'Книги', level: 1 })).toBeVisible({ timeout: 10_000 });
+  await expect(page.getByRole('dialog')).toHaveCount(0);
 
   // Кнопка — в шапке списка; на телефоне список — за «Назад».
   const back = page.getByRole('button', { name: 'Назад' });
   if (await back.isVisible()) await back.click();
   await page.getByRole('button', { name: 'Новый чат или комната' }).click();
-  await dialog.getByRole('textbox', { name: 'Кому написать' }).fill('@anya:demo.iskra.invalid');
-  await dialog.getByRole('button', { name: 'Начать' }).click();
-  // С Аней чат уже есть — открывается он, а не второй.
+  // С Аней чат уже есть — она в списке собеседников, и открывается он, а не второй.
+  await dialog.getByRole('button', { name: /^Аня/ }).click();
   await expect(page.getByRole('log')).toContainText('Возьми плед, там ветрено', { timeout: 10_000 });
 });
 
@@ -482,7 +485,7 @@ test('«Папки»: подсказка — и вкладка над списк
   await editor.getByRole('list', { name: 'Всегда показывать' }).getByRole('button', { name: 'Добавить чаты' }).click();
   const chooser = page.getByRole('dialog', { name: 'Выберите чаты' });
   await chooser.getByRole('textbox', { name: 'Поиск' }).fill('аня');
-  await chooser.getByRole('checkbox', { name: /Аня/ }).check();
+  await chooser.getByRole('switch', { name: /Аня/ }).check();
   await chooser.getByRole('button', { name: 'Готово' }).click();
   await expect(editor.getByRole('list', { name: 'Всегда показывать' })).toContainText('Аня');
   await done.click();

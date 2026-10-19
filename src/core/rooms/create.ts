@@ -18,7 +18,7 @@ const ROOM_ARRIVES_MS = 15_000;
  * Открыть её раньше — показать сырой ID и «Не удалось открыть чат». Ждём, но не вечно:
  * не пришла — всё равно открываем, лента подождёт сама.
  */
-function arrived(client: MatrixClient, roomId: string): Promise<void> {
+export function arrived(client: MatrixClient, roomId: string): Promise<void> {
   if (client.getRoom(roomId)) return Promise.resolve();
   return new Promise((resolve) => {
     const done = () => {
@@ -57,9 +57,10 @@ export async function createDirect(client: MatrixClient, userId: string): Promis
   return roomId;
 }
 
-export async function createGroup(client: MatrixClient, name: string, open: boolean): Promise<string> {
+export async function createGroup(client: MatrixClient, name: string, open: boolean, topic = ''): Promise<string> {
   const { room_id: roomId } = await client.createRoom({
     name: name.trim(),
+    ...(topic.trim() ? { topic: topic.trim() } : {}),
     preset: open ? Preset.PublicChat : Preset.PrivateChat,
     visibility: Visibility.Private,
     initial_state: open ? [] : [ENCRYPTION],

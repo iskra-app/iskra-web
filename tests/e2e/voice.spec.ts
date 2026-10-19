@@ -80,7 +80,7 @@ async function openChat(page: Page) {
   await expect(page.getByRole('log')).toBeVisible();
 }
 
-test('голосовое: нажатие — запись без рук, «Отправить» — пузырь в ленте', async ({ page }) => {
+test('голосовое: Enter — запись без рук, «Отправить» — пузырь в ленте', async ({ page }) => {
   const problems = watchForProblems(page);
   await fakeMicrophone(page);
   await signInToDemo(page);
@@ -92,7 +92,9 @@ test('голосовое: нажатие — запись без рук, «От�
   await composer.fill('черновик');
   await expect(record).toBeHidden();
   await composer.fill('');
-  await record.click();
+  // Щелчок только переключает голосовое и «кружочек»; без рук — Enter.
+  await record.focus();
+  await page.keyboard.press('Enter');
 
   const strip = page.getByRole('group', { name: 'Запись голосового' });
   await expect(strip).toBeVisible();
@@ -117,7 +119,8 @@ test('голосовое: «Остановить» — послушать пер
   const before = await articles.count();
 
   const record = page.getByRole('button', { name: 'Записать голосовое' });
-  await record.click();
+  await record.focus();
+  await page.keyboard.press('Enter');
   const strip = page.getByRole('group', { name: 'Запись голосового' });
   await expect(strip).toContainText('0:01', { timeout: 5000 });
   await page.getByRole('button', { name: 'Остановить запись' }).click();
@@ -198,12 +201,16 @@ test('«кружочек»: камера поверх комнаты, кольц
   const notes = page.getByRole('log').getByRole('button', { name: 'Видеосообщение' });
   await expect(notes).toHaveCount(0);
 
-  if (isPhone(info.project.name)) {
-    // Телефон: кнопка одна, касание переключает голосовое и видео.
-    await page.getByRole('button', { name: 'Записать голосовое' }).tap();
-    await expect(page.getByRole('button', { name: 'Записать голосовое' })).toBeHidden();
-  }
-  await page.getByRole('button', { name: 'Записать видеосообщение' }).click();
+  // Кнопка одна — и на телефоне, и на десктопе: нажатие переключает голосовое и видео.
+  if (isPhone(info.project.name)) await page.getByRole('button', { name: 'Записать голосовое' }).tap();
+  else await page.getByRole('button', { name: 'Записать голосовое' }).click();
+  await expect(page.getByRole('button', { name: 'Записать голосовое' })).toBeHidden();
+  // Удержание — запись.
+  const video = page.getByRole('button', { name: 'Записать видеосообщение' });
+  await video.hover();
+  const spot = (await video.boundingBox())!;
+  await page.mouse.move(spot.x + spot.width / 2, spot.y + spot.height / 2);
+  await page.mouse.down();
   const camera = page.getByRole('dialog', { name: 'Видеосообщение' });
   await expect(camera).toBeVisible();
   const strip = camera.getByRole('group', { name: 'Запись видеосообщения' });
@@ -212,6 +219,9 @@ test('«кружочек»: камера поверх комнаты, кольц
   const box = (await camera.locator('canvas').boundingBox())!;
   expect(Math.abs(box.width - box.height)).toBeLessThan(2);
 
+  // Увёл вверх — без рук, отправка кнопкой.
+  await page.mouse.move(spot.x + spot.width / 2, spot.y - 100, { steps: 5 });
+  await page.mouse.up();
   await camera.getByRole('button', { name: 'Отправить' }).click();
   await expect(camera).toBeHidden();
   await expect(notes).toHaveCount(1);
@@ -222,14 +232,17 @@ test('«кружочек»: «Отмена» и Esc — камера закры�
   await fakeMicrophone(page);
   await signInToDemo(page);
   await openChat(page);
+  await page.getByRole('button', { name: 'Записать голосовое' }).click();
   const record = page.getByRole('button', { name: 'Записать видеосообщение' });
   const camera = page.getByRole('dialog', { name: 'Видеосообщение' });
-  await record.click();
+  await record.focus();
+  await page.keyboard.press('Enter');
   await expect(camera.getByRole('button', { name: 'Отправить' })).toBeVisible();
   await camera.getByRole('button', { name: 'Отмена' }).click();
   await expect(camera).toBeHidden();
 
-  await record.click();
+  await record.focus();
+  await page.keyboard.press('Enter');
   await expect(camera.getByRole('button', { name: 'Отправить' })).toBeFocused();
   await page.keyboard.press('Escape');
   await expect(camera).toBeHidden();

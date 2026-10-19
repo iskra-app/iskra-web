@@ -3,7 +3,11 @@
  * nightly.web.iskra.wtf: всё новое, и иногда сломанное. Человек на одной должен знать, что
  * есть вторая, — внизу экрана входа.
  */
-export const channel = __ISKRA_CHANNEL__;
+/**
+ * Стабильная — только на своём адресе. Всё остальное — ночная, превью, локальная, чья-то
+ * копия — помечено как ночная: человек не должен принять её за боевую.
+ */
+export const channel: 'stable' | 'nightly' = globalThis.location?.hostname === 'web.iskra.wtf' ? 'stable' : 'nightly';
 export const version = __ISKRA_VERSION__;
 export const build = __ISKRA_BUILD__;
 

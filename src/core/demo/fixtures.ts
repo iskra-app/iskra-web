@@ -24,6 +24,8 @@ export const demoProfiles: Record<string, { displayname: string }> = {
   [demoUsers.anya]: { displayname: 'Аня' },
   [demoUsers.boris]: { displayname: 'Борис' },
   [demoUsers.vera]: { displayname: 'Вера' },
+  // Её нет ни в одном чате — находится только каталогом сервера, как незнакомый человек.
+  [`@lena:${DEMO_SERVER}`]: { displayname: 'Лена' },
 };
 
 export const demoRooms = {
@@ -360,3 +362,43 @@ export const demoDirect = { [demoUsers.anya]: [demoRooms.anya] };
 
 /** Беззвучные комнаты — правилом `override` без действий, как их пишут клиенты. */
 export const demoMutedRooms = [demoRooms.quiet];
+
+/**
+ * Каталог открытых комнат демо-сервера (`/publicRooms`): Алисы в них нет, пока она не вошла.
+ * Одна — только по приглашению: в каталоге видна, а войти нельзя.
+ */
+export interface DemoPublicRoom {
+  roomId: string;
+  alias: string;
+  name: string;
+  topic: string;
+  members: string[];
+  joinRule: 'public' | 'invite';
+}
+
+export const demoDirectory: DemoPublicRoom[] = [
+  {
+    roomId: `!lounge:${DEMO_SERVER}`,
+    alias: `#lounge:${DEMO_SERVER}`,
+    name: 'Гостиная',
+    topic: 'Обо всём и ни о чём',
+    members: [demoUsers.boris, demoUsers.vera],
+    joinRule: 'public',
+  },
+  {
+    roomId: `!hiking:${DEMO_SERVER}`,
+    alias: `#hiking:${DEMO_SERVER}`,
+    name: 'Походы',
+    topic: 'Маршруты выходного дня',
+    members: [demoUsers.anya],
+    joinRule: 'public',
+  },
+  {
+    roomId: `!council:${DEMO_SERVER}`,
+    alias: `#council:${DEMO_SERVER}`,
+    name: 'Совет дома',
+    topic: 'Только для жильцов',
+    members: [demoUsers.vera],
+    joinRule: 'invite',
+  },
+];

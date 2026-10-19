@@ -152,12 +152,6 @@
     gap: var(--space-close);
     cursor: pointer;
   }
-  .toggle input {
-    flex: none;
-    width: var(--size-icon);
-    height: var(--size-icon);
-    accent-color: var(--accent);
-  }
   .help {
     margin: 0;
     font-size: var(--font-size-caption);

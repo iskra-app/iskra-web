@@ -162,7 +162,7 @@ export async function saveRecoveryCode(page: Page): Promise<string> {
   const saved = page.getByRole('button', { name: 'Я сохранил код' });
   // Без галочки кнопка не нажимается: сначала прочитать предупреждение.
   await expect(saved).toBeDisabled();
-  await page.getByRole('checkbox', { name: 'Я записал код в надёжное место' }).check();
+  await page.getByRole('switch', { name: 'Я записал код в надёжное место' }).check();
   await saved.click();
   return code;
 }

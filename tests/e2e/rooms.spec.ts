@@ -196,7 +196,7 @@ test('«В папку» из меню строки: галочка — чат в
 
   await (await rowActions(page, /^Выходные/, phone)).item('В папку').click();
   const sheet = page.getByRole('dialog', { name: 'Выходные' });
-  const personal = sheet.getByRole('checkbox', { name: 'Личные' });
+  const personal = sheet.getByRole('switch', { name: 'Личные' });
   await expect(personal).not.toBeChecked();
   await personal.check();
   await expect(personal).toBeChecked();
@@ -209,7 +209,7 @@ test('«В папку» из меню строки: галочка — чат в
 
   // Сняли галочку у личного чата — его в «Личных» нет, хоть он и подходит под правило.
   await (await rowActions(page, /^Аня/, phone)).item('В папку').click();
-  await page.getByRole('dialog', { name: 'Аня' }).getByRole('checkbox', { name: 'Личные' }).uncheck();
+  await page.getByRole('dialog', { name: 'Аня' }).getByRole('switch', { name: 'Личные' }).uncheck();
   await page.getByRole('dialog', { name: 'Аня' }).getByRole('button', { name: 'Готово' }).click();
   await expect(page.getByRole('link', { name: /^Аня/ })).toHaveCount(0);
   expect(problems).toEqual([]);

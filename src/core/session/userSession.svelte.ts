@@ -27,6 +27,7 @@ import { ThumbnailCache } from '../media/thumbnails';
 import { RoomListStore } from '../rooms/roomListStore.svelte.ts';
 import { RoomDetailsStore } from '../rooms/roomDetails.svelte.ts';
 import { createDirect, createGroup } from '../rooms/create';
+import { joinByAddress, PublicRoomDirectory, searchPeople, type Person } from '../rooms/directory.svelte.ts';
 import { TimelineStore } from '../timeline/timelineStore.svelte.ts';
 import { canForward, forwardContent } from '../timeline/forward';
 import type { Message } from '../timeline/message';
@@ -250,8 +251,23 @@ export class UserSession {
     return createDirect(this.client, userId);
   }
 
-  createGroup(name: string, open: boolean): Promise<string> {
-    return createGroup(this.client, name, open);
+  createGroup(name: string, open: boolean, topic = ''): Promise<string> {
+    return createGroup(this.client, name, open, topic);
+  }
+
+  /** Люди в каталоге сервера — для поиска в «Новом чате». */
+  searchPeople(term: string): Promise<Person[]> {
+    return searchPeople(this.client, term);
+  }
+
+  /** Каталог открытых комнат. Живёт, пока открыт его экран. */
+  publicRooms(): PublicRoomDirectory {
+    return new PublicRoomDirectory(this.client);
+  }
+
+  /** Войти в комнату по адресу или ID — или из каталога. */
+  joinRoom(address: string): Promise<string> {
+    return joinByAddress(this.client, address);
   }
 
   // ————— Профиль, устройства, аккаунт —————

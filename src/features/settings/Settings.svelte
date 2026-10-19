@@ -18,12 +18,13 @@
   import Icon from '../../design/Icon.svelte';
   import type { IconName } from '../../design/icons.ts';
   import { formatRoute, type SettingsSection } from '../../core/navigation/route';
+  import { router } from '../../core/navigation/router.svelte.ts';
   import type { AccountSwitch, DefaultAlerts } from '../../core/rooms/pushRules';
   import { app } from '../../core/session/app.svelte.ts';
   import type { UserSession } from '../../core/session/userSession.svelte.ts';
   import { isPersisted, requestPersistence } from '../../core/storage/persistence';
-  import { i18n, locales, t, type TextKey } from '../../i18n/index.svelte.ts';
-  import { faceModes, fonts, preferences, type Appearance, type FaceMode, type Font, type LanguageChoice } from '../app/preferences.svelte.ts';
+  import { i18n, t, type TextKey } from '../../i18n/index.svelte.ts';
+  import { faceModes, fonts, preferences, type Appearance, type FaceMode, type Font } from '../app/preferences.svelte.ts';
   import { fileSize } from '../media/files';
   import RecoveryCode from '../recovery/RecoveryCode.svelte';
   import AccentSwatches from './AccentSwatches.svelte';
@@ -32,6 +33,8 @@
   import QuickReactionPicker from './QuickReactionPicker.svelte';
   import { builtOn, describeDevice, iskraLicence, type Licence } from './licences';
   import FoldersSettings from './FoldersSettings.svelte';
+  import { languageChoices } from '../app/languages';
+  import QrCodeDialog from '../app/QrCodeDialog.svelte';
   import { isMac } from '../../design/hotkeys';
   import { viewport } from '../../design/viewport.svelte.ts';
   import { autoDownloads, compressions, type MediaAutoDownload } from '../media/mediaSettings';
@@ -232,11 +235,7 @@
     creaturesAlways: { label: 'onboarding.faces.faces', help: 'onboarding.faces.facesHelp' },
   };
   const fontLabel = (font: Font): TextKey => `appearance.font.${font}`;
-  /** Каждый язык — своим именем: ищут свой, а не перевод его названия на чужой. */
-  const languages: Array<{ value: LanguageChoice; label: TextKey }> = [
-    { value: 'system', label: 'language.system' },
-    ...locales.map((locale) => ({ value: locale, label: `language.${locale}` as const })),
-  ];
+  const languages = languageChoices;
 
   // ————— Об Iskra —————
 
@@ -250,7 +249,13 @@
     reading = { licence, text: await licence.text() };
   }
 
+  /** Тройной щелчок — `detail` считает щелчки подряд, как `onTapGesture(count: 3)`. */
+  function openBeta(event: MouseEvent) {
+    if (event.detail === 3) router.go({ name: 'settings', section: 'beta' });
+  }
+
   let confirmingSignOut = $state(false);
+  let showingCode = $state(false);
 </script>
 
 {#snippet licenceRow(licence: Licence)}
@@ -270,7 +275,21 @@
       <span class="avatar big"><Avatar name={me.name} seed={me.id} photo={photo.url} mode={preferences.faces} /></span>
       <strong class="profile-name">{me.name}</strong>
       <span class="secondary selectable">{me.id}</span>
+      <!-- Свой QR-код — `ProfileActionTile` нативной в шапке профиля. -->
+      <button type="button" class="tile" onclick={() => (showingCode = true)}>
+        <Icon name="qr" />
+        <span>{t('qr.title')}</span>
+      </button>
     </div>
+    <QrCodeDialog
+      open={showingCode}
+      link={`https://matrix.to/#/${encodeURIComponent(me.id)}`}
+      name={me.name}
+      subtitle={me.id}
+      seed={me.id}
+      photo={photo.url}
+      onclose={() => (showingCode = false)}
+    />
     <nav aria-label={t('settings.title')}>
       <ul class="rows">
         {#each rows as row (row.section)}
@@ -425,7 +444,7 @@
 
   {:else if section === 'appearance'}
     <!-- Порядок `AppearanceView` нативной: вид ленты, тема, цвет, обои; дальше — то, что есть
-         только здесь: шрифт, мордочки, язык (в iOS язык — в настройках системы). -->
+         только здесь: шрифт и язык (в iOS язык — в настройках системы). -->
     <label class="switch">
       <span>{t('appearance.compact')}</span>
       <input
@@ -453,17 +472,6 @@
         <!-- Каждый вариант написан своим шрифтом: видно, что выбираешь. -->
         <button type="button" role="radio" data-font={font} aria-checked={preferences.font === font} onclick={() => (preferences.font = font)}>
           {t(fontLabel(font))}
-        </button>
-      {/each}
-    </div>
-    <h3 id="faces-title">{t('onboarding.faces.title')}</h3>
-    <div class="options" role="radiogroup" aria-labelledby="faces-title">
-      {#each faceModes as mode (mode)}
-        <button type="button" role="radio" aria-checked={preferences.faces === mode} onclick={() => (preferences.faces = mode)}>
-          <span class="option">
-            <span>{t(faceLabels[mode].label)}</span>
-            <span class="secondary">{t(faceLabels[mode].help)}</span>
-          </span>
         </button>
       {/each}
     </div>
@@ -551,7 +559,10 @@
     <!-- `AboutView` нативной, строка в строку: значок, имя и строка о себе; версия, сборка,
          устройство; сайт, исходный код и лицензии; внизу — чьё это и на каких условиях. -->
     <div class="profile-header">
-      <img class="app-icon" src={asset('icons/icon-192.png')} alt="" />
+      <!-- Три щелчка по значку — «Бета-функции», как в нативной: строки к ним нет, их находит тот,
+           кто ищет. -->
+      <!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_noninteractive_element_interactions -->
+      <img class="app-icon" src={asset('icons/icon-192.png')} alt="" onclick={openBeta} />
       <strong class="profile-name">{t('about.appNameWeb')}</strong>
       <span class="secondary">{t('about.webTagline')}</span>
     </div>
@@ -580,6 +591,21 @@
       <p class="secondary">{t('about.copyright')}</p>
       <p class="secondary">{t('about.freeSoftwareWeb')}</p>
     </section>
+  {:else if section === 'beta'}
+    <!-- `BetaView` нативной: что ещё не доделано, одним экраном. Пока здесь только мордочки — им
+         сюда из «Внешнего вида», как и там. -->
+    <p class="secondary">{t('beta.intro')}</p>
+    <h3 id="faces-title">{t('appearance.avatars')}</h3>
+    <div class="options" role="radiogroup" aria-labelledby="faces-title">
+      {#each faceModes as mode (mode)}
+        <button type="button" role="radio" aria-checked={preferences.faces === mode} onclick={() => (preferences.faces = mode)}>
+          <span class="option">
+            <span>{t(faceLabels[mode].label)}</span>
+            <span class="secondary">{t(faceLabels[mode].help)}</span>
+          </span>
+        </button>
+      {/each}
+    </div>
   {:else if section === 'licences'}
     <!-- `LicensesView` нативной: своя лицензия, потом — на чём всё построено; строка открывает текст. -->
     <ul class="rows">
@@ -680,6 +706,26 @@
   .big {
     --avatar-size: var(--size-avatar-profile);
     margin-block-end: var(--space-close);
+  }
+  .tile {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: var(--space-tight);
+    min-width: var(--size-avatar-profile);
+    margin-block-start: var(--space-close);
+    padding: var(--space-close) var(--space-normal);
+    border: none;
+    border-radius: var(--radius-card);
+    background: var(--color-surface);
+    color: var(--accent);
+    font: inherit;
+    font-size: var(--font-size-caption);
+    cursor: pointer;
+  }
+  .tile :global(svg) {
+    width: var(--size-icon-button);
+    height: var(--size-icon-button);
   }
   .app-icon {
     width: var(--size-avatar-profile);
@@ -913,11 +959,6 @@
     border-radius: var(--radius-card);
     background: var(--color-surface);
     cursor: pointer;
-  }
-  .switch input {
-    width: var(--size-icon);
-    height: var(--size-icon);
-    accent-color: var(--accent);
   }
   dl {
     display: grid;

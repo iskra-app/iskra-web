@@ -19,6 +19,7 @@ import {
   buildDemoWorld,
   demoCredentials,
   demoDirect,
+  demoDirectory,
   demoMutedRooms,
   demoProfiles,
   demoRooms,
@@ -137,6 +138,9 @@ export class DemoHomeserver {
       ['GET', re(`${c}/v3/sync`), (r) => this.sync(r)],
       ['GET', re(`${c}/v3/profile/([^/]+)`), (r) => this.profile(r)],
       ['GET', re(`${c}/v3/rooms/([^/]+)/messages`), (r) => this.messages(r)],
+      ['POST', re(`${c}/v3/user_directory/search`), (r) => this.searchPeople(r)],
+      ['GET', re(`${c}/v3/publicRooms`), (r) => this.publicRooms(r)],
+      ['POST', re(`${c}/v3/publicRooms`), (r) => this.publicRooms(r)],
       ['POST', re(`${c}/v3/join/([^/]+)`), (r) => this.join(r.params[0]!)],
       ['POST', re(`${c}/v3/rooms/([^/]+)/join`), (r) => this.join(r.params[0]!)],
       ['POST', re(`${c}/v3/rooms/([^/]+)/leave`), (r) => this.leave(r.params[0]!)],
@@ -655,8 +659,10 @@ export class DemoHomeserver {
     this.wake?.();
   }
 
-  /** Вход по приглашению: комната становится обычной, с Алисой среди участников. */
+  /** Вход по приглашению или из каталога: комната становится обычной, с Алисой среди участников. */
   private join(roomIdOrAlias: string): Response {
+    const listed = demoDirectory.find((room) => room.roomId === roomIdOrAlias || room.alias === roomIdOrAlias);
+    if (listed) return this.joinListed(listed);
     const invite = this.invites.find((i) => i.roomId === roomIdOrAlias);
     if (!invite && !this.rooms.has(roomIdOrAlias)) {
       return json(404, { errcode: 'M_NOT_FOUND', error: 'No such room' });
@@ -865,11 +871,77 @@ export class DemoHomeserver {
     this.wake?.();
   }
 
+  // ————— Каталоги: люди и открытые комнаты —————
+
+  /** `/user_directory/search` — по имени и адресу; Лена есть только здесь. */
+  private searchPeople({ body }: DemoRequest): Response {
+    const { search_term: term = '', limit = 10 } = (body ?? {}) as { search_term?: string; limit?: number };
+    const needle = term.trim().toLocaleLowerCase();
+    const results = Object.entries(this.profiles)
+      .filter(([id, profile]) => needle && (id.toLocaleLowerCase().includes(needle) || profile.displayname.toLocaleLowerCase().includes(needle)))
+      .slice(0, limit)
+      .map(([id, profile]) => ({ user_id: id, display_name: profile.displayname, ...(profile.avatar_url ? { avatar_url: profile.avatar_url } : {}) }));
+    return json(200, { results, limited: false });
+  }
+
+  /** `/publicRooms`: каталог по две комнаты на страницу — чтобы было что подгружать. */
+  private publicRooms({ body, url }: DemoRequest): Response {
+    const request = (body ?? {}) as { since?: string; filter?: { generic_search_term?: string } };
+    const since = Number(request.since ?? url.searchParams.get('since') ?? 0);
+    const needle = (request.filter?.generic_search_term ?? '').trim().toLocaleLowerCase();
+    const found = demoDirectory.filter((room) => !needle || `${room.name} ${room.alias} ${room.topic}`.toLocaleLowerCase().includes(needle));
+    const pageSize = 2;
+    const chunk = found.slice(since, since + pageSize).map((room) => ({
+      room_id: room.roomId,
+      name: room.name,
+      topic: room.topic,
+      canonical_alias: room.alias,
+      num_joined_members: room.members.length + (this.rooms.has(room.roomId) ? 1 : 0),
+      world_readable: false,
+      guest_can_join: false,
+      join_rule: room.joinRule,
+    }));
+    const next = since + pageSize < found.length ? String(since + pageSize) : undefined;
+    return json(200, { chunk, total_room_count_estimate: found.length, ...(next ? { next_batch: next } : {}) });
+  }
+
+  /** Войти в комнату из каталога — открытую; в закрытую без приглашения нельзя. */
+  private joinListed(listed: (typeof demoDirectory)[number]): Response {
+    if (this.rooms.has(listed.roomId)) return json(200, { room_id: listed.roomId });
+    if (listed.joinRule !== 'public') return json(403, { errcode: 'M_FORBIDDEN', error: 'You are not invited to this room' });
+    const alice = demoUsers.alice;
+    const at = Date.now();
+    const owner = listed.members[0] ?? alice;
+    const member = (u: string) => ({ type: 'm.room.member', sender: u, state_key: u, content: { membership: 'join', displayname: this.profiles[u]?.displayname } });
+    const state: DemoEvent[] = [
+      { type: 'm.room.create', sender: owner, state_key: '', content: { room_version: '10', creator: owner } },
+      ...listed.members.map(member),
+      { type: 'm.room.join_rules', sender: owner, state_key: '', content: { join_rule: 'public' } },
+      { type: 'm.room.history_visibility', sender: owner, state_key: '', content: { history_visibility: 'shared' } },
+      { type: 'm.room.name', sender: owner, state_key: '', content: { name: listed.name } },
+      { type: 'm.room.topic', sender: owner, state_key: '', content: { topic: listed.topic } },
+      { type: 'm.room.canonical_alias', sender: owner, state_key: '', content: { alias: listed.alias } },
+    ].map((e, i) => ({ ...e, event_id: `$${listed.roomId.slice(1, listed.roomId.indexOf(':'))}-${i}`, origin_server_ts: at - 1000 + i }));
+    const joinEvent: DemoEvent = { ...member(alice), event_id: `$join-${listed.roomId}-${this.batch}`, origin_server_ts: at };
+    this.rooms.set(listed.roomId, { roomId: listed.roomId, state: [...state, joinEvent], timeline: [joinEvent] });
+    this.enqueue({
+      kind: 'join',
+      roomId: listed.roomId,
+      body: {
+        state: { events: state.map((e) => withDefaults(e)) },
+        timeline: { events: [withDefaults(joinEvent)], limited: false, prev_batch: 't0' },
+        summary: { 'm.joined_member_count': listed.members.length + 1, 'm.invited_member_count': 0 },
+      },
+    });
+    return json(200, { room_id: listed.roomId });
+  }
+
   // ————— Комнаты: создание и участники —————
 
   private createRoom({ body }: DemoRequest): Response {
     const request = (body ?? {}) as {
       name?: string;
+      topic?: string;
       preset?: string;
       is_direct?: boolean;
       invite?: string[];
@@ -902,6 +974,7 @@ export class DemoHomeserver {
       { type: 'm.room.join_rules', sender: alice, state_key: '', content: { join_rule: request.preset === 'public_chat' ? 'public' : 'invite' } },
       { type: 'm.room.history_visibility', sender: alice, state_key: '', content: { history_visibility: 'shared' } },
       ...(request.name ? [{ type: 'm.room.name', sender: alice, state_key: '', content: { name: request.name } }] : []),
+      ...(request.topic ? [{ type: 'm.room.topic', sender: alice, state_key: '', content: { topic: request.topic } }] : []),
       ...(request.initial_state ?? []).map((e) => ({ ...e, sender: alice, state_key: e.state_key ?? '' })),
       ...invited.map((u) => ({
         type: 'm.room.member',

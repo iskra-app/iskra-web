@@ -18,6 +18,7 @@
   import { preferences } from '../app/preferences.svelte.ts';
   import Avatar from '../../design/Avatar.svelte';
   import RoomFace from '../rooms/RoomFace.svelte';
+  import QrCodeDialog from '../app/QrCodeDialog.svelte';
   import { Photo, pixelsFor } from '../rooms/faces.svelte.ts';
   import RoomEditDialog from './RoomEditDialog.svelte';
   import InviteDialog from './InviteDialog.svelte';
@@ -204,6 +205,9 @@
     return `https://matrix.to/#/${encodeURIComponent(details.roomId)}${server ? `?via=${encodeURIComponent(server)}` : ''}`;
   });
   let linkCopied = $state(false);
+  /** QR-код собеседника или открытой комнаты — с той же ссылкой, что «Поделиться». */
+  let showingCode = $state(false);
+  const roomPhoto = $derived(new Photo(session, room?.avatarUrl, pixelsFor(4)));
   $effect(() => {
     if (!linkCopied) return;
     const timer = setTimeout(() => (linkCopied = false), 3000);
@@ -264,8 +268,23 @@
           <Icon name="share" />
           <span>{t('profile.share')}</span>
         </button>
+        <button type="button" class="tile" onclick={() => (showingCode = true)}>
+          <Icon name="qr" />
+          <span>{t('qr.title')}</span>
+        </button>
       {/if}
     </div>
+    {#if link}
+      <QrCodeDialog
+        open={showingCode}
+        {link}
+        name={details.name}
+        subtitle={counterpart?.id ?? details.roomId}
+        seed={room?.avatarSeed}
+        photo={roomPhoto.url}
+        onclose={() => (showingCode = false)}
+      />
+    {/if}
     {#if linkCopied}<p class="copied" role="status">{t('room.linkCopiedWeb')}</p>{/if}
 
     {#if details.failure}

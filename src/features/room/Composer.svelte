@@ -170,16 +170,17 @@
   const videoSupported = VideoNoteRecorder.supported();
   const canVideo = $derived(!!videoNote && videoSupported);
   /**
-   * Что записывает кнопка на телефоне — нажатие переключает, как в нативной Искре, и выбор
-   * помнится, пока открыт композер: кто шлёт «кружочки», шлёт их несколько. На десктопе кнопок
-   * две — микрофон и камера: клик начинает, переключать нечего.
+   * Что записывает кнопка — нажатие переключает, как в нативной Искре, и выбор помнится, пока
+   * открыт композер: кто шлёт «кружочки», шлёт их несколько. Кнопка одна и на телефоне, и на
+   * десктопе: щелчок мышью — переключить, удержание — записать. С клавиатуры Enter начинает
+   * запись без рук: удерживать клавишу — не жест.
    */
   let mode = $state<RecordKind>(canVoice ? 'voice' : 'video');
   $effect(() => {
     if (!canVoice && !canVideo) return;
     if (mode === 'video' && !canVideo) mode = 'voice';
   });
-  const kinds = $derived<RecordKind[]>(viewport.finePointer ? [...(canVideo ? ['video' as const] : []), ...(canVoice ? ['voice' as const] : [])] : [mode]);
+  const kinds = $derived<RecordKind[]>([mode]);
 
   /** Нажатие на кнопку записи, пока палец (или мышь) её держит. `started` — запись пошла. */
   let press = $state<{ x: number; y: number; at: number; id: number; kind: RecordKind; started: boolean } | null>(null);
@@ -254,13 +255,7 @@
     // Время самого ввода, а не обработчика: занятый кадр не должен делать нажатие удержанием.
     const current = { x: event.clientX, y: event.clientY, at: event.timeStamp, id: event.pointerId, kind, started: false };
     press = current;
-    if (event.pointerType === 'mouse') {
-      // Мышь — сразу: короткий клик — запись без рук, держать не нужно.
-      press = { ...current, started: true };
-      begin(kind, true);
-      return;
-    }
-    // Палец — после удержания: короткое касание переключает голосовое и видео.
+    // Запись — после удержания, пальцем и мышью одинаково: короткое нажатие переключает голосовое и видео.
     clearTimeout(arming);
     arming = setTimeout(() => {
       if (!press || press.id !== current.id) return;
@@ -543,10 +538,9 @@
           bind:this={buttons[kind]}
           type="button"
           class="send voice"
-          class:quiet={kinds.length > 1 && kind === 'video'}
           class:held={press?.kind === kind && press.started}
           aria-label={recordLabel(kind)}
-          title={viewport.finePointer || recording ? recordLabel(kind) : t('recording.hint')}
+          title={recording ? recordLabel(kind) : t('recording.hint')}
           onpointerdown={(event) => recordDown(event, kind)}
           onpointermove={recordMove}
           onpointerup={recordUp}
@@ -724,11 +718,6 @@
     background: var(--accent);
     color: var(--on-accent);
     cursor: pointer;
-  }
-  /* Камера рядом с микрофоном на десктопе — вторая, тише: главная кнопка одна. */
-  .voice.quiet {
-    background: transparent;
-    color: var(--color-text-secondary);
   }
   .voice-slot {
     position: relative;

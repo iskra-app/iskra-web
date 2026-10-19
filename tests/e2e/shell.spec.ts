@@ -54,7 +54,7 @@ test('манифест устанавливаемого приложения н�
 test('окно, закрываясь, не перекладывает содержимое в ряд, пока догорает', async ({ page }) => {
   await signInToDemo(page);
   await page.getByRole('button', { name: 'Новый чат или комната' }).click();
-  const dialog = page.getByRole('dialog', { name: 'Новый чат или комната' });
+  const dialog = page.getByRole('dialog', { name: 'Новый чат' });
   await expect(dialog).toBeVisible();
   await page.waitForTimeout(500);
   // Закрыть — и в следующем кадре, пока окно ещё на экране, посмотреть, как оно разложено.

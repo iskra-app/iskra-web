@@ -46,6 +46,12 @@
      видно, и диалог висел в пустоте. Серый `systemGray` поверх белого серит, поверх чёрного —
      высветляет, — одно значение на обе темы. */
   --color-scrim: rgb(120 120 128 / 0.4);
+  /* Кружок тумблера — белый в обеих темах, как у UISwitch, с лёгкой тенью от дорожки. */
+  --color-on-switch: #ffffff;
+  --shadow-switch-knob: 0 1px 4px rgb(0 0 0 / 0.2);
+  /* QR-код — чёрным по белому в любой теме: камера читает тёмное на светлом (`QRCodeImage` нативной). */
+  --color-qr-ground: #ffffff;
+  --color-qr-ink: #000000;
 
   /* Theme.Size */
   --size-avatar: 2.5rem; /* 40 */
@@ -69,6 +75,10 @@
   --size-video-note-camera-fit: 60dvh; /* кружок не выше, чем оставляют спуск и подсказка */
   --size-icon: 1.25rem; /* 20 — значок рядом с текстом */
   --size-icon-button: 1.5rem; /* 24 — значок в кнопке-иконке */
+  --size-switch-width: 3.25rem; /* 52 — тумблер, как UISwitch (51 × 31) по сетке 4 */
+  --size-switch-height: 2rem; /* 32 */
+  --size-switch-knob: 1.5rem; /* 24 — кружок с отступом --space-tight */
+  --size-qr-code: 15rem; /* 240 — Theme.Size.qrCode: камера возьмёт и через стол */
   --size-sign-in-mark: 3.5rem; /* 56 — Theme.Size.signInMark */
   --size-media-max-width: 20rem; /* 320 — фото в ленте */
   --size-media-max-height: 25rem; /* 400 — высокое фото не занимает весь экран */
@@ -107,6 +117,11 @@
   --timing-reaction: 180ms;
   --timing-deletion: 220ms;
   --timing-recording-pulse: 600ms; /* точка записи дышит — как RecordingStrip нативной */
+  /* Блок входа появляется из глубины: чуть крупнее, размытый и прозрачный — и садится на место. */
+  --timing-entrance: 600ms;
+  --ease-entrance: cubic-bezier(0.2, 0.8, 0.2, 1);
+  --scale-entrance: 1.2;
+  --blur-entrance: 12px;
 
   /* Движение — `Theme.Timing` нативной Искры. Пружина меню — Telegram'овская, число в число
      (`menuOpens`: response 0.265, damping 0.775) по форме, разложенная в точки для `linear()`: CSS своей

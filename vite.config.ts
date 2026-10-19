@@ -65,9 +65,6 @@ export default defineConfig({
   define: {
     __ISKRA_BUILD__: JSON.stringify(buildId()),
     __ISKRA_VERSION__: JSON.stringify(versionOf()),
-    // Ночная (nightly.web.iskra.wtf, из dev) или стабильная (web.iskra.wtf, из main). Ночную
-    // собирает CI с `ISKRA_CHANNEL=nightly`; `ISKRA_META_CSP` — тоже только её признак.
-    __ISKRA_CHANNEL__: JSON.stringify(process.env['ISKRA_CHANNEL'] === 'nightly' || process.env['ISKRA_META_CSP'] ? 'nightly' : 'stable'),
   },
   plugins: [
     svelte(),

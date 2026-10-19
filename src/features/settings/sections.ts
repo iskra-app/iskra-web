@@ -2,8 +2,8 @@ import type { SettingsSection } from '../../core/navigation/route';
 import type { TextKey } from '../../i18n/index.svelte.ts';
 
 /** Заголовок страницы раздела — тот же, что у строки, которая к ней ведёт. */
-/** Куда ведёт «Назад»: «Лицензии» открываются из «Об Iskra», остальное — из списка. */
-export const settingsParent: Partial<Record<SettingsSection, SettingsSection>> = { licences: 'about' };
+/** Куда ведёт «Назад»: «Лицензии» и «Бета-функции» открываются из «Об Iskra», остальное — из списка. */
+export const settingsParent: Partial<Record<SettingsSection, SettingsSection>> = { licences: 'about', beta: 'about' };
 
 export const settingsTitles: Record<SettingsSection, TextKey> = {
   profile: 'account.editTitle',
@@ -17,4 +17,5 @@ export const settingsTitles: Record<SettingsSection, TextKey> = {
   storage: 'settings.storage',
   about: 'settings.about',
   licences: 'about.licences',
+  beta: 'beta.title',
 };
