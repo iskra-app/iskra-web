@@ -27,11 +27,13 @@ import { ThumbnailCache } from '../media/thumbnails';
 import { RoomListStore } from '../rooms/roomListStore.svelte.ts';
 import { RoomDetailsStore } from '../rooms/roomDetails.svelte.ts';
 import { createDirect, createGroup } from '../rooms/create';
+import { joinByAddress, PublicRoomDirectory, searchPeople, type Person } from '../rooms/directory.svelte.ts';
 import { TimelineStore } from '../timeline/timelineStore.svelte.ts';
 import { canForward, forwardContent } from '../timeline/forward';
 import type { Message } from '../timeline/message';
 import { RecoveryStore } from '../encryption/recovery.svelte.ts';
 import { SecretStorageKeyHolder } from '../encryption/secretStorageKey';
+import { IdentityChangesStore } from '../encryption/identityChanges.svelte.ts';
 import { VerificationStore } from '../encryption/verification.svelte.ts';
 import { deleteDatabase } from '../storage/idb';
 import { fromBase64 } from '../storage/secretBox';
@@ -129,6 +131,11 @@ export class UserSession {
     return new TimelineStore(this.client, roomId, uploadClientFor(this.client, this.account.method === 'demo' ? fetchFor(true) : undefined));
   }
 
+  /** Кто в комнате сменил ключи. Живёт, пока открыт чат, — как и лента. */
+  identityChanges(roomId: string): IdentityChangesStore {
+    return new IdentityChangesStore(this.client, roomId);
+  }
+
   /**
    * Переслать сообщения в чаты — по порядку ленты, в каждый чат по очереди; комментарий —
    * следом, своим сообщением (порядок Telegram: сначала что передают, потом что о нём сказать).
@@ -186,6 +193,12 @@ export class UserSession {
     return this.uploadLimitValue;
   }
 
+  /**
+   * Черновики аккаунта — для строк списка: «Черновик: …» на месте последнего сообщения, как в
+   * нативной. Живут здесь, а не в сводке комнаты: SDK о них не знает и не скажет, что поменялось.
+   */
+  drafts = $state.raw<Record<string, string>>({});
+
   /** Черновик чата — под ключом аккаунта (`vault`). Не прочитался — пусто, а не ошибка. */
   async draft(roomId: string): Promise<string> {
     return vault.draft(this.userId, roomId).catch(() => '');
@@ -193,6 +206,13 @@ export class UserSession {
 
   /** Пустой — стереть. Не записался — не повод мешать человеку печатать. */
   async saveDraft(roomId: string, text: string): Promise<void> {
+    const trimmed = text.trim() ? text : '';
+    if ((this.drafts[roomId] ?? '') !== trimmed) {
+      const next = { ...this.drafts };
+      if (trimmed) next[roomId] = trimmed;
+      else delete next[roomId];
+      this.drafts = next;
+    }
     await vault.saveDraft(this.userId, roomId, text).catch(() => {});
   }
 
@@ -237,8 +257,23 @@ export class UserSession {
     return createDirect(this.client, userId);
   }
 
-  createGroup(name: string, open: boolean): Promise<string> {
-    return createGroup(this.client, name, open);
+  createGroup(name: string, open: boolean, topic = ''): Promise<string> {
+    return createGroup(this.client, name, open, topic);
+  }
+
+  /** Люди в каталоге сервера — для поиска в «Новом чате». */
+  searchPeople(term: string): Promise<Person[]> {
+    return searchPeople(this.client, term);
+  }
+
+  /** Каталог открытых комнат. Живёт, пока открыт его экран. */
+  publicRooms(): PublicRoomDirectory {
+    return new PublicRoomDirectory(this.client);
+  }
+
+  /** Войти в комнату по адресу или ID — или из каталога. */
+  joinRoom(address: string): Promise<string> {
+    return joinByAddress(this.client, address);
   }
 
   // ————— Профиль, устройства, аккаунт —————
@@ -366,6 +401,7 @@ export class UserSession {
     session.listen(events);
     // До синхронизации: иначе список на миг покажет `anna_1987`, а потом «Маму».
     await session.localNames.load();
+    session.drafts = await vault.drafts(account.userId).catch(() => ({}));
     await client.startClient({
       initialSyncLimit: 20,
       lazyLoadMembers: true,

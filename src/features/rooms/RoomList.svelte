@@ -24,6 +24,10 @@
   import { folderSelection } from './folderSelection.svelte.ts';
   import { roomsOf } from '../../core/rooms/folders';
   import { roomName } from './text';
+  import Menu from '../../design/Menu.svelte';
+  import FolderMembership from './FolderMembership.svelte';
+  import ChatPeek, { type PeekAction } from './ChatPeek.svelte';
+  import { hasUnread } from '../../core/rooms/types';
 
   let { session }: { session: UserSession } = $props();
 
@@ -79,6 +83,52 @@
     router.go({ name: 'room', roomId: room.id });
   }
 
+  // ————— Меню строки — то, что в нативной под «подглядыванием» —————
+
+  let menu = $state<{ room: RoomSummary; at: { x: number; y: number }; sheet: boolean } | null>(null);
+  let choosingFolders = $state<RoomSummary | null>(null);
+
+  let peeking = $state<RoomSummary | null>(null);
+
+  /** Подглядеть: меню уступает место карточке. */
+  function peekAt(room: RoomSummary) {
+    menu = null;
+    peeking = room;
+  }
+
+  /**
+   * Что можно сделать со строкой — пункты «подглядывания» нативной, по порядку: под карточкой
+   * и в меню одни и те же. Каждый закрывает то, откуда нажат; не вышло — сказать.
+   */
+  function rowActions(room: RoomSummary): PeekAction[] {
+    const rooms = session.rooms;
+    const act = (task: () => Promise<boolean> | void, failed?: TextKey) => () => {
+      menu = null;
+      peeking = null;
+      const result = task();
+      if (result && failed) void result.then((ok) => !ok && (failure = failed));
+    };
+    return [
+      { label: t('roomList.peek.open'), run: act(() => open(room)) },
+      hasUnread(room)
+        ? { label: t('roomList.peek.markRead'), run: act(() => rooms.markRead(room.id), 'roomAction.readFailed') }
+        : { label: t('roomList.peek.markUnread'), run: act(() => rooms.markUnread(room.id), 'roomAction.readFailed') },
+      {
+        label: t(room.isFavourite ? 'roomList.swipe.unpin' : 'roomList.swipe.pin'),
+        run: act(() => rooms.setPinned(room.id, !room.isFavourite), 'roomAction.pinFailed'),
+      },
+      ...(room.kind === 'space'
+        ? []
+        : [
+            {
+              label: t(room.isLowPriority ? 'roomList.swipe.unarchive' : 'roomList.swipe.archive'),
+              run: act(() => rooms.setArchived(room.id, !room.isLowPriority), 'roomAction.archiveFailed'),
+            },
+          ]),
+      ...(folders.length > 0 ? [{ label: t('folders.addToFolder'), run: act(() => void (choosingFolders = room)) }] : []),
+    ];
+  }
+
   /** ↑/↓ — по строкам списка. */
   function onkeydown(event: KeyboardEvent) {
     if (event.key !== 'ArrowDown' && event.key !== 'ArrowUp') return;
@@ -124,18 +174,49 @@
   {:else}
     {#if view.kind === 'all' && !folder && organized.archived.length > 0}
       <button type="button" class="archive" onclick={() => (view = { kind: 'archive' })}>
-        {t('roomList.archive.entry', { count: organized.archived.length })}
+        <Icon name="archive" />
+        <span>{t('roomList.archive.title')}</span>
       </button>
     {/if}
     {#each shown as room (room.id)}
       {#if room.membership === 'invite'}
         <InviteRow {room} {session} onfailure={(key) => (failure = key)} />
       {:else}
-        <RoomRow {room} {session} {now} selected={room.id === selectedId} onopen={() => open(room)} />
+        <RoomRow
+          {room}
+          {session}
+          {now}
+          selected={room.id === selectedId}
+          onopen={() => open(room)}
+          onmenu={(at, sheet) => (sheet && room.kind !== 'space' ? (peeking = room) : (menu = { room, at, sheet }))}
+        />
       {/if}
     {/each}
   {/if}
 </div>
+
+<Menu
+  open={!!menu}
+  x={menu?.at.x ?? 0}
+  y={menu?.at.y ?? 0}
+  sheet={menu?.sheet ?? false}
+  label={t('roomList.menuWeb', { name: menu ? roomName(menu.room) : '' })}
+  onclose={() => (menu = null)}
+>
+  {#if menu}
+    {@const room = menu.room}
+    {#if room.kind !== 'space'}
+      <button type="button" role="menuitem" onclick={() => peekAt(room)}>{t('roomList.peek.peek')}</button>
+    {/if}
+    {#each rowActions(room) as action (action.label)}
+      <button type="button" role="menuitem" onclick={action.run}>{action.label}</button>
+    {/each}
+  {/if}
+</Menu>
+
+<ChatPeek room={peeking} {session} actions={peeking ? rowActions(peeking) : []} onclose={() => (peeking = null)} />
+
+<FolderMembership room={choosingFolders} {session} onclose={() => (choosingFolders = null)} />
 
 <style>
   .list {
@@ -155,8 +236,11 @@
     font-size: var(--font-size-body);
     font-weight: 600;
   }
+  /* Значок и «Архив», без числа — как `archiveEntry` нативной: архив — полка, а не счётчик. */
   .archive {
-    display: block;
+    display: flex;
+    align-items: center;
+    gap: var(--space-close);
     width: calc(100% - 2 * var(--space-tight));
     min-height: var(--tap-target);
     margin: var(--space-close) var(--space-tight);
@@ -165,8 +249,13 @@
     border-radius: var(--radius-control);
     background: transparent;
     color: var(--color-text-secondary);
+    font-weight: 500;
     text-align: start;
     cursor: pointer;
+  }
+  .archive :global(svg) {
+    width: var(--size-icon);
+    height: var(--size-icon);
   }
   /* Наведение — только там, где указатель умеет наводиться: на телефоне тап оставлял бы «залипшую» подсветку. */
   @media (hover: hover) {

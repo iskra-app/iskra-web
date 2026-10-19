@@ -17,6 +17,7 @@
   что запись идёт.
 -->
 <script lang="ts">
+  import { ICON_VIEWBOX, icons } from '../../design/icons.ts';
   import Waveform from '../../design/Waveform.svelte';
   import { duration } from '../../design/time';
   import { t } from '../../i18n/index.svelte.ts';
@@ -70,8 +71,8 @@
 <div class="strip" class:camera={onCamera} role="group" aria-label={onCamera ? t('videoNote.recording') : t('voice.recording')}>
   {#if !live && url}
     <button type="button" class="play" aria-label={playing ? t('message.media.pause') : t('message.media.play')} title={playing ? t('message.media.pause') : t('message.media.play')} onclick={toggle}>
-      <svg viewBox="0 0 24 24" aria-hidden="true">
-        {#if playing}<path d="M8 5v14M16 5v14" />{:else}<path d="M7 4.5v15l12-7.5z" />{/if}
+      <svg viewBox={ICON_VIEWBOX} aria-hidden="true">
+        {#if playing}<path d={icons.pause} />{:else}<path d={icons.play} />{/if}
       </svg>
     </button>
     <audio
@@ -159,10 +160,6 @@
     width: var(--size-icon);
     height: var(--size-icon);
     fill: currentColor;
-    stroke: currentColor;
-    stroke-width: 2;
-    stroke-linecap: round;
-    stroke-linejoin: round;
   }
   .clock {
     flex: none;

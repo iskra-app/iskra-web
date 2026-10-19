@@ -108,7 +108,12 @@ describe('список чатов на демо-сервере', () => {
     expect(hasUnread(quiet)).toBe(true);
     expect(emphasisOf(quiet)).toBe('muted');
 
-    expect(hasUnread(store.get(demoRooms.history)!)).toBe(false);
+    // Борис отреагировал на последнее Алисы после её отметки: сердечко, а не непрочитанное.
+    const history = store.get(demoRooms.history)!;
+    expect(history).toMatchObject({ unreadReactions: 1, unreadCount: 0, hasUnreadMessages: false });
+    expect(hasUnread(history)).toBe(false);
+    // В «Выходных» реакции — на чужие сообщения: сердечка нет.
+    expect(weekend.unreadReactions).toBe(0);
     // Приглашение, личный с двумя, группа с упоминанием; беззвучный не в счёт.
     expect(store.badge).toBe(3);
   });

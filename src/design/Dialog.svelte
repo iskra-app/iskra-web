@@ -4,15 +4,22 @@
 -->
 <script lang="ts">
   import type { Snippet } from 'svelte';
+  import Icon from './Icon.svelte';
+  import IconButton from './IconButton.svelte';
   import { whenClosed } from './motion';
 
   interface Props {
     open: boolean;
     title: string;
     onclose: () => void;
+    /**
+     * Окно со страницами внутри («Новый чат» → «Новая комната»): стрелка у заголовка, и `Esc`
+     * возвращает на прежнюю страницу, а не закрывает окно. Подпись — у того, кто открыл.
+     */
+    back?: { label: string; onclick: () => void };
     children: Snippet;
   }
-  let { open, title, onclose, children }: Props = $props();
+  let { open, title, onclose, back, children }: Props = $props();
 
   let dialog: HTMLDialogElement | undefined = $state();
   const id = $props.id();
@@ -30,11 +37,24 @@
       return whenClosed(dialog, () => (shown = false));
     }
   });
+
+  function oncancel(event: Event) {
+    if (!back) return;
+    event.preventDefault();
+    back.onclick();
+  }
 </script>
 
-<dialog bind:this={dialog} data-motion="pop" aria-labelledby="{id}-title" {onclose}>
+<dialog bind:this={dialog} data-motion="pop" aria-labelledby="{id}-title" {onclose} {oncancel}>
   {#if open || shown}
-    <h2 id="{id}-title">{title}</h2>
+    {#if back}
+      <div class="heading">
+        <IconButton label={back.label} onclick={back.onclick}><Icon name="back" /></IconButton>
+        <h2 id="{id}-title">{title}</h2>
+      </div>
+    {:else}
+      <h2 id="{id}-title">{title}</h2>
+    {/if}
     {@render children()}
   {/if}
 </dialog>
@@ -51,16 +71,27 @@
     box-shadow: 0 var(--space-close) var(--space-generous) rgb(0 0 0 / 0.25);
     overflow-y: auto;
   }
-  dialog[open] {
-    display: flex;
+  /* Колонка — у окна всегда, а не только открытого: закрывающееся ещё догорает (`display` с
+     `allow-discrete` в `base.css`), `[open]` с него уже снят — и содержимое вставало в ряд. */
+  dialog {
     flex-direction: column;
     gap: var(--space-normal);
   }
+  dialog[open] {
+    display: flex;
+  }
   dialog::backdrop {
-    background: rgb(0 0 0 / var(--backdrop-menu-scrim));
+    background: var(--color-scrim);
   }
   h2 {
     margin: 0;
     font-size: var(--font-size-title);
+  }
+  /* Стрелка — на месте отступа окна: заголовок остаётся вровень с остальным. */
+  .heading {
+    display: flex;
+    align-items: center;
+    gap: var(--space-tight);
+    margin-inline-start: calc(-1 * var(--space-normal));
   }
 </style>

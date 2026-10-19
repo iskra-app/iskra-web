@@ -46,3 +46,13 @@ test('сервер нашёлся — «Войти» и «Создать акк�
   await page.getByRole('button', { name: 'Изменить' }).click();
   await expect(page.getByRole('textbox', { name: 'Адрес аккаунта' })).toHaveValue(DEMO_ADDRESS);
 });
+
+test('внизу экрана входа — версия и сборка; не на web.iskra.wtf — пометка nightly и ссылка на стабильную', async ({ page }) => {
+  await openApp(page);
+  await expect(page.getByText(/^Версия \d{4}\.\d{2}\.\d{2} · сборка \w+$/)).toBeVisible();
+  // Стабильная — только на своём адресе; тесты гоняют сборку на localhost, и это ночная.
+  await expect(page.getByText('nightly', { exact: true })).toBeVisible();
+  await expect(page.getByRole('link', { name: 'Стабильная версия' })).toHaveAttribute('href', 'https://web.iskra.wtf/');
+  // Сайт Искры — в любой сборке.
+  await expect(page.getByRole('link', { name: 'iskra.wtf' })).toHaveAttribute('href', 'https://iskra.wtf');
+});

@@ -224,3 +224,23 @@ test('автозагрузка «Никогда»: чужое фото — ра�
   await expect(waiting).toHaveCount(1);
   expect(problems).toEqual([]);
 });
+
+test('альбом: три фото, отправленные разом, — один пузырь с подписью; плитка открывает просмотрщик на себе', async ({ page }) => {
+  const problems = watchForProblems(page);
+  await signInToDemo(page);
+  await openRoom(page, /^Дом 14/);
+  const album = page.getByRole('log').getByRole('article').filter({ hasText: 'Двор сейчас' });
+  await expect(album).toHaveCount(1);
+  const tiles = album.getByRole('button', { name: 'Фото' });
+  await expect(tiles).toHaveCount(3);
+  // Плитки — внутри одной рамки, без наложений: вторая и третья не там же, где первая.
+  const boxes = await Promise.all([0, 1, 2].map(async (i) => (await tiles.nth(i).boundingBox())!));
+  expect(new Set(boxes.map((b) => `${Math.round(b.x)},${Math.round(b.y)}`)).size).toBe(3);
+  await tiles.nth(1).click();
+  const viewer = page.getByRole('dialog', { name: 'Фото' });
+  await expect(viewer).toBeVisible();
+  await expect(viewer.getByRole('status')).toHaveText('2 из 3');
+  await page.keyboard.press('Escape');
+  await expect(viewer).toBeHidden();
+  expect(problems).toEqual([]);
+});

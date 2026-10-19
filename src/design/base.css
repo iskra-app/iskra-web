@@ -15,6 +15,13 @@ body {
   height: 100%;
 }
 
+/* По-японски и по-китайски пробелов между словами нет — переносить по фразам, а не посреди
+   слова (где браузер это умеет). */
+:lang(ja),
+:lang(zh) {
+  word-break: auto-phrase;
+}
+
 body {
   background: var(--color-background);
   color: var(--color-text);
@@ -181,4 +188,53 @@ dialog[data-motion][open]::backdrop {
   overflow: hidden;
   clip-path: inset(50%);
   white-space: nowrap;
+}
+
+/*
+ * Любой флажок — тумблер, как в нативной Искре: дорожка и кружок, включённое — акцентом.
+ * Нарисован поверх настоящего `<input type="checkbox">`, поэтому `bind:checked`, клавиатура,
+ * `disabled` и роль для чтеца экрана остаются его, а не самодельные.
+ */
+input[type='checkbox'] {
+  appearance: none;
+  position: relative;
+  flex: none;
+  width: var(--size-switch-width);
+  height: var(--size-switch-height);
+  margin: 0;
+  border-radius: var(--radius-circle);
+  background: var(--color-separator);
+  cursor: pointer;
+  transition: background-color var(--timing-chrome) ease-out;
+}
+input[type='checkbox']::before {
+  content: '';
+  position: absolute;
+  inset-block-start: var(--space-tight);
+  inset-inline-start: var(--space-tight);
+  width: var(--size-switch-knob);
+  height: var(--size-switch-knob);
+  border-radius: var(--radius-circle);
+  background: var(--color-on-switch);
+  box-shadow: var(--shadow-switch-knob);
+  transition: translate var(--timing-chrome) ease-out;
+}
+input[type='checkbox']:checked {
+  background: var(--accent);
+}
+input[type='checkbox']:checked::before {
+  translate: calc(var(--size-switch-width) - var(--size-switch-knob) - 2 * var(--space-tight)) 0;
+}
+input[type='checkbox']:checked:dir(rtl)::before {
+  translate: calc(-1 * (var(--size-switch-width) - var(--size-switch-knob) - 2 * var(--space-tight))) 0;
+}
+input[type='checkbox']:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+@media (prefers-reduced-motion: reduce) {
+  input[type='checkbox'],
+  input[type='checkbox']::before {
+    transition: none;
+  }
 }

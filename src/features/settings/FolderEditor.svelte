@@ -127,7 +127,7 @@
           <label class="chat">
             <span class="face"><RoomFace {room} {session} /></span>
             <span class="chat-name">{roomName(room)}</span>
-            <input type="checkbox" bind:group={chosen} value={room.id} />
+            <input type="checkbox" role="switch" bind:group={chosen} value={room.id} />
           </label>
         </li>
       {/each}
@@ -197,11 +197,6 @@
     justify-content: space-between;
   }
   .switch input,
-  .chat input {
-    width: var(--size-icon);
-    height: var(--size-icon);
-    accent-color: var(--accent);
-  }
   .face {
     --avatar-size: var(--size-avatar-small);
     display: flex;

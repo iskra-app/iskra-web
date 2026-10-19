@@ -21,8 +21,12 @@ export const photoCompression: Record<MediaCompression, { side: number; quality:
 /** Без сжатия, но без метаданных — перекодировать почти без потерь, в исходном размере. */
 const UNCOMPRESSED_QUALITY = 0.92;
 
-/** Когда фото и видео в ленте загружаются сами — три ответа Telegram, как в нативной. */
-export const autoDownloads = ['always', 'wifi', 'never'] as const;
+/**
+ * Когда фото и видео в ленте загружаются сами. У нативной (и Telegram) есть третий ответ —
+ * «только по Wi-Fi», — но браузер сеть почти не различает (только Chromium, и то не всегда):
+ * обещать его здесь — обещать то, что в Safari и Firefox молча не работает.
+ */
+export const autoDownloads = ['always', 'never'] as const;
 export type MediaAutoDownload = (typeof autoDownloads)[number];
 
 export interface MediaSendSettings {
@@ -60,18 +64,4 @@ export function renamed(name: string, mimetype: string): string {
   const ext = mimetype === 'image/png' ? 'png' : mimetype === 'image/webp' ? 'webp' : 'jpg';
   const base = name.replace(/\.[^./]+$/, '');
   return `${base || 'image'}.${ext}`;
-}
-
-/**
- * Дорогая ли сеть. Знает только Chromium (`navigator.connection`): мобильная сеть или
- * «экономия трафика». Где браузер не говорит — считаем, что нет: молча не показывать фото
- * хуже, чем показать.
- */
-export function onExpensiveNetwork(): boolean {
-  const connection = (navigator as Navigator & { connection?: { type?: string; saveData?: boolean } }).connection;
-  return !!connection && (connection.saveData === true || connection.type === 'cellular');
-}
-
-export function allowsAutoDownload(choice: MediaAutoDownload, expensive = onExpensiveNetwork()): boolean {
-  return choice === 'always' || (choice === 'wifi' && !expensive);
 }

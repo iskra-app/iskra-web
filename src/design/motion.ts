@@ -44,7 +44,7 @@ interface Motion {
 const easeOut = (t: number): number => 1 - Math.pow(1 - t, 3);
 
 /** Лист выезжает с края (справа — в письме слева направо) и уезжает туда же. */
-export function slideFromEnd(_node: Element, { duration = 300 }: { duration?: number } = {}): Motion {
+export function slideFromEnd(_node: Element, { duration = 220 }: { duration?: number } = {}): Motion {
   const rtl = typeof document !== 'undefined' && document.dir === 'rtl';
   return {
     duration: reducedMotion() ? 0 : duration,
@@ -54,6 +54,6 @@ export function slideFromEnd(_node: Element, { duration = 300 }: { duration?: nu
 }
 
 /** Проявиться и погаснуть — подложка под листом. */
-export function fadeInOut(_node: Element, { duration = 200 }: { duration?: number } = {}): Motion {
+export function fadeInOut(_node: Element, { duration = 150 }: { duration?: number } = {}): Motion {
   return { duration: reducedMotion() ? 0 : duration, easing: easeOut, css: (t) => `opacity: ${t}` };
 }

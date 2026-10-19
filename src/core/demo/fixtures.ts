@@ -24,6 +24,8 @@ export const demoProfiles: Record<string, { displayname: string }> = {
   [demoUsers.anya]: { displayname: 'Аня' },
   [demoUsers.boris]: { displayname: 'Борис' },
   [demoUsers.vera]: { displayname: 'Вера' },
+  // Её нет ни в одном чате — находится только каталогом сервера, как незнакомый человек.
+  [`@lena:${DEMO_SERVER}`]: { displayname: 'Лена' },
 };
 
 export const demoRooms = {
@@ -60,6 +62,8 @@ export interface DemoRoom {
   fullyRead?: string;
   /** Теги комнаты: `m.favourite` — закреплённый, `m.lowpriority` — архив. */
   tags?: Record<string, Record<string, unknown>>;
+  /** Данные комнаты, кроме тегов и маркера, — метка «непрочитано» (`m.marked_unread`). */
+  accountData?: Record<string, unknown>;
 }
 
 export interface DemoInvite {
@@ -119,6 +123,20 @@ function stamp(roomId: string, events: DemoEvent[], now: number, endsMinutesAgo:
     event_id: event.event_id ?? `$${slug}-${index}`,
     origin_server_ts: now - (endsMinutesAgo + (events.length - 1 - index) * step) * MINUTE,
   }));
+}
+
+function photo(sender: string, id: string, w: number, h: number, caption?: string): DemoEvent {
+  return {
+    type: 'm.room.message',
+    sender,
+    content: {
+      msgtype: 'm.image',
+      body: caption ?? `${id}.svg`,
+      ...(caption ? { filename: `${id}.svg` } : {}),
+      url: `mxc://${DEMO_SERVER}/${id}`,
+      info: { w, h, mimetype: 'image/svg+xml' },
+    },
+  };
 }
 
 export function buildDemoWorld(now: number): { rooms: DemoRoom[]; invites: DemoInvite[] } {
@@ -245,19 +263,30 @@ export function buildDemoWorld(now: number): { rooms: DemoRoom[]; invites: DemoI
         formatted_body:
           '<p><b>Повестка</b> — <a href="https://example.org/agenda">полностью здесь</a></p><ul><li>лифт</li><li>двор</li></ul><img src="mxc://demo.iskra.invalid/plan" alt="схема двора"><script>alert(1)</script>',
       }),
+      // Альбом: три фото подряд, с разницей в секунды, — одним пузырём (`album.ts`).
+      photo(boris, 'yard', 900, 900, 'Двор сейчас'),
+      photo(boris, 'forest', 800, 1000),
+      photo(boris, 'lake', 1200, 800),
       text(vera, 'Лифт опять не работает'),
     ],
     now,
     60 * 5,
     30,
+  ).map((event, index, all) =>
+    // Отправлены разом: через четыре секунды друг за другом, а не через полчаса, как прочее.
+    index > 2 && index < 5 ? { ...event, origin_server_ts: all[2]!.origin_server_ts! + (index - 2) * 4_000 } : event,
   );
 
   const history = demoRooms.history;
   const historyTimeline = stamp(
     history,
-    Array.from({ length: 400 }, (_, i) =>
-      text(i % 3 === 0 ? alice : i % 3 === 1 ? boris : vera, `Сообщение номер ${i + 1}`),
-    ),
+    [
+      ...Array.from({ length: 400 }, (_, i) =>
+        text(i % 3 === 0 ? alice : i % 3 === 1 ? boris : vera, `Сообщение номер ${i + 1}`),
+      ),
+      // Последнее — Алисы, и прочитано; Борис отреагировал позже — сердечко в строке, не число.
+      { type: 'm.reaction', sender: boris, content: { 'm.relates_to': { rel_type: 'm.annotation', event_id: '$history-399', key: '👍' } } },
+    ],
     now,
     60 * 26,
     3,
@@ -305,7 +334,7 @@ export function buildDemoWorld(now: number): { rooms: DemoRoom[]; invites: DemoI
           { type: 'm.room.name', sender: alice, state_key: '', content: { name: 'Длинная история' }, event_id: `$name-${history}` },
         ]),
         timeline: historyTimeline,
-        readUpTo: historyTimeline[historyTimeline.length - 1]!.event_id!,
+        readUpTo: '$history-399',
       },
       {
         roomId: demoRooms.archived,
@@ -358,3 +387,43 @@ export const demoDirect = { [demoUsers.anya]: [demoRooms.anya] };
 
 /** Беззвучные комнаты — правилом `override` без действий, как их пишут клиенты. */
 export const demoMutedRooms = [demoRooms.quiet];
+
+/**
+ * Каталог открытых комнат демо-сервера (`/publicRooms`): Алисы в них нет, пока она не вошла.
+ * Одна — только по приглашению: в каталоге видна, а войти нельзя.
+ */
+export interface DemoPublicRoom {
+  roomId: string;
+  alias: string;
+  name: string;
+  topic: string;
+  members: string[];
+  joinRule: 'public' | 'invite';
+}
+
+export const demoDirectory: DemoPublicRoom[] = [
+  {
+    roomId: `!lounge:${DEMO_SERVER}`,
+    alias: `#lounge:${DEMO_SERVER}`,
+    name: 'Гостиная',
+    topic: 'Обо всём и ни о чём',
+    members: [demoUsers.boris, demoUsers.vera],
+    joinRule: 'public',
+  },
+  {
+    roomId: `!hiking:${DEMO_SERVER}`,
+    alias: `#hiking:${DEMO_SERVER}`,
+    name: 'Походы',
+    topic: 'Маршруты выходного дня',
+    members: [demoUsers.anya],
+    joinRule: 'public',
+  },
+  {
+    roomId: `!council:${DEMO_SERVER}`,
+    alias: `#council:${DEMO_SERVER}`,
+    name: 'Совет дома',
+    topic: 'Только для жильцов',
+    members: [demoUsers.vera],
+    joinRule: 'invite',
+  },
+];

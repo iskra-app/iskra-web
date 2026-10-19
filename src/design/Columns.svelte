@@ -131,7 +131,7 @@
       <!-- Скрим — только указатель; с клавиатуры лист закрывает Esc. -->
       <div class="scrim" aria-hidden="true" onclick={() => onClosePanel?.()} transition:fadeInOut></div>
     {/if}
-    <aside class="panel" class:sheet={panelAsSheet} transition:slideFromEnd={{ duration: panelAsSheet ? 300 : 0 }}>
+    <aside class="panel" class:sheet={panelAsSheet} transition:slideFromEnd={{ duration: panelAsSheet ? 220 : 0 }}>
       {@render panel()}
     </aside>
   {/if}
@@ -142,8 +142,6 @@
     position: relative;
     display: grid;
     height: 100%;
-    max-width: var(--column-app-max);
-    margin-inline: auto;
     overflow: hidden;
   }
 
@@ -231,7 +229,7 @@
     position: absolute;
     inset: 0;
     z-index: 10;
-    background: rgb(0 0 0 / var(--backdrop-menu-scrim));
+    background: var(--color-scrim);
   }
 
   .panel.sheet {

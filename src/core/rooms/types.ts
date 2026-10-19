@@ -50,15 +50,36 @@ export interface RoomSummary {
   mentionCount: number;
   /** Есть новое после отметки о прочтении — хоть бы и без уведомлений. */
   hasUnreadMessages: boolean;
+  /**
+   * Чужие реакции на мои сообщения после отметки о прочтении — сердечко в строке, а не число:
+   * реакция — ответ на прочитанное, и считать её сообщением — звать в чат, где нового нет.
+   */
+  unreadReactions: number;
   isMarkedUnread: boolean;
   isMuted: boolean;
   isFavourite: boolean;
   isLowPriority: boolean;
 
   preview?: Preview;
+  /**
+   * Кто написал последнее, если не я, — группа ставит его отдельной строкой над словами, как
+   * Telegram: «приду в семь» без того, чьё оно, ничего не говорит.
+   */
+  lastSender?: string;
+  /** Докуда дошло моё последнее; `undefined` — последнее не моё. */
+  lastMark?: LastMark;
+  /** Кто-то, кроме меня, сейчас печатает. */
+  typing: boolean;
+  /** Сколько вошло — для «N участников» под именем в шапке чата. */
+  memberCount: number;
+  /** Собеседник личного чата — его Matrix ID под именем в шапке. */
+  counterpartId?: string;
   /** Мс с эпохи — по нему сортировка. */
   lastActivity: number;
 }
+
+/** Отметка своего последнего сообщения в строке — те же, что у пузыря в ленте. */
+export type LastMark = 'sending' | 'sent' | 'read' | 'failed';
 
 export const hasUnread = (room: RoomSummary): boolean =>
   room.unreadCount > 0 || room.hasUnreadMessages || room.isMarkedUnread;

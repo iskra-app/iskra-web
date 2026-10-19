@@ -122,7 +122,7 @@
     border-radius: var(--radius-menu) var(--radius-menu) 0 0;
   }
   dialog.sheet::backdrop {
-    background: rgb(0 0 0 / var(--backdrop-menu-scrim));
+    background: var(--color-scrim);
   }
   .menu {
     display: flex;

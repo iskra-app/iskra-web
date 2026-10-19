@@ -4,6 +4,7 @@
   раскрывается в панель на том же месте. Под реакциями — действия, внизу — когда отправлено.
 -->
 <script lang="ts">
+  import { ICON_VIEWBOX, icons } from '../../design/icons.ts';
   import { tick } from 'svelte';
   import Menu from '../../design/Menu.svelte';
   import { clock } from '../../design/time';
@@ -89,7 +90,7 @@
           document.querySelector<HTMLElement>('.panel .cell')?.focus();
         }}
       >
-        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14" /></svg>
+        <svg viewBox={ICON_VIEWBOX} aria-hidden="true"><path d={icons.plus} /></svg>
       </button>
     </div>
     {#if actions.canReply}
@@ -157,10 +158,7 @@
   .more svg {
     width: var(--size-icon);
     height: var(--size-icon);
-    fill: none;
-    stroke: currentColor;
-    stroke-width: 2;
-    stroke-linecap: round;
+    fill: currentColor;
   }
   .reactions button.mine {
     background: var(--color-own-reaction);

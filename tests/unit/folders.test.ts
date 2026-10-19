@@ -5,8 +5,8 @@ import type { RoomSummary } from '../../src/core/rooms/types';
 function room(id: string, fields: Partial<RoomSummary> = {}): RoomSummary {
   return {
     id, avatarSeed: id, faces: [], kind: 'group', encrypted: true, membership: 'join',
-    unreadCount: 0, mentionCount: 0, hasUnreadMessages: false, isMarkedUnread: false,
-    isMuted: false, isFavourite: false, isLowPriority: false, lastActivity: 0, ...fields,
+    unreadCount: 0, mentionCount: 0, hasUnreadMessages: false, unreadReactions: 0, isMarkedUnread: false,
+    isMuted: false, isFavourite: false, isLowPriority: false, typing: false, memberCount: 2, lastActivity: 0, ...fields,
   };
 }
 

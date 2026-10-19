@@ -42,7 +42,18 @@
   --backdrop-blur: 24px;
   --backdrop-wash: 0.12;
   --backdrop-plate: 0.45;
-  --backdrop-menu-scrim: 0.4;
+  /* Theme.Opacity.warningWash — подложка серьёзного предупреждения (смена проверенных ключей). */
+  --warning-wash: 14%;
+  /* Затемнение за диалогом и листом — серое, не чёрное: в тёмной теме чёрное по чёрному не
+     видно, и диалог висел в пустоте. Серый `systemGray` поверх белого серит, поверх чёрного —
+     высветляет, — одно значение на обе темы. */
+  --color-scrim: rgb(120 120 128 / 0.4);
+  /* Кружок тумблера — белый в обеих темах, как у UISwitch, с лёгкой тенью от дорожки. */
+  --color-on-switch: #ffffff;
+  --shadow-switch-knob: 0 1px 4px rgb(0 0 0 / 0.2);
+  /* QR-код — чёрным по белому в любой теме: камера читает тёмное на светлом (`QRCodeImage` нативной). */
+  --color-qr-ground: #ffffff;
+  --color-qr-ink: #000000;
 
   /* Theme.Size */
   --size-avatar: 2.5rem; /* 40 */
@@ -52,6 +63,7 @@
   --size-avatar-profile: 6rem; /* 96 */
   --size-room-avatar: 3.5rem; /* 56 — Theme.Size.roomAvatar; под мышью меньше, см. ниже */
   --size-unread-badge: 1.25rem; /* 20 — Theme.Size.unreadBadge: высота значка и ширина «@» */
+  --size-unread-heart: 0.75rem; /* 12 — сердечко в значке: половина его, как у нативной, до сетки 4 */
   --size-navigation-bar: 2.75rem; /* 44 */
   --size-sign-in-column: 26.25rem; /* 420 */
   --size-menu-width: 15rem; /* 240 */
@@ -66,6 +78,10 @@
   --size-video-note-camera-fit: 60dvh; /* кружок не выше, чем оставляют спуск и подсказка */
   --size-icon: 1.25rem; /* 20 — значок рядом с текстом */
   --size-icon-button: 1.5rem; /* 24 — значок в кнопке-иконке */
+  --size-switch-width: 3.25rem; /* 52 — тумблер, как UISwitch (51 × 31) по сетке 4 */
+  --size-switch-height: 2rem; /* 32 */
+  --size-switch-knob: 1.5rem; /* 24 — кружок с отступом --space-tight */
+  --size-qr-code: 15rem; /* 240 — Theme.Size.qrCode: камера возьмёт и через стол */
   --size-sign-in-mark: 3.5rem; /* 56 — Theme.Size.signInMark */
   --size-media-max-width: 20rem; /* 320 — фото в ленте */
   --size-media-max-height: 25rem; /* 400 — высокое фото не занимает весь экран */
@@ -85,6 +101,8 @@
   --size-attachment-tile: 4.5rem; /* 72 — вложение в лотке над полем */
   --size-wallpaper-tile-width: 3.5rem; /* 56 — плитка обоев: вытянута, как экран */
   --size-wallpaper-tile-height: 5rem; /* 80 */
+  --size-peek-height: 40rem; /* 640 — Theme.Size.peekHeight: лента «подглядывания» */
+  --size-peek-fit: 50dvh; /* и не выше, чем оставляют действия под ней */
   --size-gallery-tile: 6rem; /* 96 — наименьшая клетка сетки «Фото и видео», как у RoomMediaGrid */
 
   /* Колонки. Список чатов — Theme.Size.sidebarMinimum/Ideal/Maximum. */
@@ -93,28 +111,33 @@
   --column-list-max: 25rem; /* 400 */
   --column-panel: 22.5rem; /* 360 — правая панель «О чате» */
   --column-timeline-max: 47.5rem; /* 760 — строку в 200 символов читать нельзя */
-  --column-app-max: 120rem; /* 1920 — дальше поля, а не строки */
 
-  /* Время — Theme.Timing */
-  --timing-chrome: 200ms;
-  --timing-arrival: 320ms; /* Theme.Timing.arrival */
-  --timing-reaction: 250ms;
-  --timing-deletion: 300ms;
+  /* Время. Начинали с `Theme.Timing` нативной; в вебе всё на четверть быстрее — в браузере
+     то же движение кажется медленнее, чем под пальцем на iPhone. */
+  --timing-chrome: 150ms;
+  --timing-arrival: 240ms;
+  --timing-reaction: 180ms;
+  --timing-deletion: 220ms;
   --timing-recording-pulse: 600ms; /* точка записи дышит — как RecordingStrip нативной */
+  /* Блок входа появляется из глубины: чуть крупнее, размытый и прозрачный — и садится на место. */
+  --timing-entrance: 800ms;
+  --ease-entrance: cubic-bezier(0.2, 0.8, 0.2, 1);
+  --scale-entrance: 1.2;
+  --blur-entrance: 12px;
 
   /* Движение — `Theme.Timing` нативной Искры. Пружина меню — Telegram'овская, число в число
-     (`menuOpens`: response 0.265, damping 0.775), разложенная в точки для `linear()`: CSS своей
+     (`menuOpens`: response 0.265, damping 0.775) по форме, разложенная в точки для `linear()`: CSS своей
      пружины не знает. Легко перелетает на 2 % и садится — то, что поднимают, имеет вес. */
-  --timing-menu-open: 420ms;
+  --timing-menu-open: 320ms;
   --ease-menu-open: linear(0, 0.069, 0.222, 0.4, 0.569, 0.711, 0.822, 0.903, 0.957, 0.991, 1.01, 1.019, 1.021, 1.02, 1.016, 1.013, 1.009, 1.006, 1.004, 1.002, 1.001, 1);
-  /* Закрытие — без пружины: положенное не бросают (`menuCloses`, 0.2 с ease-in-out). */
-  --timing-menu-close: 200ms;
+  /* Закрытие — без пружины: положенное не бросают (`menuCloses`, ease-in-out). */
+  --timing-menu-close: 150ms;
   --ease-menu-close: ease-in-out;
   /* Пункты меню проявляются почти сразу, когда стекло уже почти раскрылось (`menuListShows`, `menuFills`). */
   --timing-menu-list: 50ms;
-  --delay-menu-fills: 150ms;
+  --delay-menu-fills: 110ms;
   /* Смена экрана на телефоне — пуш, как в навигации iOS. */
-  --timing-screen: 350ms;
+  --timing-screen: 260ms;
   --ease-screen: cubic-bezier(0.2, 0.8, 0.2, 1);
   /* Приход и уход всего остального: плавный выход в покой. */
   --ease-out: cubic-bezier(0.2, 0, 0, 1);

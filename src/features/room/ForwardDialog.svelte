@@ -7,6 +7,7 @@
   пересланном было негде.
 -->
 <script lang="ts">
+  import { ICON_VIEWBOX, icons } from '../../design/icons.ts';
   import Dialog from '../../design/Dialog.svelte';
   import PlainButton from '../../design/PlainButton.svelte';
   import PrimaryButton from '../../design/PrimaryButton.svelte';
@@ -64,7 +65,7 @@
           <span class="face">
             <RoomFace {room} {session} />
             {#if on}
-              <span class="tick" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M6 12.5l4 4 8-9" /></svg></span>
+              <span class="tick" aria-hidden="true"><svg viewBox={ICON_VIEWBOX}><path d={icons.check} /></svg></span>
             {/if}
           </span>
           <span class="name">{roomName(room)}</span>
@@ -134,11 +135,7 @@
   .tick svg {
     width: 100%;
     height: 100%;
-    fill: none;
-    stroke: var(--on-accent);
-    stroke-width: 3;
-    stroke-linecap: round;
-    stroke-linejoin: round;
+    fill: var(--on-accent);
   }
   .name {
     display: -webkit-box;

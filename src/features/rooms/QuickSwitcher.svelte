@@ -114,12 +114,15 @@
     box-shadow: 0 var(--space-close) var(--space-generous) rgb(0 0 0 / 0.3);
     overflow: hidden;
   }
-  .switcher[open] {
-    display: flex;
+  /* Колонка — и у догорающего после закрытия окна (см. `Dialog`). */
+  .switcher {
     flex-direction: column;
   }
+  .switcher[open] {
+    display: flex;
+  }
   .switcher::backdrop {
-    background: rgb(0 0 0 / var(--backdrop-menu-scrim));
+    background: var(--color-scrim);
   }
   input {
     min-height: var(--size-navigation-bar);

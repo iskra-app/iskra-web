@@ -36,6 +36,7 @@ import { currentMarker, rememberMovedMarker } from './readMarker';
 import { canSendPoll, pollEndContent, pollStartContent, type PollDraft } from './poll';
 import { mentionsMarkdown, rankCandidates, unlinkMentions, type ComposerMention, type RankedCandidate } from './composerMentions';
 import { mapEvent, type MapperContext } from './mapper';
+import { isMarkedUnread, MARKED_UNREAD } from '../rooms/summarize';
 import { layout, SHOW_ALL_SERVICE, type ServiceHiding, type TimelineItem } from './layout';
 import type { Message, Reaction } from './message';
 
@@ -89,6 +90,8 @@ export class TimelineStore {
   /** Последнее закреплённое — для полосы над лентой. Не загружено — достаём отдельно. */
   pinnedMessage = $state.raw<Message | undefined>(undefined);
   canPin = $state(false);
+  /** Можно ли писать сюда — по правам комнаты. Нельзя — вместо поля плашка, как в нативной. */
+  canPost = $state(true);
   /** Вложения в пути — по порядку отправки. */
   uploads = $state.raw<Upload[]>([]);
   /** Последнее действие не удалось — сказать и дать повторить. */
@@ -257,6 +260,7 @@ export class TimelineStore {
     const ids = Array.isArray(pinned) ? pinned.filter((id): id is string => typeof id === 'string') : [];
     if (ids.join() !== this.pinnedIds.join()) this.pinnedIds = ids;
     this.canPin = !!state?.maySendStateEvent(PINNED_EVENTS, this.ownUserId);
+    this.canPost = state ? state.maySendMessage(this.ownUserId) : true;
   }
 
   private readPinnedMessage(room: Room, context: MapperContext): void {
@@ -727,11 +731,20 @@ export class TimelineStore {
   // ————— Прочитано —————
 
   private lastReceiptFor?: string;
+  private clearingFlag = false;
 
   /** Отметить прочитанным последнее чужое — зовёт экран, когда чат виден и внизу. */
   markRead(): void {
     const room = this.room;
     if (!room) return;
+    // Метку «непрочитано», поставленную из меню строки, снимает прочтение, как в нативной.
+    if (isMarkedUnread(room) && !this.clearingFlag) {
+      this.clearingFlag = true;
+      this.client
+        .setRoomAccountData(this.roomId, MARKED_UNREAD as never, { unread: false } as never)
+        .catch(() => {})
+        .finally(() => (this.clearingFlag = false));
+    }
     const events = room.getLiveTimeline().getEvents();
     for (let i = events.length - 1; i >= 0; i--) {
       const event = events[i]!;

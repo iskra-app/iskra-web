@@ -11,6 +11,7 @@
   Колёсико листает панель, а не закрывает меню, как над остальным меню.
 -->
 <script lang="ts">
+  import { ICON_VIEWBOX, icons, type IconName } from '../../design/icons.ts';
   import { t } from '../../i18n/index.svelte.ts';
   import { emojiCatalog, emojiCategories, type EmojiCategory } from './emojiCatalog';
 
@@ -22,15 +23,15 @@
   }
   let { mine, recent, onpick }: Props = $props();
 
-  const icons: Record<EmojiCategory, string> = {
-    smileys: 'M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM8 14a4.5 4.5 0 0 0 8 0M9 9.5v.01M15 9.5v.01',
-    animals: 'M8 11a2 2 0 1 0 0-4 2 2 0 0 0 0 4zM16 11a2 2 0 1 0 0-4 2 2 0 0 0 0 4zM5 15a1.5 1.5 0 1 0 0-3M19 15a1.5 1.5 0 1 1 0-3M12 13c-3 0-5 3-5 5a2 2 0 0 0 3 1.5 4 4 0 0 1 4 0 2 2 0 0 0 3-1.5c0-2-2-5-5-5z',
-    food: 'M7 3v8M5 3v5a2 2 0 0 0 4 0V3M7 11v10M17 21V3c-2 1-3 4-3 8h3',
-    activity: 'M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM12 8l3.5 2.5-1.3 4h-4.4l-1.3-4zM12 3v5M21 10.5l-5.5 0M3 10.5l5.5 0M7 19.5l2.8-5M17 19.5l-2.8-5',
-    places: 'M5 16V11l2-5h10l2 5v5zM5 16v2M19 16v2M5 11h14M8 13.5v.01M16 13.5v.01',
-    objects: 'M9 18h6M10 21h4M12 3a6 6 0 0 0-3.5 10.9c.6.5 1 1.2 1 2.1h5c0-.9.4-1.6 1-2.1A6 6 0 0 0 12 3z',
-    symbols: 'M9 18V5l11-2v13M9 18a3 3 0 1 1-3-3 3 3 0 0 1 3 3zM20 16a3 3 0 1 1-3-3 3 3 0 0 1 3 3z',
-    flags: 'M5 21V4M5 4h12l-2 4 2 4H5',
+  const glyphs: Record<EmojiCategory, IconName> = {
+    smileys: 'emojiSmileys',
+    animals: 'emojiAnimals',
+    food: 'emojiFood',
+    activity: 'emojiActivity',
+    places: 'emojiPlaces',
+    objects: 'emojiObjects',
+    symbols: 'emojiSymbols',
+    flags: 'emojiFlags',
   };
 
   let scroller: HTMLDivElement | undefined = $state();
@@ -116,7 +117,7 @@
   <div class="tabs" role="toolbar" aria-label={t('reactions.more')}>
     {#each emojiCategories as category (category)}
       <button type="button" class:selected={selected === category} aria-label={t(`reactions.${category}`)} title={t(`reactions.${category}`)} aria-pressed={selected === category} onclick={() => jump(category)}>
-        <svg viewBox="0 0 24 24" aria-hidden="true"><path d={icons[category]} /></svg>
+        <svg viewBox={ICON_VIEWBOX} aria-hidden="true"><path d={icons[glyphs[category]]} /></svg>
       </button>
     {/each}
   </div>
@@ -192,10 +193,6 @@
   .tabs svg {
     width: var(--size-icon);
     height: var(--size-icon);
-    fill: none;
-    stroke: currentColor;
-    stroke-width: 2;
-    stroke-linecap: round;
-    stroke-linejoin: round;
+    fill: currentColor;
   }
 </style>

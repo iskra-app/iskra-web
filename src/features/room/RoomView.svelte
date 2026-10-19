@@ -1,5 +1,5 @@
 <!--
-  Открытый чат: полоса закреплённого, лента, «печатает…», композер. Лента создаётся при
+  Открытый чат: полоса о смене ключей, полоса закреплённого, лента, «печатает…», композер. Лента создаётся при
   открытии и уничтожается при уходе — стор живёт ровно столько, сколько чат на экране.
 
   Здесь же сходятся действия над сообщением (`MessageActions`): ответ и правка — в
@@ -27,11 +27,13 @@
   import SelectionBar from './SelectionBar.svelte';
   import ForwardDialog from './ForwardDialog.svelte';
   import { canForward } from '../../core/timeline/forward';
+  import { membersOf } from '../../core/timeline/album';
   import { inTimelineOrder, selectionTranscript } from '../../core/timeline/selection';
   import { SvelteSet } from 'svelte/reactivity';
   import MessageMenu from './MessageMenu.svelte';
   import PinnedStrip from './PinnedStrip.svelte';
-  import { typingText } from './text';
+  import IdentityBanner from './IdentityBanner.svelte';
+  import type { IdentityChangesStore } from '../../core/encryption/identityChanges.svelte.ts';
   import Timeline from './Timeline.svelte';
   import WallpaperBackdrop from './WallpaperBackdrop.svelte';
   import { distance } from './distance';
@@ -49,8 +51,6 @@
   }
   let { session, roomId, store = $bindable() }: Props = $props();
 
-  /** Сколько «печатает…» держится после того, как все перестали: сообщение вот-вот придёт. */
-  const TYPING_GRACE_MS = 700;
   const DRAFT_SAVE_MS = 400;
 
   let composer: Composer | undefined = $state();
@@ -84,10 +84,12 @@
     selectionTranscript(chosen, (ts) => new Intl.DateTimeFormat(i18n.locale, { dateStyle: 'short', timeStyle: 'short' }).format(ts)),
   );
 
+  /** Альбом выбирается, пересылается и удаляется целиком — всеми своими фото. */
   function toggleSelected(message: Message) {
     if (!selection) return;
-    if (selection.has(message.key)) selection.delete(message.key);
-    else selection.add(message.key);
+    const keys = membersOf(message).map((m) => m.key);
+    if (selection.has(message.key)) for (const key of keys) selection.delete(key);
+    else for (const key of keys) selection.add(key);
   }
 
   function copySelection() {
@@ -165,7 +167,31 @@
     composer?.focus();
   });
 
+  /** Кто здесь сменил ключи — живёт, пока открыт чат, как и лента. */
+  let identities = $state<IdentityChangesStore | null>(null);
+  $effect(() => {
+    const created = session.identityChanges(roomId);
+    identities = created;
+    return () => {
+      created.destroy();
+      if (identities === created) identities = null;
+    };
+  });
+  const identityChange = $derived(identities?.changes[0]);
+
+  async function acknowledgeIdentity() {
+    const change = identityChange;
+    if (!change || !identities) return;
+    try {
+      await identities.acknowledge(change);
+    } catch {
+      notice = t('room.identity.failed');
+    }
+  }
+
   const room = $derived(session.rooms.get(roomId));
+  /** Собеседник личного чата, если вы его заблокировали: в группе один заблокированный писать не мешает. */
+  const blockedId = $derived(room?.kind === 'direct' && room.counterpartId && session.blocked.has(room.counterpartId) ? room.counterpartId : undefined);
   const canSend = $derived(room?.membership === 'join' || (!room && session.canSend(roomId)));
 
   // ————— Черновик и «печатает» —————
@@ -358,25 +384,6 @@
     composer?.attach();
   }
 
-  // ————— «Печатает…» с задержкой —————
-
-  let showTyping = $state(false);
-  let typingLine = $state('');
-  let hideTimer: ReturnType<typeof setTimeout> | undefined;
-  $effect(() => {
-    const names = store?.typing ?? [];
-    clearTimeout(hideTimer);
-    if (names.length) {
-      typingLine = typingText(names);
-      showTyping = true;
-    } else {
-      // Уведомления о наборе — поток мелкой неточности: «никто» между двумя «печатает»
-      // мигало бы строкой. Прячем с небольшой задержкой.
-      hideTimer = setTimeout(() => (showTyping = false), TYPING_GRACE_MS);
-    }
-    return () => clearTimeout(hideTimer);
-  });
-
   // ————— Действия —————
 
   const actions: MessageActions = {
@@ -394,8 +401,8 @@
     react: (message, key) => store?.react(message, key),
     vote: (message, ids) => store?.vote(message, ids),
     endPoll: (message) => (endingPoll = message),
-    select: (message) => (selection = new SvelteSet([message.key])),
-    forward: (message) => (forwarding = [message]),
+    select: (message) => (selection = new SvelteSet(membersOf(message).map((m) => m.key))),
+    forward: (message) => (forwarding = membersOf(message)),
     pin: (message) => store?.pin(message),
     unpin: (message) => store?.unpin(message),
     remove: (message) => (deleting = message),
@@ -423,13 +430,15 @@
   }
 
   /** `Esc` в чате, когда закрывать нечего: вниз и прочитано. */
-  export function escape(): void {
-    // Сначала — выйти из выбора: это то, что сейчас на экране.
-    if (selection) {
-      selection = null;
-      return;
-    }
-    timeline?.toBottom();
+  /**
+   * `Esc`, которое не забрали меню, окна и полоса ответа над полем (у них своё): выйти из
+   * выбора, если он есть, — и `true`. `false` — закрывать здесь нечего, закрывается сам чат,
+   * как в нативной Искре на Mac.
+   */
+  export function escape(): boolean {
+    if (!selection) return false;
+    selection = null;
+    return true;
   }
 
   /** Из панели «О чате»: к закреплённому сообщению. */
@@ -457,6 +466,12 @@
   {#if dropping}
     <div class="drop" aria-hidden="true"><span>{t('room.dropToAttach')}</span></div>
   {/if}
+  <!-- Над закреплённым: это о том, кто прочтёт написанное здесь, — важнее того, что закрепили. -->
+  {#if identityChange}
+    {#key identityChange.userId}
+      <IdentityBanner change={identityChange} onacknowledge={() => void acknowledgeIdentity()} />
+    {/key}
+  {/if}
   {#if store && store.pinnedIds.length}
     <PinnedStrip
       message={store.pinnedMessage}
@@ -474,7 +489,6 @@
     <VideoNoteCapture recorder={videoNote} holding={videoHolding} onsend={() => void finishVideoNote()} oncancel={cancelVideoNote} />
   {/if}
   <div class="below">
-    <p class="typing" aria-live="polite">{showTyping ? typingLine : ''}</p>
     {#if notice}
       <div class="failure" role="alert">
         <span>{notice}</span>
@@ -505,6 +519,15 @@
       oncopy={copySelection}
       ondelete={() => (deletingSelection = true)}
     />
+  {:else if blockedId}
+    <!-- Вместо поля — что происходит и как это отменить (`BlockedBanner` нативной): иначе чат
+         выглядел бы как обычный, а собеседник — просто замолчавшим. -->
+    <div class="instead" role="status">
+      <p>{t('profile.blockedNotice')}</p>
+      <button type="button" onclick={() => void session.blocked.unblock(blockedId)}>{t('settings.unblock')}</button>
+    </div>
+  {:else if store && !store.canPost}
+    <div class="instead" role="status"><p>{t('room.readOnly')}</p></div>
   {:else}
   <Composer
     bind:this={composer}
@@ -547,7 +570,7 @@
   destructive
   onclose={() => (deleting = null)}
   onconfirm={() => {
-    if (deleting) store?.remove(deleting);
+    if (deleting) for (const message of membersOf(deleting)) store?.remove(message);
     deleting = null;
   }}
 />
@@ -648,18 +671,32 @@
     margin-inline: auto;
     padding-inline: var(--timeline-gutter);
   }
-  .typing {
-    min-height: calc(var(--font-size-caption) * var(--line-height-body));
-    margin: 0;
-    font-size: var(--font-size-caption);
-    color: var(--color-text-secondary);
+  .instead {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: var(--space-tight);
+    max-width: var(--column-timeline-max);
+    width: 100%;
+    margin-inline: auto;
+    padding: var(--space-normal) var(--timeline-gutter) max(var(--space-normal), env(safe-area-inset-bottom));
+    border-block-start: var(--border-hairline) solid var(--color-separator);
+    text-align: center;
   }
-  /* На обоях — на плашке, как имя отправителя (см. MessageRow). Пустая строка плашки не рисует. */
-  [data-wallpaper] .typing:not(:empty) {
-    width: fit-content;
-    padding: 0 var(--space-close);
-    border-radius: var(--radius-circle);
-    background: var(--color-incoming-bubble);
+  .instead p {
+    margin: 0;
+    color: var(--color-text-secondary);
+    font-size: var(--font-size-caption);
+  }
+  .instead button {
+    min-height: var(--tap-target);
+    padding: 0 var(--space-normal);
+    border: none;
+    background: transparent;
+    color: var(--accent);
+    font: inherit;
+    font-weight: 600;
+    cursor: pointer;
   }
   .failure {
     display: flex;

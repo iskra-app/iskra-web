@@ -7,6 +7,16 @@
  */
 import type { IPushRules } from 'matrix-js-sdk';
 
+/**
+ * Правило нативной Искры (`ReactionPushRule`): реакции уведомляют. Оно на аккаунте, а не на
+ * устройстве — стоит нативная хоть где-то, и счётчик сервера включает реакции.
+ */
+export const REACTION_RULE_ID = 'moscow.swag.iskra.reactions';
+
+export function reactionsNotify(rules: IPushRules | undefined): boolean {
+  return (rules?.global?.override ?? []).some((rule) => rule.rule_id === REACTION_RULE_ID && rule.enabled);
+}
+
 export function mutedRoomIds(rules: IPushRules | undefined): Set<string> {
   const muted = new Set<string>();
   for (const rule of rules?.global?.override ?? []) {

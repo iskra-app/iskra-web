@@ -50,3 +50,29 @@ test('манифест устанавливаемого приложения н�
   expect(manifest.launch_handler).toEqual({ client_mode: 'focus-existing' });
   expect(manifest.icons.some((i: { purpose?: string }) => i.purpose === 'maskable')).toBe(true);
 });
+
+test('окно, закрываясь, не перекладывает содержимое в ряд, пока догорает', async ({ page }) => {
+  await signInToDemo(page);
+  await page.getByRole('button', { name: 'Новый чат или комната' }).click();
+  const dialog = page.getByRole('dialog', { name: 'Новый чат' });
+  await expect(dialog).toBeVisible();
+  await page.waitForTimeout(500);
+  // Закрыть — и в следующем кадре, пока окно ещё на экране, посмотреть, как оно разложено.
+  const during = await page.evaluate(async () => {
+    const element = document.querySelector('dialog[open]') as HTMLDialogElement;
+    element.close();
+    await new Promise((resolve) => requestAnimationFrame(() => resolve(null)));
+    const style = getComputedStyle(element);
+    return { display: style.display, direction: style.flexDirection };
+  });
+  expect(during.display === 'none' || during.direction === 'column', JSON.stringify(during)).toBe(true);
+});
+
+test('на широком мониторе — во всю ширину, без полей по бокам', async ({ page }, info) => {
+  test.skip(isPhone(info.project.name), 'только десктоп');
+  await page.setViewportSize({ width: 2560, height: 1080 });
+  await signInToDemo(page);
+  const box = (await page.locator('.columns').boundingBox())!;
+  expect(box.x).toBe(0);
+  expect(box.width).toBe(2560);
+});

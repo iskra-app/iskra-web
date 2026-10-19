@@ -25,7 +25,31 @@ async function openPanel(page: Page) {
   return panel;
 }
 
-test('«О чате» там, где прав нет: только уведомления, закреплённые, участники и выход', async ({ page }) => {
+test('«О чате» в личном чате: ID собеседника, «Поделиться», «Заблокировать», «Удалить чат»', async ({ page }, info) => {
+  const problems = watchForProblems(page);
+  await page.context().grantPermissions(['clipboard-read', 'clipboard-write']).catch(() => {});
+  await signInToDemo(page);
+  await openRoom(page, /^Аня/);
+  const panel = await openPanel(page);
+  await expect(panel.locator('header')).toContainText('@anya:demo.iskra.invalid');
+  await expect(panel.locator('header')).toContainText('Переписка зашифрована');
+  if (!isPhone(info.project.name) && info.project.name.startsWith('chromium')) {
+    await panel.getByRole('button', { name: 'Поделиться' }).click();
+    await expect(panel.getByRole('status')).toHaveText('Ссылка скопирована');
+    expect(await page.evaluate(() => navigator.clipboard.readText())).toBe('https://matrix.to/#/%40anya%3Ademo.iskra.invalid');
+  } else {
+    await expect(panel.getByRole('button', { name: 'Поделиться' })).toBeVisible();
+  }
+  await panel.getByRole('button', { name: 'Заблокировать пользователя' }).click();
+  await expect(panel).toContainText('Вы заблокировали этого пользователя');
+  await panel.getByRole('button', { name: 'Разблокировать пользователя' }).click();
+  await expect(panel.getByRole('button', { name: 'Заблокировать пользователя' })).toBeVisible();
+  await panel.getByRole('button', { name: 'Удалить чат' }).click();
+  await expect(page.getByRole('dialog', { name: 'Удалить чат?' })).toBeVisible();
+  expect(problems).toEqual([]);
+});
+
+test('«О чате» там, где прав нет: шапка, кнопки, уведомления, закреплённые, участники', async ({ page }) => {
   const problems = watchForProblems(page);
   await signInToDemo(page);
   await openRoom(page, /^Выходные/);
@@ -34,10 +58,17 @@ test('«О чате» там, где прав нет: только уведом�
   await expect(panel.getByRole('button', { name: /Борис.*Администратор/ })).toBeVisible();
   await expect(panel).toContainText('3 участника');
 
+  // Шапка — как в нативной: сколько участников и что с шифрованием; под ней — кнопки.
+  await expect(panel.locator('header')).toContainText('3 участника');
+  await expect(panel.locator('header')).toContainText('Переписка не зашифрована');
+  await expect(panel.getByRole('button', { name: 'Пригласить' })).toBeVisible();
+
   const alerts = panel.getByRole('radiogroup', { name: 'Уведомления' });
   await expect(alerts.getByRole('radio', { name: 'Все сообщения' })).toHaveAttribute('aria-checked', 'true');
-  await alerts.getByRole('radio', { name: 'Выключены' }).click();
+  // «Без звука» под шапкой — то же, что «Выключены».
+  await panel.getByRole('button', { name: 'Без звука' }).click();
   await expect(alerts.getByRole('radio', { name: 'Выключены' })).toHaveAttribute('aria-checked', 'true');
+  await expect(panel.getByRole('button', { name: 'Со звуком' })).toBeVisible();
 
   // Закреплённое из панели ведёт к сообщению.
   await panel.getByRole('button', { name: /Кто что берёт на пикник/ }).click();
@@ -88,20 +119,23 @@ test('выйти из чата — с вопросом, и чата больше
 test('новая комната и новый чат — создаются и сразу открываются', async ({ page }) => {
   await signInToDemo(page);
   await page.getByRole('button', { name: 'Новый чат или комната' }).click();
-  const dialog = page.getByRole('dialog', { name: 'Новый чат или комната' });
-  await dialog.getByRole('tab', { name: 'Новая комната' }).click();
-  await expect(dialog).toContainText('поэтому шифрования в ней нет');
-  await dialog.getByRole('textbox', { name: 'Название' }).fill('Книги');
-  await dialog.getByRole('button', { name: 'Создать' }).click();
+  const dialog = page.getByRole('dialog', { name: 'Новый чат' });
+  await dialog.getByRole('button', { name: 'Создать комнату' }).click();
+  await expect(page.getByRole('dialog', { name: 'Новая комната' })).toContainText('поэтому шифрования в ней нет');
+  const roomPage = page.getByRole('dialog', { name: 'Новая комната' });
+  await expect(roomPage).toContainText('Комната будет с шифрованием');
+  await roomPage.getByRole('textbox', { name: 'Название' }).fill('Книги');
+  await roomPage.getByRole('textbox', { name: 'Описание' }).fill('Что читаем');
+  await roomPage.getByRole('button', { name: 'Создать' }).click();
   await expect(page.getByRole('heading', { name: 'Книги', level: 1 })).toBeVisible({ timeout: 10_000 });
+  await expect(page.getByRole('dialog')).toHaveCount(0);
 
   // Кнопка — в шапке списка; на телефоне список — за «Назад».
   const back = page.getByRole('button', { name: 'Назад' });
   if (await back.isVisible()) await back.click();
   await page.getByRole('button', { name: 'Новый чат или комната' }).click();
-  await dialog.getByRole('textbox', { name: 'Кому написать' }).fill('@anya:demo.iskra.invalid');
-  await dialog.getByRole('button', { name: 'Начать' }).click();
-  // С Аней чат уже есть — открывается он, а не второй.
+  // С Аней чат уже есть — она в списке собеседников, и открывается он, а не второй.
+  await dialog.getByRole('button', { name: /^Аня/ }).click();
   await expect(page.getByRole('log')).toContainText('Возьми плед, там ветрено', { timeout: 10_000 });
 });
 
@@ -146,6 +180,11 @@ test('настройки по разделам: имя, язык, тема, шр
 
   await page.getByRole('radio', { name: 'English' }).click();
   await expect(page.getByRole('heading', { name: 'Appearance', level: 1 })).toBeVisible();
+  // Языки нативной — каждый своим именем; китайский — с письменностью в `lang`.
+  await page.getByRole('radio', { name: '简体中文' }).click();
+  await expect(page.locator('html')).toHaveAttribute('lang', 'zh-Hans');
+  await page.getByRole('radio', { name: 'Deutsch' }).click();
+  await expect(page.getByRole('heading', { name: 'Darstellung', level: 1 })).toBeVisible();
   await page.getByRole('radio', { name: 'Русский' }).click();
   await expect(page.getByRole('heading', { name: 'Внешний вид', level: 1 })).toBeVisible();
 
@@ -446,7 +485,7 @@ test('«Папки»: подсказка — и вкладка над списк
   await editor.getByRole('list', { name: 'Всегда показывать' }).getByRole('button', { name: 'Добавить чаты' }).click();
   const chooser = page.getByRole('dialog', { name: 'Выберите чаты' });
   await chooser.getByRole('textbox', { name: 'Поиск' }).fill('аня');
-  await chooser.getByRole('checkbox', { name: /Аня/ }).check();
+  await chooser.getByRole('switch', { name: /Аня/ }).check();
   await chooser.getByRole('button', { name: 'Готово' }).click();
   await expect(editor.getByRole('list', { name: 'Всегда показывать' })).toContainText('Аня');
   await done.click();

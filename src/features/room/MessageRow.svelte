@@ -16,6 +16,7 @@
   выделенным текстом правый щелчок остаётся браузеру: его меню там нужнее нашего.
 -->
 <script lang="ts">
+  import { ICON_VIEWBOX, icons } from '../../design/icons.ts';
   import Avatar from '../../design/Avatar.svelte';
   import { clock } from '../../design/time';
   import { viewport } from '../../design/viewport.svelte.ts';
@@ -31,6 +32,7 @@
   import FileCard from '../media/FileCard.svelte';
   import VoiceMessage from '../media/VoiceMessage.svelte';
   import MediaPreview from '../media/MediaPreview.svelte';
+  import AlbumView from './AlbumView.svelte';
   import type { MediaLoader } from '../../core/media/media';
   import { attachmentLabel, serviceText } from './text';
 
@@ -58,11 +60,26 @@
   /** Картинка во весь пузырь: отступы пузыря — тоньше, фон — у самой картинки. */
   const visual = $derived(kind.type === 'image' || kind.type === 'video' || kind.type === 'videoNote' || kind.type === 'sticker');
 
+  const selected = () => (window.getSelection()?.toString() ?? '') !== '';
+
+  /**
+   * Было ли выделение до правого щелчка. Safari на Mac выделяет слово под курсором сам, ещё до
+   * `contextmenu`, — и по выделению «сейчас» наше меню там не открывалось бы никогда.
+   */
+  let selectedBefore: boolean | null = null;
+  function onpointerdown(event: PointerEvent) {
+    selectedBefore = event.button === 2 ? selected() : null;
+  }
+
   function oncontextmenu(event: MouseEvent) {
     if (!interactive) return;
     const target = event.target as Element | null;
-    if (target?.closest('a') || (window.getSelection()?.toString() ?? '') !== '') return;
+    const hadSelection = selectedBefore ?? selected();
+    selectedBefore = null;
+    if (target?.closest('a') || hadSelection) return;
     event.preventDefault();
+    // Слово, выделенное браузером на правый щелчок, — не выбор человека: снять.
+    if (selected()) window.getSelection()?.removeAllRanges();
     actions.openMenu(message, { x: event.clientX, y: event.clientY }, !viewport.finePointer);
   }
 
@@ -106,6 +123,7 @@
         class:notice={kind.type === 'notice'}
         class:muted={kind.type === 'deleted' || kind.type === 'unreadable' || kind.type === 'unsupported'}
         {oncontextmenu}
+        {onpointerdown}
         use:touchGestures={gestures}
       >
         <!-- Кто говорит — скринридеру, в начале каждого сообщения (`spokenLabel` нативной Искры):
@@ -140,6 +158,9 @@
             <em>{t('message.unsupported')}</em>
           {:else if kind.type === 'poll'}
             <PollView poll={kind.poll} canVote={!!message.eventId} own={message.own && !compact} onvote={(ids) => actions.vote(message, ids)} />
+          {:else if message.album}
+            <AlbumView items={message.album} {media} onopen={(item) => actions.openMedia(item)} />
+            {#if (kind.type === 'image' || kind.type === 'video') && kind.attachment.caption}<span class="caption text"><LinkedText text={kind.attachment.caption} /></span>{/if}
           {:else if kind.type === 'image' || kind.type === 'video' || kind.type === 'videoNote' || kind.type === 'sticker'}
             <MediaPreview kind={kind.type} attachment={kind.attachment} {media} own={message.own} onopen={() => actions.openMedia(message)} />
             {#if kind.attachment.caption}<span class="caption text"><LinkedText text={kind.attachment.caption} /></span>{/if}
@@ -160,16 +181,16 @@
            `MessageMarks` нативной Искры: в углу время дерётся с последней строкой за место. -->
       <span class="marks">
         {#if message.pinned}
-          <svg class="pin" viewBox="0 0 24 24" role="img" aria-label={t('room.pinned')}><path d="M9 4h6l-1 6 3 3H7l3-3-1-6zM12 13v7" /></svg>
+          <svg class="pin" viewBox={ICON_VIEWBOX} role="img" aria-label={t('room.pinned')}><path d={icons.pin} /></svg>
         {/if}
         {#if message.edited}<span>{t('message.edited')}</span>{/if}
         <time>{clock(message.ts, i18n.locale)}</time>
         {#if message.delivery.state === 'sending'}
-          <svg viewBox="0 0 24 24" role="img" aria-label={t('message.delivery.sending')}><circle cx="12" cy="12" r="8" /><path d="M12 8v4l3 2" /></svg>
+          <svg viewBox={ICON_VIEWBOX} role="img" aria-label={t('message.delivery.sending')}><path d={icons.sending} /></svg>
         {:else if message.own && message.readMark}
-          <svg viewBox="0 0 24 24" role="img" aria-label={t('message.delivery.read')}><path d="M2 12s3.5-6 10-6 10 6 10 6-3.5 6-10 6S2 12 2 12z" /><circle cx="12" cy="12" r="2.5" /></svg>
+          <svg viewBox={ICON_VIEWBOX} role="img" aria-label={t('message.delivery.read')}><path d={icons.read} /></svg>
         {:else if message.own && !message.read && message.delivery.state === 'sent' && message.eventId}
-          <svg viewBox="0 0 24 24" role="img" aria-label={t('message.delivery.sent')}><path d="M5 12.5l4.5 4.5L19 7.5" /></svg>
+          <svg viewBox={ICON_VIEWBOX} role="img" aria-label={t('message.delivery.sent')}><path d={icons.check} /></svg>
         {/if}
       </span>
         {#if interactive && viewport.finePointer}
@@ -179,11 +200,11 @@
             <button type="button" tabindex="-1" aria-label={t('message.menu.react', { emoji: preferences.quickReaction })} title={t('message.menu.react', { emoji: preferences.quickReaction })} onclick={() => actions.react(message, preferences.quickReaction)}>{preferences.quickReaction}</button>
             {#if actions.canReply}
               <button type="button" tabindex="-1" aria-label={t('message.menu.reply')} title={t('message.menu.reply')} onclick={() => actions.reply(message)}>
-                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10 7L4 12l6 5M4 12h11a5 5 0 0 1 5 5v1" /></svg>
+                <svg viewBox={ICON_VIEWBOX} aria-hidden="true"><path d={icons.reply} /></svg>
               </button>
             {/if}
             <button type="button" aria-label={t('message.menu.more')} title={t('message.menu.more')} aria-haspopup="menu" onclick={more}>
-              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 12h.01M12 12h.01M18 12h.01" /></svg>
+              <svg viewBox={ICON_VIEWBOX} aria-hidden="true"><path d={icons.more} /></svg>
             </button>
           </div>
         {/if}
@@ -341,11 +362,7 @@
   .marks svg {
     width: var(--font-size-caption);
     height: var(--font-size-caption);
-    fill: none;
-    stroke: currentColor;
-    stroke-width: 2;
-    stroke-linecap: round;
-    stroke-linejoin: round;
+    fill: currentColor;
   }
   :global([data-wallpaper]) .marks {
     padding: var(--space-within-run) var(--space-close);
@@ -516,11 +533,7 @@
   .hover-bar svg {
     width: var(--size-icon);
     height: var(--size-icon);
-    fill: none;
-    stroke: currentColor;
-    stroke-width: 2;
-    stroke-linecap: round;
-    stroke-linejoin: round;
+    fill: currentColor;
   }
   /* HTML сообщения: разметка Matrix, но в масштабе пузыря. */
   .html :global(p),

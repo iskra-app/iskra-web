@@ -55,7 +55,8 @@ describe('TimelineStore на демо-сервере', () => {
     const { client } = await started();
     store = new TimelineStore(client, demoRooms.history);
     const before = texts(store).length;
-    expect(before).toBe(20);
+    // Синхронизация отдаёт 20 последних событий; одно из них — реакция Бориса, не сообщение.
+    expect(before).toBe(19);
     // «Экран» хочет 100 сообщений.
     await store.fill(() => texts(store!).length < 100);
     expect(texts(store).length).toBeGreaterThanOrEqual(100);

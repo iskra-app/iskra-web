@@ -62,7 +62,10 @@ function versionOf(): string {
 
 export default defineConfig({
   base,
-  define: { __ISKRA_BUILD__: JSON.stringify(buildId()), __ISKRA_VERSION__: JSON.stringify(versionOf()) },
+  define: {
+    __ISKRA_BUILD__: JSON.stringify(buildId()),
+    __ISKRA_VERSION__: JSON.stringify(versionOf()),
+  },
   plugins: [
     svelte(),
     VitePWA({

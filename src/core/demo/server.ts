@@ -12,6 +12,7 @@
  * Настоящего аккаунта он не трогает никогда: адрес — в зоне `.invalid`, которая по
  * RFC 2606 не резолвится, и ни один запрос отсюда в сеть не уходит.
  */
+import { anyaIdentities } from './identities';
 import { emptyAccount, mergeSignatures, type DemoAccountState, type DemoStorage } from './account';
 import { demoMediaLibrary, demoMxc, type DemoMedia } from './media';
 import {
@@ -19,6 +20,7 @@ import {
   buildDemoWorld,
   demoCredentials,
   demoDirect,
+  demoDirectory,
   demoMutedRooms,
   demoProfiles,
   demoRooms,
@@ -84,6 +86,8 @@ export class DemoHomeserver {
   private readonly storage: DemoStorage | undefined;
   /** Данные аккаунта, изменённые с прошлой синхронизации. */
   private pendingAccountData: Array<{ type: string; content: unknown }> = [];
+  /** Чьи ключи сменились с прошлой синхронизации — `device_lists.changed`. */
+  private pendingKeyChanges: string[] = [];
   /** Что отдать следующей синхронизацией: вход по приглашению, выход, отметки о прочтении. */
   private pending: Array<Record<string, unknown>> = [];
   private wake: (() => void) | undefined;
@@ -137,6 +141,9 @@ export class DemoHomeserver {
       ['GET', re(`${c}/v3/sync`), (r) => this.sync(r)],
       ['GET', re(`${c}/v3/profile/([^/]+)`), (r) => this.profile(r)],
       ['GET', re(`${c}/v3/rooms/([^/]+)/messages`), (r) => this.messages(r)],
+      ['POST', re(`${c}/v3/user_directory/search`), (r) => this.searchPeople(r)],
+      ['GET', re(`${c}/v3/publicRooms`), (r) => this.publicRooms(r)],
+      ['POST', re(`${c}/v3/publicRooms`), (r) => this.publicRooms(r)],
       ['POST', re(`${c}/v3/join/([^/]+)`), (r) => this.join(r.params[0]!)],
       ['POST', re(`${c}/v3/rooms/([^/]+)/join`), (r) => this.join(r.params[0]!)],
       ['POST', re(`${c}/v3/rooms/([^/]+)/leave`), (r) => this.leave(r.params[0]!)],
@@ -177,6 +184,9 @@ export class DemoHomeserver {
       ['GET', re(`${c}/v3/room_keys/keys`), (r) => this.getBackupKeys(r)],
       // Ключи одной комнаты — их просит Rust-крипто, приглашая: чтобы передать приглашённому историю.
       ['GET', re(`${c}/v3/room_keys/keys/([^/]+)`), (r) => this.getRoomBackupKeys(r)],
+      ['PUT', re(`${c}/v3/user/([^/]+)/rooms/([^/]+)/tags/([^/]+)`), (r) => this.putTag(r.params[1]!, r.params[2]!, r.body)],
+      ['DELETE', re(`${c}/v3/user/([^/]+)/rooms/([^/]+)/tags/([^/]+)`), (r) => this.putTag(r.params[1]!, r.params[2]!, undefined)],
+      ['PUT', re(`${c}/v3/user/([^/]+)/rooms/([^/]+)/account_data/([^/]+)`), (r) => this.putRoomAccountData(r.params[1]!, r.params[2]!, r.body)],
       ['GET', re(`${c}/v3/user/([^/]+)/account_data/([^/]+)`), (r) => this.getAccountData(r.params[1]!)],
       ['PUT', re(`${c}/v3/user/([^/]+)/account_data/([^/]+)`), (r) => this.putAccountData(r.params[1]!, r.body)],
     ];
@@ -307,10 +317,11 @@ export class DemoHomeserver {
       for (const [id, device] of Object.entries(this.account.devices)) if (device.keys) device_keys[demoUsers.alice]![id] = device.keys;
     }
     const byUser = (key: string) => (aboutAlice && this.account.crossSigning[key] ? { [demoUsers.alice]: this.account.crossSigning[key] } : {});
+    const anya = asked.includes(demoUsers.anya) ? anyaIdentities[this.account.anyaNewKeys ? 1 : 0]! : undefined;
     return json(200, {
       device_keys,
-      master_keys: byUser('master_key'),
-      self_signing_keys: byUser('self_signing_key'),
+      master_keys: { ...byUser('master_key'), ...(anya ? { [demoUsers.anya]: anya.master_key } : {}) },
+      self_signing_keys: { ...byUser('self_signing_key'), ...(anya ? { [demoUsers.anya]: anya.self_signing_key } : {}) },
       user_signing_keys: byUser('user_signing_key'),
       failures: {},
     });
@@ -361,6 +372,26 @@ export class DemoHomeserver {
     this.save();
     this.pendingAccountData.push({ type, content });
     this.wake?.();
+    return json(200, {});
+  }
+
+  /** Тег комнаты: `content` — поставить, `undefined` — снять. Приходит синхронизацией целиком. */
+  private putTag(roomId: string, tag: string, content: unknown): Response {
+    const room = this.rooms.get(roomId);
+    if (!room) return json(403, { errcode: 'M_FORBIDDEN', error: 'Not in room' });
+    const tags = { ...room.tags };
+    if (content === undefined) delete tags[tag];
+    else tags[tag] = (content ?? {}) as Record<string, unknown>;
+    room.tags = tags;
+    this.enqueue({ kind: 'join', roomId: room.roomId, body: { account_data: { events: [{ type: 'm.tag', content: { tags } }] } } });
+    return json(200, {});
+  }
+
+  private putRoomAccountData(roomId: string, type: string, content: unknown): Response {
+    const room = this.rooms.get(roomId);
+    if (!room) return json(403, { errcode: 'M_FORBIDDEN', error: 'Not in room' });
+    room.accountData = { ...room.accountData, [type]: content };
+    this.enqueue({ kind: 'join', roomId: room.roomId, body: { account_data: { events: [{ type, content }] } } });
     return json(200, {});
   }
 
@@ -547,7 +578,7 @@ export class DemoHomeserver {
     if (since) {
       // Нового ничего нет — держим длинный опрос, как настоящий сервер, но недолго;
       // появилось (вошли по приглашению, прочитали) — отвечаем сразу.
-      if (this.pending.length === 0 && this.pendingAccountData.length === 0) {
+      if (this.pending.length === 0 && this.pendingAccountData.length === 0 && this.pendingKeyChanges.length === 0) {
         const timeout = Number(url.searchParams.get('timeout') ?? 0);
         await Promise.race([
           delay(Math.min(timeout, LONG_POLL_CAP_MS), signal),
@@ -576,6 +607,7 @@ export class DemoHomeserver {
           events: [
             ...(room.tags ? [{ type: 'm.tag', content: { tags: room.tags } }] : []),
             ...(room.fullyRead ? [{ type: 'm.fully_read', content: { event_id: room.fullyRead } }] : []),
+            ...Object.entries(room.accountData ?? {}).map(([type, content]) => ({ type, content })),
           ],
         },
         unread_notifications: {
@@ -619,10 +651,12 @@ export class DemoHomeserver {
       else join[roomId] = mergeJoin(join[roomId] as Record<string, unknown> | undefined, change['body'] as Record<string, unknown>);
     }
     const accountData = this.pendingAccountData.splice(0);
+    const keyChanges = this.pendingKeyChanges.splice(0);
     return {
       next_batch: `s${++this.batch}`,
       rooms: { join, invite: {}, leave },
       ...(accountData.length ? { account_data: { events: accountData } } : {}),
+      ...(keyChanges.length ? { device_lists: { changed: keyChanges, left: [] } } : {}),
     };
   }
 
@@ -631,8 +665,10 @@ export class DemoHomeserver {
     this.wake?.();
   }
 
-  /** Вход по приглашению: комната становится обычной, с Алисой среди участников. */
+  /** Вход по приглашению или из каталога: комната становится обычной, с Алисой среди участников. */
   private join(roomIdOrAlias: string): Response {
+    const listed = demoDirectory.find((room) => room.roomId === roomIdOrAlias || room.alias === roomIdOrAlias);
+    if (listed) return this.joinListed(listed);
     const invite = this.invites.find((i) => i.roomId === roomIdOrAlias);
     if (!invite && !this.rooms.has(roomIdOrAlias)) {
       return json(404, { errcode: 'M_NOT_FOUND', error: 'No such room' });
@@ -714,7 +750,21 @@ export class DemoHomeserver {
     };
     this.append(roomId, event, txnId);
     if (type === 'm.room.message' && roomId === demoRooms.weekend) this.veraTypes(roomId);
+    if (roomId === demoRooms.anya && !this.account.anyaNewKeys) this.anyaChangesKeys();
     return json(200, { event_id: eventId });
+  }
+
+  /**
+   * На первое сообщение Алисы Аня будто входит с нового телефона: у неё вторая личность
+   * (`identities.ts`), и следующая синхронизация говорит об этом в `device_lists`. Так в демо
+   * видно полосу «новые ключи шифрования». Сообщения в этом чате зашифрованы — сервер их не
+   * читает, поэтому повод — само сообщение, а не слово в нём.
+   */
+  private anyaChangesKeys(): void {
+    this.account.anyaNewKeys = true;
+    this.save();
+    this.pendingKeyChanges.push(demoUsers.anya);
+    this.wake?.();
   }
 
   /** Событие Алисы — в историю и в следующую синхронизацию, с её `transaction_id`. */
@@ -841,11 +891,77 @@ export class DemoHomeserver {
     this.wake?.();
   }
 
+  // ————— Каталоги: люди и открытые комнаты —————
+
+  /** `/user_directory/search` — по имени и адресу; Лена есть только здесь. */
+  private searchPeople({ body }: DemoRequest): Response {
+    const { search_term: term = '', limit = 10 } = (body ?? {}) as { search_term?: string; limit?: number };
+    const needle = term.trim().toLocaleLowerCase();
+    const results = Object.entries(this.profiles)
+      .filter(([id, profile]) => needle && (id.toLocaleLowerCase().includes(needle) || profile.displayname.toLocaleLowerCase().includes(needle)))
+      .slice(0, limit)
+      .map(([id, profile]) => ({ user_id: id, display_name: profile.displayname, ...(profile.avatar_url ? { avatar_url: profile.avatar_url } : {}) }));
+    return json(200, { results, limited: false });
+  }
+
+  /** `/publicRooms`: каталог по две комнаты на страницу — чтобы было что подгружать. */
+  private publicRooms({ body, url }: DemoRequest): Response {
+    const request = (body ?? {}) as { since?: string; filter?: { generic_search_term?: string } };
+    const since = Number(request.since ?? url.searchParams.get('since') ?? 0);
+    const needle = (request.filter?.generic_search_term ?? '').trim().toLocaleLowerCase();
+    const found = demoDirectory.filter((room) => !needle || `${room.name} ${room.alias} ${room.topic}`.toLocaleLowerCase().includes(needle));
+    const pageSize = 2;
+    const chunk = found.slice(since, since + pageSize).map((room) => ({
+      room_id: room.roomId,
+      name: room.name,
+      topic: room.topic,
+      canonical_alias: room.alias,
+      num_joined_members: room.members.length + (this.rooms.has(room.roomId) ? 1 : 0),
+      world_readable: false,
+      guest_can_join: false,
+      join_rule: room.joinRule,
+    }));
+    const next = since + pageSize < found.length ? String(since + pageSize) : undefined;
+    return json(200, { chunk, total_room_count_estimate: found.length, ...(next ? { next_batch: next } : {}) });
+  }
+
+  /** Войти в комнату из каталога — открытую; в закрытую без приглашения нельзя. */
+  private joinListed(listed: (typeof demoDirectory)[number]): Response {
+    if (this.rooms.has(listed.roomId)) return json(200, { room_id: listed.roomId });
+    if (listed.joinRule !== 'public') return json(403, { errcode: 'M_FORBIDDEN', error: 'You are not invited to this room' });
+    const alice = demoUsers.alice;
+    const at = Date.now();
+    const owner = listed.members[0] ?? alice;
+    const member = (u: string) => ({ type: 'm.room.member', sender: u, state_key: u, content: { membership: 'join', displayname: this.profiles[u]?.displayname } });
+    const state: DemoEvent[] = [
+      { type: 'm.room.create', sender: owner, state_key: '', content: { room_version: '10', creator: owner } },
+      ...listed.members.map(member),
+      { type: 'm.room.join_rules', sender: owner, state_key: '', content: { join_rule: 'public' } },
+      { type: 'm.room.history_visibility', sender: owner, state_key: '', content: { history_visibility: 'shared' } },
+      { type: 'm.room.name', sender: owner, state_key: '', content: { name: listed.name } },
+      { type: 'm.room.topic', sender: owner, state_key: '', content: { topic: listed.topic } },
+      { type: 'm.room.canonical_alias', sender: owner, state_key: '', content: { alias: listed.alias } },
+    ].map((e, i) => ({ ...e, event_id: `$${listed.roomId.slice(1, listed.roomId.indexOf(':'))}-${i}`, origin_server_ts: at - 1000 + i }));
+    const joinEvent: DemoEvent = { ...member(alice), event_id: `$join-${listed.roomId}-${this.batch}`, origin_server_ts: at };
+    this.rooms.set(listed.roomId, { roomId: listed.roomId, state: [...state, joinEvent], timeline: [joinEvent] });
+    this.enqueue({
+      kind: 'join',
+      roomId: listed.roomId,
+      body: {
+        state: { events: state.map((e) => withDefaults(e)) },
+        timeline: { events: [withDefaults(joinEvent)], limited: false, prev_batch: 't0' },
+        summary: { 'm.joined_member_count': listed.members.length + 1, 'm.invited_member_count': 0 },
+      },
+    });
+    return json(200, { room_id: listed.roomId });
+  }
+
   // ————— Комнаты: создание и участники —————
 
   private createRoom({ body }: DemoRequest): Response {
     const request = (body ?? {}) as {
       name?: string;
+      topic?: string;
       preset?: string;
       is_direct?: boolean;
       invite?: string[];
@@ -878,6 +994,7 @@ export class DemoHomeserver {
       { type: 'm.room.join_rules', sender: alice, state_key: '', content: { join_rule: request.preset === 'public_chat' ? 'public' : 'invite' } },
       { type: 'm.room.history_visibility', sender: alice, state_key: '', content: { history_visibility: 'shared' } },
       ...(request.name ? [{ type: 'm.room.name', sender: alice, state_key: '', content: { name: request.name } }] : []),
+      ...(request.topic ? [{ type: 'm.room.topic', sender: alice, state_key: '', content: { topic: request.topic } }] : []),
       ...(request.initial_state ?? []).map((e) => ({ ...e, sender: alice, state_key: e.state_key ?? '' })),
       ...invited.map((u) => ({
         type: 'm.room.member',

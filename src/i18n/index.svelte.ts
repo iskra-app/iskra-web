@@ -9,10 +9,17 @@
  * ни плагина, ни рантайма больше этого файла.
  *
  * Русский пишется первым, английский — вторым. Тексты, общие с нативной Искрой,
- * переносятся дословно из её Localizable.strings — с тем же ключом.
+ * переносятся дословно из её Localizable.strings — с тем же ключом. Остальные языки — те же,
+ * что у нативной (de, es, fr, ja, zh-Hans): общее — из её переводов, своё веба — переведено
+ * здесь, на «вы», как там.
  */
 import ru from './ru.json';
 import en from './en.json';
+import de from './de.json';
+import es from './es.json';
+import fr from './fr.json';
+import ja from './ja.json';
+import zh from './zh.json';
 
 type Ru = typeof ru;
 export type MessageKey = keyof Ru;
@@ -23,16 +30,21 @@ export type TextKey = Exclude<MessageKey, PluralKey>;
 export type PluralForms = Partial<Record<Intl.LDMLPluralRule, string>> & { other: string };
 export type Catalog = { [K in MessageKey]: Ru[K] extends string ? string : PluralForms };
 
-export const locales = ['ru', 'en'] as const;
+export const locales = ['ru', 'en', 'de', 'es', 'fr', 'ja', 'zh'] as const;
 export type Locale = (typeof locales)[number];
 
-export const catalogs: Record<Locale, Catalog> = { ru, en };
+export const catalogs: Record<Locale, Catalog> = { ru, en, de, es, fr, ja, zh };
 
-/** Первый язык из `navigator.languages`, который у нас есть; иначе английский. */
+/**
+ * Первый язык из `navigator.languages`, который у нас есть; иначе английский. Китайский у нас
+ * только упрощённый — традиционному (`zh-Hant`, `zh-TW`, `zh-HK`) честнее английский, чем
+ * чужая письменность.
+ */
 export function preferredLocale(languages: readonly string[]): Locale {
   for (const tag of languages) {
-    const base = tag.toLowerCase().split('-')[0];
-    const found = locales.find((l) => l === base);
+    const parts = tag.toLowerCase().split('-');
+    if (parts[0] === 'zh' && parts.slice(1).some((p) => p === 'hant' || p === 'tw' || p === 'hk' || p === 'mo')) continue;
+    const found = locales.find((l) => l === parts[0]);
     if (found) return found;
   }
   return 'en';

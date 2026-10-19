@@ -3,6 +3,7 @@
   резервную копию. Отложил шаг восстановления — плашка помнит за него.
 -->
 <script lang="ts">
+  import { ICON_VIEWBOX, icons } from '../../design/icons.ts';
   import type { RecoveryStore } from '../../core/encryption/recovery.svelte.ts';
   import { t } from '../../i18n/index.svelte.ts';
 
@@ -11,8 +12,8 @@
 
 {#if recovery?.protection === 'keyNeeded'}
   <button type="button" class="locked" onclick={onopen}>
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true">
-      <path d="M7 11V8a5 5 0 0 1 10 0v3M6 11h12v9H6z" />
+    <svg viewBox={ICON_VIEWBOX} aria-hidden="true">
+      <path d={icons.lock} />
     </svg>
     <span>{t('recovery.banner.locked')}</span>
   </button>

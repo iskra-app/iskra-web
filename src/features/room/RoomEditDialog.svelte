@@ -96,12 +96,12 @@
       {/if}
       {#if details.permissions.canChangeVisibility}
         <label class="toggle">
-          <input type="checkbox" bind:checked={isOpen} />
           <span>
             <strong>{t('room.manage.openToAnyone')}</strong>
             <span class="help">{t('room.manage.openToAnyoneHelp')}</span>
             {#if isOpen && details.encrypted}<span class="help">{t('roomList.new.openMeansUnencrypted')}</span>{/if}
           </span>
+          <input type="checkbox" role="switch" bind:checked={isOpen} />
         </label>
       {/if}
     {/if}
@@ -147,21 +147,15 @@
   }
   .toggle {
     display: flex;
-    align-items: flex-start;
+    align-items: center;
     gap: var(--space-close);
     color: var(--color-text);
     font-size: var(--font-size-body);
     cursor: pointer;
   }
-  .toggle input {
-    flex: none;
-    width: var(--size-icon);
-    height: var(--size-icon);
-    margin-block-start: var(--space-within-run);
-    accent-color: var(--accent);
-  }
   .toggle > span {
     display: flex;
+    flex: 1;
     flex-direction: column;
     gap: var(--space-tight);
   }

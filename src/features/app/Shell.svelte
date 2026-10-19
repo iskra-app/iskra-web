@@ -11,9 +11,11 @@
   import { viewport } from '../../design/viewport.svelte.ts';
   import ConfirmDialog from '../../design/ConfirmDialog.svelte';
   import { router } from '../../core/navigation/router.svelte.ts';
+  import { parseRoute } from '../../core/navigation/route';
   import { app } from '../../core/session/app.svelte.ts';
   import type { UserSession } from '../../core/session/userSession.svelte.ts';
-  import { t } from '../../i18n/index.svelte.ts';
+  import { plural, t } from '../../i18n/index.svelte.ts';
+  import { typingText } from '../room/text';
   import { describeHotkey, match } from '../../design/hotkeys';
   import { hasUnread } from '../../core/rooms/types';
   import { preferences } from './preferences.svelte.ts';
@@ -46,6 +48,26 @@
   const room = $derived(roomId ? session.rooms.get(roomId) : undefined);
   // Чат, которого нет в списке (чужая ссылка, ещё не синхронизирован), — показываем ID.
   const title = $derived(room ? roomName(room) : (roomId ?? ''));
+
+  /**
+   * Что сейчас со связью — вместо «Чаты» над списком и первым под именем чата, как
+   * `RoomListStatus` нативной. `undefined` — всё в порядке.
+   */
+  const status = $derived(
+    session.connection === 'offline' ? t('roomList.waitingForNetwork') : session.connection === 'connecting' ? t('roomList.updating') : undefined,
+  );
+  /**
+   * Строка под именем чата — `headerSubtitle` нативной: связь, потом кто печатает, потом кто
+   * это — ID собеседника в личном чате, число участников в группе.
+   */
+  const subtitle = $derived.by(() => {
+    if (status) return status;
+    const typing = roomTimeline?.typing ?? [];
+    if (typing.length) return room?.kind === 'direct' ? t('room.typing') : typingText(typing);
+    if (!room) return undefined;
+    if (room.kind === 'direct') return room.counterpartId;
+    return room.memberCount > 0 ? plural('room.members', room.memberCount) : undefined;
+  });
 
   $effect(() => {
     showBadge(session.rooms.badge, t('app.name'));
@@ -99,7 +121,9 @@
         // Открытое окно или меню закрывается само (`<dialog>`); это — когда закрывать нечего.
         if (document.querySelector('dialog[open]')) return;
         if (panelOpen) panelOpen = false;
-        else if (roomId) roomView?.escape();
+        else if (roomId) {
+          if (!roomView?.escape()) closeRoom();
+        } else if (router.route.name === 'settings') settingsBack();
         else return;
         break;
       case 'attach':
@@ -124,6 +148,17 @@
 
   /** Раздел настроек на экране; `undefined` — список разделов или не настройки. */
   const settingsSection = $derived(router.route.name === 'settings' ? router.route.section : undefined);
+  /**
+   * «Назад» в настройках — и кнопкой в шапке, и `Esc`: из раздела — к тому, откуда он открыт, из
+   * списка — к чатам. От адреса, а не от `router.route`: пока смена экрана анимируется, маршрут ещё
+   * прежний, и второй `Esc` подряд вёл бы туда же, где уже стоим.
+   */
+  function settingsBack() {
+    const current = parseRoute(window.location.hash);
+    const settingsSection = current.name === 'settings' ? current.section : undefined;
+    if (settingsSection) router.go({ name: 'settings', section: settingsParent[settingsSection] });
+    else router.go({ name: 'home' });
+  }
 </script>
 
 <!--
@@ -148,7 +183,7 @@
 >
   {#snippet list()}
     <div class="list-column">
-      <Bar title={t('roomList.title')}>
+      <Bar title={status ?? t('roomList.title')}>
         {#snippet trailing()}
           <IconButton label={t('quickSwitch.label')} shortcut={describeHotkey('quickSwitch')} onclick={() => (switching = true)}>
             <Icon name="search" />
@@ -171,7 +206,7 @@
   {#snippet main()}
     {#if roomId}
       <div class="main-column">
-      <Bar {title}>
+      <Bar {title} {subtitle}>
         {#snippet leading()}
           {#if viewport.layout === 'stack'}
             <IconButton label={t('room.back')} onclick={closeRoom}><Icon name="back" /></IconButton>
@@ -194,9 +229,9 @@
           {#snippet leading()}
             <!-- Из раздела — к списку разделов; из списка — к чатам, если они не рядом. -->
             {#if settingsSection}
-              <IconButton label={t('settings.back')} onclick={() => router.go({ name: 'settings', section: settingsParent[settingsSection] })}><Icon name="back" /></IconButton>
+              <IconButton label={t('settings.back')} onclick={settingsBack}><Icon name="back" /></IconButton>
             {:else if viewport.layout === 'stack'}
-              <IconButton label={t('settings.back')} onclick={() => router.go({ name: 'home' })}><Icon name="back" /></IconButton>
+              <IconButton label={t('settings.back')} onclick={settingsBack}><Icon name="back" /></IconButton>
             {/if}
           {/snippet}
           {#snippet trailing()}

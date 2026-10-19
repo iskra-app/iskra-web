@@ -32,11 +32,20 @@ function forest(): string {
 <rect width="800" height="1000" fill="#cfe3d0"/><circle cx="600" cy="180" r="90" fill="#fdf1c7"/>${trees}</svg>`;
 }
 
+function yard(): string {
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="900" height="900" viewBox="0 0 900 900">
+<rect width="900" height="900" fill="#dfe6ee"/><rect y="620" width="900" height="280" fill="#9aa7a0"/>
+<rect x="180" y="220" width="540" height="420" fill="#c98f6b"/><path d="M150 230 L450 80 L750 230Z" fill="#7a4b3a"/>
+${Array.from({ length: 6 }, (_, i) => `<rect x="${230 + (i % 3) * 160}" y="${280 + Math.floor(i / 3) * 150}" width="80" height="90" fill="#f4e7b8"/>`).join('')}
+<rect x="410" y="520" width="80" height="120" fill="#5b3a2c"/></svg>`;
+}
+
 /** mediaId → байты. */
 export function demoMediaLibrary(): Map<string, DemoMedia> {
   return new Map([
     ['lake', { bytes: encode(lake()), type: 'image/svg+xml' }],
     ['forest', { bytes: encode(forest()), type: 'image/svg+xml' }],
+    ['yard', { bytes: encode(yard()), type: 'image/svg+xml' }],
     ['voice', { bytes: voiceWav(), type: 'audio/wav' }],
     ['list', { bytes: encode('Что взять на пикник\n\n— плед\n— термос\n— мангал и угли\n— пирог (Вера)\n'), type: 'text/plain' }],
   ]);

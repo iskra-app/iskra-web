@@ -164,13 +164,18 @@ test('закреплённое: полоса над лентой, нажатие
   await expect(menu.getByRole('menuitem', { name: /Закрепить|Открепить/ })).toHaveCount(0);
 });
 
-test('«печатает…»: Вера отвечает на сообщение и затихает', async ({ page }) => {
+test('шапка чата, как в нативной: под именем — «печатает…», потом число участников; в личном — ID собеседника', async ({ page }) => {
   await signInToDemo(page);
   await openRoom(page, /^Выходные/);
+  const subtitle = page.locator('.main-column header .subtitle');
+  await expect(subtitle).toHaveText('3 участника');
   await page.getByRole('textbox', { name: 'Сообщение' }).fill('Кто за рулём?');
   await page.getByRole('button', { name: 'Отправить' }).click();
-  await expect(page.getByText('Вера печатает…')).toBeVisible({ timeout: 10_000 });
-  await expect(page.getByText('Вера печатает…')).toBeHidden({ timeout: 15_000 });
+  await expect(subtitle).toHaveText('Вера печатает…', { timeout: 10_000 });
+  await expect(subtitle).toHaveText('3 участника', { timeout: 15_000 });
+
+  await openRoom(page, /^Аня/);
+  await expect(subtitle).toHaveText('@anya:demo.iskra.invalid');
 });
 
 test('HTML сообщения: разметка на месте, скрипта нет, картинка — подписью; под CSP без ошибок', async ({ page }) => {
@@ -218,15 +223,12 @@ test('мышь: панель по наведению; справка по кла
   await page.keyboard.press('Escape');
   await expect(help).toBeHidden();
 
-  // `Esc`, когда закрывать нечего: вниз, к последнему.
+  // `Esc`, когда закрывать нечего: чат закрывается, как в нативной на Mac.
   await openRoom(page, /^Длинная история/);
-  await expect(bubble(page, 'Сообщение номер 400')).toBeInViewport();
-  await page.getByRole('log').evaluate((log) => log.parentElement!.scrollBy({ top: -300 }));
-  const toBottom = page.getByRole('button', { name: 'Вниз, к последнему сообщению' });
-  await expect(toBottom).toBeVisible();
+  await page.getByRole('log').click();
   await page.keyboard.press('Escape');
-  await expect(toBottom).toBeHidden();
-  await expect(bubble(page, 'Сообщение номер 400')).toBeInViewport();
+  await expect(page.getByRole('log')).toHaveCount(0);
+  await expect(page).not.toHaveURL(/#\/room\//);
 });
 
 test('телефон: меню листом снизу', async ({ page }, info) => {
@@ -442,4 +444,55 @@ test('лента с клавиатуры: одна остановка Tab, ст�
   await page.keyboard.press('Home');
   expect(await focused()).toMatch(/^article:/);
   expect(await focused()).not.toMatch(/Прогноз/);
+});
+
+test('плавающая дата: пока листают — день того, что наверху; остановились — гаснет', async ({ page }, info) => {
+  test.skip(isPhone(info.project.name), 'колесо — десктоп');
+  await signInToDemo(page);
+  await openRoom(page, /^Длинная история/);
+  await expect(bubble(page, 'Сообщение номер 400')).toBeInViewport();
+  const floating = page.locator('.floating');
+  await expect(floating).toHaveCount(0);
+  await page.getByRole('log').hover();
+  await page.mouse.wheel(0, -600);
+  await expect(page.locator('.floating.shown')).toBeVisible();
+  await expect(floating).not.toBeEmpty();
+  await expect(page.locator('.floating.shown')).toHaveCount(0, { timeout: 3000 });
+});
+
+test('заблокировали собеседника — вместо поля «Вы заблокировали…» и «Разблокировать»', async ({ page }) => {
+  await signInToDemo(page);
+  await openRoom(page, /^Аня/);
+  await page.getByRole('button', { name: 'О чате' }).click();
+  await page.getByRole('button', { name: 'Заблокировать пользователя' }).click();
+  await page.getByRole('button', { name: 'Закрыть' }).first().click().catch(() => {});
+  const banner = page.getByRole('status').filter({ hasText: 'Вы заблокировали этого пользователя' });
+  await expect(banner).toBeVisible();
+  await expect(page.getByRole('textbox', { name: 'Сообщение' })).toHaveCount(0);
+  await banner.getByRole('button', { name: 'Разблокировать' }).click();
+  await expect(page.getByRole('textbox', { name: 'Сообщение' })).toBeVisible();
+});
+
+test('полоса «новые ключи»: собеседник сменил ключи — сказано над лентой; «Понятно» убирает её насовсем', async ({ page }) => {
+  const problems = watchForProblems(page);
+  await signInToDemo(page);
+  await openRoom(page, /^Аня/);
+  const banner = page.getByRole('status').filter({ hasText: 'Аня: новые ключи шифрования' });
+  await expect(banner).toHaveCount(0);
+  // В демо Аня «входит с нового телефона» в ответ на первое сообщение ей.
+  await page.getByRole('textbox', { name: 'Сообщение' }).fill('Ты тут?');
+  await page.getByRole('button', { name: 'Отправить' }).click();
+  await expect(banner).toBeVisible({ timeout: 20_000 });
+  await expect(banner).toContainText('после входа на новом телефоне');
+  // Пока не ответили — вопрос остаётся и после перезагрузки: его помнит крипто, а не экран.
+  await page.reload({ waitUntil: 'domcontentloaded' });
+  await expect(banner).toBeVisible({ timeout: 20_000 });
+  await banner.getByRole('button', { name: 'Понятно' }).click();
+  await expect(banner).toHaveCount(0);
+  // Новые ключи запомнены как ожидаемые: после перезагрузки полоса не возвращается.
+  await page.reload({ waitUntil: 'domcontentloaded' });
+  await expect(page.getByRole('log').getByRole('article').filter({ hasText: 'Возьми плед' })).toBeVisible({ timeout: 20_000 });
+  await page.waitForTimeout(1_000);
+  await expect(banner).toHaveCount(0);
+  expect(problems).toEqual([]);
 });

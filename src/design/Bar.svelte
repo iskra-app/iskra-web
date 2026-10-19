@@ -7,14 +7,23 @@
   interface Props {
     leading?: Snippet;
     title: string;
+    /** Строка под заголовком — как у шапки чата в нативной: кто печатает, кто это, сколько их. */
+    subtitle?: string;
     trailing?: Snippet;
   }
-  let { leading, title, trailing }: Props = $props();
+  let { leading, title, subtitle, trailing }: Props = $props();
 </script>
 
 <header class="bar glass" data-titlebar>
   <div class="side">{#if leading}{@render leading()}{/if}</div>
-  <h1>{title}</h1>
+  {#if subtitle}
+    <div class="titles">
+      <h1>{title}</h1>
+      <p class="subtitle">{subtitle}</p>
+    </div>
+  {:else}
+    <h1>{title}</h1>
+  {/if}
   <div class="side end">{#if trailing}{@render trailing()}{/if}</div>
 </header>
 
@@ -41,6 +50,19 @@
     margin: 0;
     font-size: var(--font-size-body);
     font-weight: 600;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+  }
+  .titles {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+  }
+  .subtitle {
+    margin: 0;
+    font-size: var(--font-size-caption);
+    color: var(--color-text-secondary);
     overflow: hidden;
     white-space: nowrap;
     text-overflow: ellipsis;

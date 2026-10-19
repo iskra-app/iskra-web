@@ -19,7 +19,8 @@
     "commonmark": "0.31.2",
     "dompurify": "^3.4.16",
     "matrix-encrypt-attachment": "^1.0.3",
-    "matrix-js-sdk": "^42.4.0"
+    "matrix-js-sdk": "^42.4.0",
+    "uqr": "0.1.2"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",

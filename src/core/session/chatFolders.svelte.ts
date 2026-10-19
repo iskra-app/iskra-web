@@ -38,6 +38,19 @@ export class ChatFolders {
     return this.write(next);
   }
 
+  /**
+   * «В папку» из меню чата: галочка — чат в папке вручную, даже если не подходит под правило;
+   * без галочки — исключён из неё. Обе — поправки по имени, правило папки не трогается.
+   */
+  setMembership(roomId: string, folderId: string, isIn: boolean): Promise<boolean> {
+    const folder = this.folders.find((f) => f.id === folderId);
+    if (!folder) return Promise.resolve(false);
+    const included = folder.included.filter((id) => id !== roomId);
+    const excluded = folder.excluded.filter((id) => id !== roomId);
+    (isIn ? included : excluded).push(roomId);
+    return this.save({ ...folder, included, excluded });
+  }
+
   delete(id: string): Promise<boolean> {
     return this.write(this.folders.filter((f) => f.id !== id));
   }

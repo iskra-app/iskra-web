@@ -53,7 +53,9 @@
   });
 
   $effect(() => {
-    document.documentElement.lang = i18n.locale;
+    // Китайский — с письменностью: по `lang` браузер выбирает начертания иероглифов, и без
+    // `Hans` они могли бы прийти из японского шрифта.
+    document.documentElement.lang = i18n.locale === 'zh' ? 'zh-Hans' : i18n.locale;
     // Вошедшему заголовок ведёт `badge.svelte.ts` — с числом непрочитанных.
     if (app.phase.name !== 'signed-in') document.title = t('app.name');
   });

@@ -18,12 +18,15 @@
   import { preferences } from '../app/preferences.svelte.ts';
   import Avatar from '../../design/Avatar.svelte';
   import RoomFace from '../rooms/RoomFace.svelte';
+  import QrCodeDialog from '../app/QrCodeDialog.svelte';
   import { Photo, pixelsFor } from '../rooms/faces.svelte.ts';
   import RoomEditDialog from './RoomEditDialog.svelte';
   import InviteDialog from './InviteDialog.svelte';
   import RoleDialog from './RoleDialog.svelte';
   import type { TimelineStore } from '../../core/timeline/timelineStore.svelte.ts';
   import { roomTimestamp } from '../../design/time';
+  import { viewport } from '../../design/viewport.svelte.ts';
+  import Icon from '../../design/Icon.svelte';
   import FileCard from '../media/FileCard.svelte';
   import VoiceMessage from '../media/VoiceMessage.svelte';
   import MediaTile from '../media/MediaTile.svelte';
@@ -180,6 +183,50 @@
     return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
   };
 
+  // ————— Шапка и кнопки под ней — как `RoomInfoView` нативной —————
+
+  /** Собеседник личного чата: его Matrix ID — подзаголовок, ради него этот экран и открывают. */
+  const counterpart = $derived(details?.direct ? details.members.find((m) => m.id !== session.userId) : undefined);
+  const subtitle = $derived(
+    !details ? '' : counterpart ? counterpart.id : details.members.length > 0 ? plural('room.members', details.members.length) : '',
+  );
+  const muted = $derived(details?.alerts === 'muted');
+  const blocked = $derived(!!counterpart && session.blocked.has(counterpart.id));
+
+  /**
+   * Ссылка, которой можно поделиться: на человека — в личном чате, на комнату — только на
+   * открытую (в закрытую по ссылке не войти). Иначе «Поделиться» нет.
+   */
+  const link = $derived.by(() => {
+    if (!details) return undefined;
+    if (counterpart) return `https://matrix.to/#/${encodeURIComponent(counterpart.id)}`;
+    if (!details.open) return undefined;
+    const server = details.roomId.split(':').slice(1).join(':');
+    return `https://matrix.to/#/${encodeURIComponent(details.roomId)}${server ? `?via=${encodeURIComponent(server)}` : ''}`;
+  });
+  let linkCopied = $state(false);
+  /** QR-код собеседника или открытой комнаты — с той же ссылкой, что «Поделиться». */
+  let showingCode = $state(false);
+  const roomPhoto = $derived(new Photo(session, room?.avatarUrl, pixelsFor(4)));
+  $effect(() => {
+    if (!linkCopied) return;
+    const timer = setTimeout(() => (linkCopied = false), 3000);
+    return () => clearTimeout(timer);
+  });
+
+  /** Системный лист «Поделиться», где он есть (телефон), иначе — в буфер обмена. */
+  async function share() {
+    if (!link) return;
+    if (typeof navigator.share === 'function' && !viewport.finePointer) {
+      await navigator.share({ url: link }).catch(() => {});
+      return;
+    }
+    await navigator.clipboard
+      .writeText(link)
+      .then(() => (linkCopied = true))
+      .catch(() => {});
+  }
+
   async function leave() {
     leaving = false;
     if (await details?.leave()) router.go({ name: 'home' });
@@ -193,16 +240,64 @@
         {#if room}<RoomFace {room} {session} />{/if}
       </span>
       <h2>{details.name}</h2>
-      {#if details.topic}<p class="topic">{details.topic}</p>{/if}
+      {#if subtitle}<p class="subtitle" class:selectable={!!counterpart}>{subtitle}</p>{/if}
+      <!-- Что значит замок в шапке — мелко, сразу под именем: первое, что стоит знать о чате после того, кто это. -->
+      <p class="privacy" class:open={!details.encrypted}>
+        <Icon name={details.encrypted ? 'lock' : 'unlock'} />
+        {t(details.encrypted ? 'privacy.protected' : 'privacy.notProtected')}
+      </p>
       {#if canEdit}
         <button type="button" class="link" onclick={() => (editing = true)}>{t('room.manage.edit')}</button>
       {/if}
     </header>
 
+    <!-- Круглые кнопки под портретом: звук, пригласить, поделиться — `ProfileActionTile` нативной. -->
+    <div class="tiles">
+      <button type="button" class="tile" onclick={() => details?.setAlerts(muted ? 'all' : 'muted')}>
+        <Icon name={muted ? 'bellOff' : 'bell'} />
+        <span>{t(muted ? 'profile.unmute' : 'profile.mute')}</span>
+      </button>
+      {#if !details.direct && details.permissions.canInvite}
+        <button type="button" class="tile" onclick={() => (inviting = true)}>
+          <Icon name="personAdd" />
+          <span>{t('room.manage.invite')}</span>
+        </button>
+      {/if}
+      {#if link}
+        <button type="button" class="tile" onclick={() => void share()}>
+          <Icon name="share" />
+          <span>{t('profile.share')}</span>
+        </button>
+        <button type="button" class="tile" onclick={() => (showingCode = true)}>
+          <Icon name="qr" />
+          <span>{t('qr.title')}</span>
+        </button>
+      {/if}
+    </div>
+    {#if link}
+      <QrCodeDialog
+        open={showingCode}
+        {link}
+        name={details.name}
+        subtitle={counterpart?.id ?? details.roomId}
+        seed={room?.avatarSeed}
+        photo={roomPhoto.url}
+        onclose={() => (showingCode = false)}
+      />
+    {/if}
+    {#if linkCopied}<p class="copied" role="status">{t('room.linkCopiedWeb')}</p>{/if}
+
     {#if details.failure}
       <div class="failure">
         <ProblemPanel message={t(`roomAction.${details.failure}Failed` as TextKey)} />
       </div>
+    {/if}
+
+    {#if details.topic}
+      <section aria-labelledby="about-title">
+        <h3 id="about-title">{t('room.about')}</h3>
+        <p class="topic">{details.topic}</p>
+      </section>
     {/if}
 
     <section aria-labelledby="alerts-title">
@@ -218,6 +313,23 @@
           >
         {/each}
       </div>
+      {#if counterpart}
+        <button
+          type="button"
+          class="danger"
+          onclick={() => void (blocked ? session.blocked.unblock(counterpart.id) : session.blocked.block(counterpart.id))}
+          >{t(blocked ? 'profile.unblockUser' : 'profile.blockUser')}</button
+        >
+        {#if blocked}<p class="blocked-note">{t('profile.blockedNotice')}</p>{/if}
+      {/if}
+    </section>
+
+    <!-- Выход — над содержимым, как в нативной: под сотней участников его было бы не найти.
+         Личный чат не покидают, а удаляют: собеседник остаётся, и вопрос — другой. -->
+    <section>
+      <button type="button" class="danger" disabled={details.working} onclick={() => (leaving = true)}
+        >{t(details.direct ? 'room.manage.deleteChat' : 'room.manage.leave')}</button
+      >
     </section>
 
     {#if details.pinned.length}
@@ -260,9 +372,6 @@
             {#if tab === 'members'}<span class="count">{plural('room.members', details.members.length)}</span>{/if}
           </h3>
           {#if tab === 'members'}
-            {#if details.permissions.canInvite}
-              <button type="button" class="link" onclick={() => (inviting = true)}>{t('room.manage.invite')}</button>
-            {/if}
             <ul class="list">
               {#each details.members as member (member.id)}
                 {@const can = actionsFor(member)}
@@ -338,9 +447,6 @@
       </section>
     {/if}
 
-    <section>
-      <button type="button" class="danger" disabled={details.working} onclick={() => (leaving = true)}>{t('room.manage.leave')}</button>
-    </section>
   </div>
 
   <Menu
@@ -377,9 +483,9 @@
 
   <ConfirmDialog
     open={leaving}
-    title={t('room.manage.leaveQuestion')}
-    message={t('room.manage.leaveHelp')}
-    confirmLabel={t('room.manage.leave')}
+    title={t(details.direct ? 'room.manage.deleteChatQuestion' : 'room.manage.leaveQuestion')}
+    message={t(details.direct ? 'room.manage.deleteChatHelp' : 'room.manage.leaveHelp')}
+    confirmLabel={t(details.direct ? 'room.manage.deleteChat' : 'room.manage.leave')}
     cancelLabel={t('room.manage.cancel')}
     destructive
     onclose={() => (leaving = false)}
@@ -426,9 +532,66 @@
   }
   .topic {
     margin: 0;
-    color: var(--color-text-secondary);
     white-space: pre-wrap;
     overflow-wrap: anywhere;
+    user-select: text;
+  }
+  .subtitle {
+    margin: 0;
+    color: var(--color-text-secondary);
+    overflow-wrap: anywhere;
+  }
+  .subtitle.selectable {
+    user-select: text;
+  }
+  .privacy {
+    display: flex;
+    align-items: center;
+    gap: var(--space-tight);
+    margin: 0;
+    color: var(--color-text-secondary);
+    font-size: var(--font-size-caption);
+  }
+  .privacy.open {
+    color: var(--color-warning);
+  }
+  .privacy :global(svg) {
+    width: var(--font-size-caption);
+    height: var(--font-size-caption);
+  }
+  .tiles {
+    display: grid;
+    grid-auto-columns: minmax(0, 1fr);
+    grid-auto-flow: column;
+    gap: var(--space-close);
+  }
+  .tile {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: var(--space-tight);
+    min-height: var(--tap-target);
+    padding: var(--space-close) var(--space-tight);
+    border: none;
+    border-radius: var(--radius-card);
+    background: var(--color-surface);
+    color: var(--accent);
+    font: inherit;
+    font-size: var(--font-size-caption);
+    cursor: pointer;
+  }
+  .tile :global(svg) {
+    width: var(--size-icon-button);
+    height: var(--size-icon-button);
+  }
+  .copied,
+  .blocked-note {
+    margin: 0;
+    color: var(--color-text-secondary);
+    font-size: var(--font-size-caption);
+  }
+  .copied {
+    text-align: center;
   }
   section {
     display: flex;

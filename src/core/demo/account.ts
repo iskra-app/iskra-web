@@ -26,6 +26,8 @@ export interface DemoAccountState {
   accountData: Record<string, unknown>;
   backups: DemoBackup[];
   nextDevice: number;
+  /** Аня уже сменила ключи (`identities.ts`): вторая личность вместо первой. */
+  anyaNewKeys?: boolean;
 }
 
 export interface DemoStorage {

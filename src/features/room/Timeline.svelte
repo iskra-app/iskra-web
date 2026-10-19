@@ -6,6 +6,7 @@
   подгруженной истории. Новые входящие объявляет отдельная вежливая область.
 -->
 <script lang="ts">
+  import { ICON_VIEWBOX, icons } from '../../design/icons.ts';
   import { onMount, tick } from 'svelte';
   import EmptyState from '../../design/EmptyState.svelte';
   import PrimaryButton from '../../design/PrimaryButton.svelte';
@@ -34,8 +35,10 @@
     /** Режим выбора: ключи отмеченных. `null` — обычная лента. */
     selection?: ReadonlySet<string> | null;
     ontoggle?: (message: Message) => void;
+    /** `false` — подглядывание из списка: лента не отмечает прочитанным ничего, сколько ни смотри. */
+    reads?: boolean;
   }
-  let { store, session, showSenders, actions, selection = null, ontoggle }: Props = $props();
+  let { store, session, showSenders, actions, selection = null, ontoggle, reads = true }: Props = $props();
 
   /** Имя строки-галочки: содержимое под ней `inert` и скринридеру не видно. */
   function spoken(message: Message): string {
@@ -65,6 +68,57 @@
   let anchor: ScrollAnchor | undefined = $state();
   let announcement = $state('');
   let now = $state(Date.now());
+
+  // ————— Плавающая дата — `FloatingDate` нативной (Telegram) —————
+  // Пока ленту листают, над ней — день того, что сейчас наверху: даты быстрой прокрутки
+  // проносятся быстрее, чем их прочтёшь. Остановились — гаснет: читающему она уже не нужна.
+  // Только когда листает человек — колесом, пальцем, клавишами, ползунком: лента, вставшая на
+  // место сама (открытие, подгрузка истории), датой не мигает.
+
+  const FLOATING_HOLD_MS = 700;
+  let floating = $state<string | null>(null);
+  let floatingShown = $state(false);
+  let handledAt = Number.NEGATIVE_INFINITY;
+  let floatTimer: ReturnType<typeof setTimeout> | undefined;
+  let floatFrame = 0;
+  const byHand = () => (handledAt = performance.now());
+
+  function onscroll() {
+    if (performance.now() - handledAt > 1000 || floatFrame) return;
+    floatFrame = requestAnimationFrame(() => {
+      floatFrame = 0;
+      const ts = topmostTs();
+      if (ts === undefined) return;
+      floating = dayLabel(ts, now, i18n.locale, t('room.today'), t('room.yesterday'));
+      floatingShown = true;
+      clearTimeout(floatTimer);
+      floatTimer = setTimeout(() => (floatingShown = false), FLOATING_HOLD_MS);
+    });
+  }
+
+  /** Время сообщения, что сейчас у верхнего края ленты. */
+  function topmostTs(): number | undefined {
+    if (!container || !content) return undefined;
+    const top = container.getBoundingClientRect().top;
+    for (const row of content.querySelectorAll<HTMLElement>('[data-anchor]')) {
+      if (row.getBoundingClientRect().bottom <= top) continue;
+      const item = store.items.find((entry) => entry.key === row.dataset['anchor']);
+      if (item?.kind === 'message') return item.message.ts;
+    }
+    return undefined;
+  }
+  // Слушаем, а не обрабатываем: это не нажатия, а признак того, что прокрутку ведёт человек.
+  $effect(() => {
+    const target = container;
+    if (!target) return;
+    const kinds = ['wheel', 'touchmove', 'pointerdown', 'keydown'] as const;
+    for (const kind of kinds) target.addEventListener(kind, byHand, { passive: true });
+    return () => {
+      for (const kind of kinds) target.removeEventListener(kind, byHand);
+      clearTimeout(floatTimer);
+      cancelAnimationFrame(floatFrame);
+    };
+  });
 
   /** Theme.Size.paginationReach и newestReach. */
   const TOP_REACH = 400;
@@ -125,7 +179,7 @@
 
   // Прочитано: чат на экране, окно в фокусе, человек внизу.
   function maybeMarkRead() {
-    if (anchor?.atBottom && document.visibilityState === 'visible' && document.hasFocus()) store.markRead();
+    if (reads && anchor?.atBottom && document.visibilityState === 'visible' && document.hasFocus()) store.markRead();
   }
   $effect(() => {
     void store.messages;
@@ -166,7 +220,10 @@
    */
   export async function reveal(eventId: string): Promise<void> {
     if (!(await store.reveal(eventId))) return;
-    const key = store.messages.find((m) => m.eventId === eventId)?.key;
+    // Фото внутри альбома своей строки не имеет — строка альбома та, что у первого.
+    const key = store.items.find(
+      (item) => item.kind === 'message' && (item.message.album ?? [item.message]).some((m) => m.eventId === eventId),
+    )?.key;
     if (!key) return;
     // Лента пересобирается раз в кадр — строки может ещё не быть в DOM. Подождать несколько.
     let element: HTMLElement | null = null;
@@ -213,7 +270,10 @@
 <svelte:document onvisibilitychange={maybeMarkRead} />
 
 <div class="timeline">
-<div class="scroller" bind:this={container}>
+{#if floating}
+  <p class="day floating" class:shown={floatingShown} aria-hidden="true"><span>{floating}</span></p>
+{/if}
+<div class="scroller" bind:this={container} {onscroll}>
   <div class="content" bind:this={content} role="log" aria-live="off" aria-label={t('room.timeline')} use:rovingFocus={{ onmenu: menuByKey }}>
     {#if store.loadFailed}
       <div class="problem">
@@ -249,7 +309,7 @@
             onkeydown={(event) => toggleByKey(event, item.message)}
           >
             <span class="mark" class:on aria-hidden="true">
-              {#if on}<svg viewBox="0 0 24 24"><path d="M6 12.5l4 4 8-9" /></svg>{/if}
+              {#if on}<svg viewBox={ICON_VIEWBOX}><path d={icons.check} /></svg>{/if}
             </span>
             <div class="chosen-row" inert>
               <MessageRow
@@ -297,7 +357,7 @@
     title={t('room.scrollToBottom')}
     onclick={() => anchor?.scrollToBottom()}
   >
-    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6" /></svg>
+    <svg viewBox={ICON_VIEWBOX} aria-hidden="true"><path d={icons.down} /></svg>
     {#if unseenBelow > 0}<span class="unseen" aria-hidden="true">{new Intl.NumberFormat(i18n.locale).format(unseenBelow)}</span>{/if}
   </button>
 {/if}
@@ -355,6 +415,21 @@
     font-size: var(--font-size-caption);
     color: var(--color-text-secondary);
   }
+  /* Поверх ленты, под шапкой; не ловит нажатий — под ней сообщения. */
+  .floating {
+    position: absolute;
+    inset-inline: 0;
+    top: var(--space-close);
+    z-index: 1;
+    margin: 0;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity var(--timing-menu-close) var(--ease-out);
+  }
+  .floating.shown {
+    opacity: 1;
+    transition-duration: var(--timing-chrome);
+  }
   .selectable {
     display: flex;
     align-items: center;
@@ -385,11 +460,7 @@
   .mark svg {
     width: 100%;
     height: 100%;
-    fill: none;
-    stroke: var(--on-accent);
-    stroke-width: 3;
-    stroke-linecap: round;
-    stroke-linejoin: round;
+    fill: var(--on-accent);
   }
   .item.arrived {
     animation: arrive var(--timing-arrival) var(--ease-out);
@@ -477,10 +548,6 @@
   .to-bottom svg {
     width: var(--size-icon);
     height: var(--size-icon);
-    fill: none;
-    stroke: currentColor;
-    stroke-width: 2.5;
-    stroke-linecap: round;
-    stroke-linejoin: round;
+    fill: currentColor;
   }
 </style>
