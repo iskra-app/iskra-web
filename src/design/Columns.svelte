@@ -131,7 +131,7 @@
       <!-- Скрим — только указатель; с клавиатуры лист закрывает Esc. -->
       <div class="scrim" aria-hidden="true" onclick={() => onClosePanel?.()} transition:fadeInOut></div>
     {/if}
-    <aside class="panel" class:sheet={panelAsSheet} transition:slideFromEnd={{ duration: panelAsSheet ? 300 : 0 }}>
+    <aside class="panel" class:sheet={panelAsSheet} transition:slideFromEnd={{ duration: panelAsSheet ? 220 : 0 }}>
       {@render panel()}
     </aside>
   {/if}
