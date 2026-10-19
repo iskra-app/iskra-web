@@ -297,11 +297,11 @@
       {#if counterpart}
         <button
           type="button"
-          class="danger plain"
+          class="danger"
           onclick={() => void (blocked ? session.blocked.unblock(counterpart.id) : session.blocked.block(counterpart.id))}
           >{t(blocked ? 'profile.unblockUser' : 'profile.blockUser')}</button
         >
-        {#if blocked}<p class="note">{t('profile.blockedNotice')}</p>{/if}
+        {#if blocked}<p class="blocked-note">{t('profile.blockedNotice')}</p>{/if}
       {/if}
     </section>
 
@@ -566,7 +566,7 @@
     height: var(--size-icon-button);
   }
   .copied,
-  .note {
+  .blocked-note {
     margin: 0;
     color: var(--color-text-secondary);
     font-size: var(--font-size-caption);

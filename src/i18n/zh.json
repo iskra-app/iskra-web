@@ -465,6 +465,7 @@
   "room.pinnedEmpty": "这里还没有置顶内容",
   "room.pinnedJump": "前往置顶消息",
   "room.pinnedTitle": "置顶消息",
+  "room.readOnly": "您不能在这个聊天中发消息",
   "room.removeAttachment": "从消息中移除",
   "room.replyingTo": "回复",
   "room.scrollToBottom": "跳到最新消息",

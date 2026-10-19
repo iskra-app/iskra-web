@@ -163,6 +163,8 @@
   });
 
   const room = $derived(session.rooms.get(roomId));
+  /** Собеседник личного чата, если вы его заблокировали: в группе один заблокированный писать не мешает. */
+  const blockedId = $derived(room?.kind === 'direct' && room.counterpartId && session.blocked.has(room.counterpartId) ? room.counterpartId : undefined);
   const canSend = $derived(room?.membership === 'join' || (!room && session.canSend(roomId)));
 
   // ————— Черновик и «печатает» —————
@@ -484,6 +486,15 @@
       oncopy={copySelection}
       ondelete={() => (deletingSelection = true)}
     />
+  {:else if blockedId}
+    <!-- Вместо поля — что происходит и как это отменить (`BlockedBanner` нативной): иначе чат
+         выглядел бы как обычный, а собеседник — просто замолчавшим. -->
+    <div class="instead" role="status">
+      <p>{t('profile.blockedNotice')}</p>
+      <button type="button" onclick={() => void session.blocked.unblock(blockedId)}>{t('settings.unblock')}</button>
+    </div>
+  {:else if store && !store.canPost}
+    <div class="instead" role="status"><p>{t('room.readOnly')}</p></div>
   {:else}
   <Composer
     bind:this={composer}
@@ -626,6 +637,33 @@
     width: 100%;
     margin-inline: auto;
     padding-inline: var(--timeline-gutter);
+  }
+  .instead {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: var(--space-tight);
+    max-width: var(--column-timeline-max);
+    width: 100%;
+    margin-inline: auto;
+    padding: var(--space-normal) var(--timeline-gutter) max(var(--space-normal), env(safe-area-inset-bottom));
+    border-block-start: var(--border-hairline) solid var(--color-separator);
+    text-align: center;
+  }
+  .instead p {
+    margin: 0;
+    color: var(--color-text-secondary);
+    font-size: var(--font-size-caption);
+  }
+  .instead button {
+    min-height: var(--tap-target);
+    padding: 0 var(--space-normal);
+    border: none;
+    background: transparent;
+    color: var(--accent);
+    font: inherit;
+    font-weight: 600;
+    cursor: pointer;
   }
   .failure {
     display: flex;

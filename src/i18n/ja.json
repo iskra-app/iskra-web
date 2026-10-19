@@ -465,6 +465,7 @@
   "room.pinnedEmpty": "まだ何もピン留めされていません",
   "room.pinnedJump": "固定されたメッセージへ移動",
   "room.pinnedTitle": "ピン留めしたメッセージ",
+  "room.readOnly": "このチャットにはメッセージを送れません",
   "room.removeAttachment": "メッセージから外す",
   "room.replyingTo": "返信",
   "room.scrollToBottom": "最新のメッセージへ",

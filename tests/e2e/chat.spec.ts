@@ -445,3 +445,30 @@ test('лента с клавиатуры: одна остановка Tab, ст�
   expect(await focused()).toMatch(/^article:/);
   expect(await focused()).not.toMatch(/Прогноз/);
 });
+
+test('плавающая дата: пока листают — день того, что наверху; остановились — гаснет', async ({ page }, info) => {
+  test.skip(isPhone(info.project.name), 'колесо — десктоп');
+  await signInToDemo(page);
+  await openRoom(page, /^Длинная история/);
+  await expect(bubble(page, 'Сообщение номер 400')).toBeInViewport();
+  const floating = page.locator('.floating');
+  await expect(floating).toHaveCount(0);
+  await page.getByRole('log').hover();
+  await page.mouse.wheel(0, -600);
+  await expect(page.locator('.floating.shown')).toBeVisible();
+  await expect(floating).not.toBeEmpty();
+  await expect(page.locator('.floating.shown')).toHaveCount(0, { timeout: 3000 });
+});
+
+test('заблокировали собеседника — вместо поля «Вы заблокировали…» и «Разблокировать»', async ({ page }) => {
+  await signInToDemo(page);
+  await openRoom(page, /^Аня/);
+  await page.getByRole('button', { name: 'О чате' }).click();
+  await page.getByRole('button', { name: 'Заблокировать пользователя' }).click();
+  await page.getByRole('button', { name: 'Закрыть' }).first().click().catch(() => {});
+  const banner = page.getByRole('status').filter({ hasText: 'Вы заблокировали этого пользователя' });
+  await expect(banner).toBeVisible();
+  await expect(page.getByRole('textbox', { name: 'Сообщение' })).toHaveCount(0);
+  await banner.getByRole('button', { name: 'Разблокировать' }).click();
+  await expect(page.getByRole('textbox', { name: 'Сообщение' })).toBeVisible();
+});

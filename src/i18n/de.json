@@ -468,6 +468,7 @@
   "room.pinnedEmpty": "Hier ist noch nichts angeheftet",
   "room.pinnedJump": "Zur angehefteten Nachricht",
   "room.pinnedTitle": "Angeheftete Nachrichten",
+  "room.readOnly": "In diesem Chat können Sie keine Nachrichten senden",
   "room.removeAttachment": "Aus der Nachricht entfernen",
   "room.replyingTo": "Antwort",
   "room.scrollToBottom": "Zur neuesten Nachricht",

@@ -108,7 +108,7 @@
         <span class="preview draft">{t('roomList.draft', { text: draft })}</span>
       {:else}
         <span class="preview"
-          >{#if sender}<span class="sender">{sender}</span><span class="colon">: </span><br class="break" />{/if}{previewText(room.preview)}</span
+          >{#if sender}<span class="sender">{sender}</span><span class="colon">:</span><br class="break" />{/if}{previewText(room.preview)}</span
         >
       {/if}
       {#if hasUnread(room) || room.mentionCount > 0}
@@ -226,8 +226,10 @@
   .sender {
     color: var(--color-text);
   }
+  /* Двоеточие — со своим отступом: пробел в конце строчного элемента браузер съедал. */
   .colon {
     display: none;
+    margin-inline-end: var(--space-tight);
   }
   .typing {
     color: var(--accent);

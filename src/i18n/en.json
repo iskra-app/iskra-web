@@ -468,6 +468,7 @@
   "room.pinnedEmpty": "Nothing is pinned here yet",
   "room.pinnedJump": "Go to the pinned message",
   "room.pinnedTitle": "Pinned messages",
+  "room.readOnly": "You can’t send messages in this chat",
   "room.removeAttachment": "Remove from message",
   "room.replyingTo": "Reply",
   "room.scrollToBottom": "Go to the latest message",

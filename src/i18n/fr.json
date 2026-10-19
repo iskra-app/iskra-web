@@ -470,6 +470,7 @@
   "room.pinnedEmpty": "Rien n’est encore épinglé ici",
   "room.pinnedJump": "Aller au message épinglé",
   "room.pinnedTitle": "Messages épinglés",
+  "room.readOnly": "Vous ne pouvez pas envoyer de messages dans cette discussion",
   "room.removeAttachment": "Retirer du message",
   "room.replyingTo": "Réponse",
   "room.scrollToBottom": "Aller au dernier message",

@@ -474,6 +474,7 @@
   "room.pinnedEmpty": "Здесь пока ничего не закреплено",
   "room.pinnedJump": "Перейти к закреплённому",
   "room.pinnedTitle": "Закреплённые",
+  "room.readOnly": "В этот чат нельзя отправлять сообщения",
   "room.removeAttachment": "Убрать из сообщения",
   "room.replyingTo": "Ответ",
   "room.scrollToBottom": "Вниз, к последнему сообщению",

@@ -470,6 +470,7 @@
   "room.pinnedEmpty": "Aquí aún no hay nada fijado",
   "room.pinnedJump": "Ir al mensaje fijado",
   "room.pinnedTitle": "Mensajes fijados",
+  "room.readOnly": "No puede enviar mensajes en este chat",
   "room.removeAttachment": "Quitar del mensaje",
   "room.replyingTo": "Respuesta",
   "room.scrollToBottom": "Ir al último mensaje",

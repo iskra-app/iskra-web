@@ -90,6 +90,8 @@ export class TimelineStore {
   /** Последнее закреплённое — для полосы над лентой. Не загружено — достаём отдельно. */
   pinnedMessage = $state.raw<Message | undefined>(undefined);
   canPin = $state(false);
+  /** Можно ли писать сюда — по правам комнаты. Нельзя — вместо поля плашка, как в нативной. */
+  canPost = $state(true);
   /** Вложения в пути — по порядку отправки. */
   uploads = $state.raw<Upload[]>([]);
   /** Последнее действие не удалось — сказать и дать повторить. */
@@ -258,6 +260,7 @@ export class TimelineStore {
     const ids = Array.isArray(pinned) ? pinned.filter((id): id is string => typeof id === 'string') : [];
     if (ids.join() !== this.pinnedIds.join()) this.pinnedIds = ids;
     this.canPin = !!state?.maySendStateEvent(PINNED_EVENTS, this.ownUserId);
+    this.canPost = state ? state.maySendMessage(this.ownUserId) : true;
   }
 
   private readPinnedMessage(room: Room, context: MapperContext): void {

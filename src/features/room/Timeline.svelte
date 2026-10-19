@@ -69,6 +69,57 @@
   let announcement = $state('');
   let now = $state(Date.now());
 
+  // ————— Плавающая дата — `FloatingDate` нативной (Telegram) —————
+  // Пока ленту листают, над ней — день того, что сейчас наверху: даты быстрой прокрутки
+  // проносятся быстрее, чем их прочтёшь. Остановились — гаснет: читающему она уже не нужна.
+  // Только когда листает человек — колесом, пальцем, клавишами, ползунком: лента, вставшая на
+  // место сама (открытие, подгрузка истории), датой не мигает.
+
+  const FLOATING_HOLD_MS = 700;
+  let floating = $state<string | null>(null);
+  let floatingShown = $state(false);
+  let handledAt = Number.NEGATIVE_INFINITY;
+  let floatTimer: ReturnType<typeof setTimeout> | undefined;
+  let floatFrame = 0;
+  const byHand = () => (handledAt = performance.now());
+
+  function onscroll() {
+    if (performance.now() - handledAt > 1000 || floatFrame) return;
+    floatFrame = requestAnimationFrame(() => {
+      floatFrame = 0;
+      const ts = topmostTs();
+      if (ts === undefined) return;
+      floating = dayLabel(ts, now, i18n.locale, t('room.today'), t('room.yesterday'));
+      floatingShown = true;
+      clearTimeout(floatTimer);
+      floatTimer = setTimeout(() => (floatingShown = false), FLOATING_HOLD_MS);
+    });
+  }
+
+  /** Время сообщения, что сейчас у верхнего края ленты. */
+  function topmostTs(): number | undefined {
+    if (!container || !content) return undefined;
+    const top = container.getBoundingClientRect().top;
+    for (const row of content.querySelectorAll<HTMLElement>('[data-anchor]')) {
+      if (row.getBoundingClientRect().bottom <= top) continue;
+      const item = store.items.find((entry) => entry.key === row.dataset['anchor']);
+      if (item?.kind === 'message') return item.message.ts;
+    }
+    return undefined;
+  }
+  // Слушаем, а не обрабатываем: это не нажатия, а признак того, что прокрутку ведёт человек.
+  $effect(() => {
+    const target = container;
+    if (!target) return;
+    const kinds = ['wheel', 'touchmove', 'pointerdown', 'keydown'] as const;
+    for (const kind of kinds) target.addEventListener(kind, byHand, { passive: true });
+    return () => {
+      for (const kind of kinds) target.removeEventListener(kind, byHand);
+      clearTimeout(floatTimer);
+      cancelAnimationFrame(floatFrame);
+    };
+  });
+
   /** Theme.Size.paginationReach и newestReach. */
   const TOP_REACH = 400;
   const BOTTOM_REACH = 80;
@@ -216,7 +267,10 @@
 <svelte:document onvisibilitychange={maybeMarkRead} />
 
 <div class="timeline">
-<div class="scroller" bind:this={container}>
+{#if floating}
+  <p class="day floating" class:shown={floatingShown} aria-hidden="true"><span>{floating}</span></p>
+{/if}
+<div class="scroller" bind:this={container} {onscroll}>
   <div class="content" bind:this={content} role="log" aria-live="off" aria-label={t('room.timeline')} use:rovingFocus={{ onmenu: menuByKey }}>
     {#if store.loadFailed}
       <div class="problem">
@@ -357,6 +411,21 @@
     background: var(--color-incoming-bubble);
     font-size: var(--font-size-caption);
     color: var(--color-text-secondary);
+  }
+  /* Поверх ленты, под шапкой; не ловит нажатий — под ней сообщения. */
+  .floating {
+    position: absolute;
+    inset-inline: 0;
+    top: var(--space-close);
+    z-index: 1;
+    margin: 0;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity var(--timing-menu-close) var(--ease-out);
+  }
+  .floating.shown {
+    opacity: 1;
+    transition-duration: var(--timing-chrome);
   }
   .selectable {
     display: flex;
