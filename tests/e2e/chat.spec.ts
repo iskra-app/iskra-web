@@ -409,3 +409,34 @@ test('«Больше эмодзи»: панель с разделами, реа�
   await expect(menu).toBeHidden();
   expect(problems).toEqual([]);
 });
+
+test('лента с клавиатуры: одна остановка Tab, стрелки по сообщениям, Enter — меню', async ({ page }, info) => {
+  test.skip(isPhone(info.project.name), 'клавиатура — путь десктопа');
+  await signInToDemo(page);
+  await openRoom(page, /^Выходные/);
+  const log = page.getByRole('log');
+  const focused = () => page.evaluate(() => document.activeElement?.getAttribute('role') + ':' + (document.activeElement?.textContent ?? '').trim().slice(0, 40));
+
+  // Из поля назад — через кнопки последнего сообщения к нему самому.
+  await page.getByRole('textbox', { name: 'Сообщение' }).focus();
+  for (let i = 0; i < 8 && !(await focused()).startsWith('article'); i++) await page.keyboard.press('Shift+Tab');
+  expect(await focused()).toMatch(/^article:.*Алиса, ты с нами/);
+  // Ещё Shift Tab — и лента позади: других остановок в ней нет.
+  await page.keyboard.press('Shift+Tab');
+  expect(await log.evaluate((el) => el.contains(document.activeElement))).toBe(false);
+
+  await page.keyboard.press('Tab');
+  expect(await focused()).toMatch(/^article:.*Алиса, ты с нами/);
+  await page.keyboard.press('ArrowUp');
+  expect(await focused()).toMatch(/^article:.*Прогноз на субботу/);
+  await page.keyboard.press('Enter');
+  const menu = page.getByRole('menu', { name: 'Ещё' });
+  await expect(menu.getByRole('menuitem', { name: 'Ответить' })).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(menu).toBeHidden();
+  // Меню закрылось — фокус там, откуда его открыли.
+  expect(await focused()).toMatch(/^article:.*Прогноз на субботу/);
+  await page.keyboard.press('Home');
+  expect(await focused()).toMatch(/^article:/);
+  expect(await focused()).not.toMatch(/Прогноз/);
+});

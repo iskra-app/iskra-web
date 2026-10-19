@@ -3,11 +3,14 @@ import { describe as describeChord, hotkeys, reserved, sameChord } from '../../s
 import { roomTimestamp } from '../../src/design/time';
 
 describe('горячие клавиши', () => {
-  const all = hotkeys.flatMap((h) => h.chords.map((c) => ({ id: h.id, chord: c })));
+  const all = hotkeys.flatMap((h) => h.chords.map((c) => ({ id: h.id, chord: c, local: h.local })));
 
-  it('на одном сочетании — одно действие', () => {
+  it('на одном сочетании — одно действие (в разных местах фокуса — можно)', () => {
     for (const [i, a] of all.entries()) {
-      for (const b of all.slice(i + 1)) expect(sameChord(a.chord, b.chord), `${a.id} и ${b.id}`).toBe(false);
+      for (const b of all.slice(i + 1)) {
+        const elsewhere = !!a.local && !!b.local && a.local !== b.local;
+        if (!elsewhere) expect(sameChord(a.chord, b.chord), `${a.id} и ${b.id}`).toBe(false);
+      }
     }
   });
 

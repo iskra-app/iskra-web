@@ -22,6 +22,8 @@
   import { Photo, pixelsFor } from '../rooms/faces.svelte.ts';
   import type { MessageActions } from './actions';
   import MessageRow from './MessageRow.svelte';
+  import { rovingFocus } from './rovingFocus';
+  import { viewport } from '../../design/viewport.svelte.ts';
   import UploadRow from '../media/UploadRow.svelte';
 
   interface Props {
@@ -40,6 +42,16 @@
     const kind = message.kind;
     const words = 'body' in kind ? firstLineOf(kind.body, 'html' in kind ? kind.html : undefined) : attachmentLabel(kind);
     return `${message.own ? t('message.spoken.you') : message.senderName}: ${words}`;
+  }
+
+  /** Меню сообщения с клавиатуры — под пузырём, как от «ещё». С удалённым делать нечего. */
+  function menuByKey(key: string, stop: HTMLElement) {
+    const item = store.items.find((entry) => entry.key === key);
+    if (!item || item.kind !== 'message') return;
+    const message = item.message;
+    if (!message.eventId || message.kind.type === 'deleted' || message.kind.type === 'service') return;
+    const rect = stop.getBoundingClientRect();
+    actions.openMenu(message, { x: rect.left, y: rect.bottom }, !viewport.finePointer);
   }
 
   function toggleByKey(event: KeyboardEvent, message: Message) {
@@ -202,7 +214,7 @@
 
 <div class="timeline">
 <div class="scroller" bind:this={container}>
-  <div class="content" bind:this={content} role="log" aria-live="off" aria-label={t('room.timeline')}>
+  <div class="content" bind:this={content} role="log" aria-live="off" aria-label={t('room.timeline')} use:rovingFocus={{ onmenu: menuByKey }}>
     {#if store.loadFailed}
       <div class="problem">
         <EmptyState title={t('room.loadFailedTitle')} message={t('room.loadFailedMessage')} />
@@ -229,9 +241,10 @@
           <div
             class="selectable"
             role="checkbox"
+            data-row-stop
             aria-checked={on}
             aria-label={spoken(item.message)}
-            tabindex="0"
+            tabindex="-1"
             onclick={() => ontoggle?.(item.message)}
             onkeydown={(event) => toggleByKey(event, item.message)}
           >

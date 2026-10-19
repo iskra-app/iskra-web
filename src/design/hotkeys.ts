@@ -26,7 +26,10 @@ export type HotkeyId =
   | 'editLast'
   | 'attach'
   | 'settings'
-  | 'help';
+  | 'help'
+  | 'messageMove'
+  | 'messageEdges'
+  | 'messageMenu';
 
 export interface Hotkey {
   id: HotkeyId;
@@ -34,10 +37,12 @@ export interface Hotkey {
   /** Работает и из поля ввода. */
   inInput?: boolean;
   /**
-   * Обрабатывает не приложение, а поле, для которого сочетание и сделано (`↑` в пустом
-   * композере). В таблице — ради справки и проверки на дубли; `match` его не отдаёт.
+   * Обрабатывает не приложение, а место, для которого сочетание и сделано: `composer` — `↑` в
+   * пустом поле, `message` — стрелки и `Enter` на сообщении в ленте (`rovingFocus.ts`). В таблице —
+   * ради справки и проверки на дубли; `match` его не отдаёт. Одно сочетание в разных местах —
+   * не дубль: фокус бывает только в одном.
    */
-  local?: boolean;
+  local?: 'composer' | 'message';
   /** Ещё не работает (настройки — этап 8): в справке не показываем. */
   planned?: boolean;
 }
@@ -51,10 +56,13 @@ export const hotkeys: readonly Hotkey[] = [
   { id: 'escape', chords: [{ key: 'Escape' }], inInput: true },
   { id: 'pageUp', chords: [{ key: 'PageUp' }], inInput: true },
   { id: 'pageDown', chords: [{ key: 'PageDown' }], inInput: true },
-  { id: 'editLast', chords: [{ key: 'ArrowUp' }], inInput: true, local: true },
+  { id: 'editLast', chords: [{ key: 'ArrowUp' }], inInput: true, local: 'composer' },
   { id: 'attach', chords: [{ key: 'u', primary: true, shift: true }], inInput: true },
   { id: 'settings', chords: [{ key: ',', primary: true }], inInput: true },
   { id: 'help', chords: [{ key: '?' }, { key: '/', primary: true }] },
+  { id: 'messageMove', chords: [{ key: 'ArrowUp' }, { key: 'ArrowDown' }], local: 'message' },
+  { id: 'messageEdges', chords: [{ key: 'Home' }, { key: 'End' }], local: 'message' },
+  { id: 'messageMenu', chords: [{ key: 'Enter' }, { key: 'F10', shift: true }, { key: 'ContextMenu' }], local: 'message' },
 ];
 
 /**
@@ -120,6 +128,7 @@ export function describe(chord: Chord, mac = isMac()): string {
     Escape: 'Esc',
     PageUp: 'Page Up',
     PageDown: 'Page Down',
+    ContextMenu: '☰',
   };
   const key = keyName[chord.key] ?? (chord.key.length === 1 ? chord.key.toUpperCase() : chord.key);
   const parts = mac

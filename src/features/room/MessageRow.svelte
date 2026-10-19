@@ -96,9 +96,10 @@
         <span class="sender" aria-hidden="true">{message.senderName}</span>
       {/if}
       <div class="bubble-wrap">
-      <!-- Пузырь — `article`: запись в `role="log"` ленты. С клавиатуры меню открывает «ещё»
-           (панель по наведению появляется и по фокусу), правый щелчок — дублирующий путь. -->
+      <!-- Пузырь — `article`: запись в `role="log"` ленты и её остановка с клавиатуры
+           (`rovingFocus.ts`): стрелки ходят по сообщениям, Enter открывает меню. -->
       <div
+        data-row-stop
         class="bubble"
         class:visual
         class:bare={kind.type === 'sticker' || kind.type === 'videoNote'}
@@ -488,6 +489,11 @@
   .own .hover-bar {
     inset-inline-start: auto;
     inset-inline-end: calc(100% + var(--space-tight));
+  }
+  /* Текущее сообщение с клавиатуры — обводкой акцента, как пункт меню. */
+  .bubble:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
   }
   .row:hover .hover-bar,
   .row:focus-within .hover-bar {
