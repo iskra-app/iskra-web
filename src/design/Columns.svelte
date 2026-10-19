@@ -142,8 +142,6 @@
     position: relative;
     display: grid;
     height: 100%;
-    max-width: var(--column-app-max);
-    margin-inline: auto;
     overflow: hidden;
   }
 

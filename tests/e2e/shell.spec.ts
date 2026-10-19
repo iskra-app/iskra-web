@@ -67,3 +67,12 @@ test('окно, закрываясь, не перекладывает содер
   });
   expect(during.display === 'none' || during.direction === 'column', JSON.stringify(during)).toBe(true);
 });
+
+test('на широком мониторе — во всю ширину, без полей по бокам', async ({ page }, info) => {
+  test.skip(isPhone(info.project.name), 'только десктоп');
+  await page.setViewportSize({ width: 2560, height: 1080 });
+  await signInToDemo(page);
+  const box = (await page.locator('.columns').boundingBox())!;
+  expect(box.x).toBe(0);
+  expect(box.width).toBe(2560);
+});
