@@ -31,7 +31,6 @@
   import { SvelteSet } from 'svelte/reactivity';
   import MessageMenu from './MessageMenu.svelte';
   import PinnedStrip from './PinnedStrip.svelte';
-  import { typingText } from './text';
   import Timeline from './Timeline.svelte';
   import WallpaperBackdrop from './WallpaperBackdrop.svelte';
   import { distance } from './distance';
@@ -49,8 +48,6 @@
   }
   let { session, roomId, store = $bindable() }: Props = $props();
 
-  /** Сколько «печатает…» держится после того, как все перестали: сообщение вот-вот придёт. */
-  const TYPING_GRACE_MS = 700;
   const DRAFT_SAVE_MS = 400;
 
   let composer: Composer | undefined = $state();
@@ -358,25 +355,6 @@
     composer?.attach();
   }
 
-  // ————— «Печатает…» с задержкой —————
-
-  let showTyping = $state(false);
-  let typingLine = $state('');
-  let hideTimer: ReturnType<typeof setTimeout> | undefined;
-  $effect(() => {
-    const names = store?.typing ?? [];
-    clearTimeout(hideTimer);
-    if (names.length) {
-      typingLine = typingText(names);
-      showTyping = true;
-    } else {
-      // Уведомления о наборе — поток мелкой неточности: «никто» между двумя «печатает»
-      // мигало бы строкой. Прячем с небольшой задержкой.
-      hideTimer = setTimeout(() => (showTyping = false), TYPING_GRACE_MS);
-    }
-    return () => clearTimeout(hideTimer);
-  });
-
   // ————— Действия —————
 
   const actions: MessageActions = {
@@ -476,7 +454,6 @@
     <VideoNoteCapture recorder={videoNote} holding={videoHolding} onsend={() => void finishVideoNote()} oncancel={cancelVideoNote} />
   {/if}
   <div class="below">
-    <p class="typing" aria-live="polite">{showTyping ? typingLine : ''}</p>
     {#if notice}
       <div class="failure" role="alert">
         <span>{notice}</span>
@@ -649,19 +626,6 @@
     width: 100%;
     margin-inline: auto;
     padding-inline: var(--timeline-gutter);
-  }
-  .typing {
-    min-height: calc(var(--font-size-caption) * var(--line-height-body));
-    margin: 0;
-    font-size: var(--font-size-caption);
-    color: var(--color-text-secondary);
-  }
-  /* На обоях — на плашке, как имя отправителя (см. MessageRow). Пустая строка плашки не рисует. */
-  [data-wallpaper] .typing:not(:empty) {
-    width: fit-content;
-    padding: 0 var(--space-close);
-    border-radius: var(--radius-circle);
-    background: var(--color-incoming-bubble);
   }
   .failure {
     display: flex;

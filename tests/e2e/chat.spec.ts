@@ -164,13 +164,18 @@ test('закреплённое: полоса над лентой, нажатие
   await expect(menu.getByRole('menuitem', { name: /Закрепить|Открепить/ })).toHaveCount(0);
 });
 
-test('«печатает…»: Вера отвечает на сообщение и затихает', async ({ page }) => {
+test('шапка чата, как в нативной: под именем — «печатает…», потом число участников; в личном — ID собеседника', async ({ page }) => {
   await signInToDemo(page);
   await openRoom(page, /^Выходные/);
+  const subtitle = page.locator('.main-column header .subtitle');
+  await expect(subtitle).toHaveText('3 участника');
   await page.getByRole('textbox', { name: 'Сообщение' }).fill('Кто за рулём?');
   await page.getByRole('button', { name: 'Отправить' }).click();
-  await expect(page.getByText('Вера печатает…')).toBeVisible({ timeout: 10_000 });
-  await expect(page.getByText('Вера печатает…')).toBeHidden({ timeout: 15_000 });
+  await expect(subtitle).toHaveText('Вера печатает…', { timeout: 10_000 });
+  await expect(subtitle).toHaveText('3 участника', { timeout: 15_000 });
+
+  await openRoom(page, /^Аня/);
+  await expect(subtitle).toHaveText('@anya:demo.iskra.invalid');
 });
 
 test('HTML сообщения: разметка на месте, скрипта нет, картинка — подписью; под CSP без ошибок', async ({ page }) => {

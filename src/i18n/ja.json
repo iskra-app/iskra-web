@@ -560,6 +560,8 @@
   "roomList.unread": {
     "other": "未読 {count} 件"
   },
+  "roomList.updating": "更新中…",
+  "roomList.waitingForNetwork": "ネットワークを待っています…",
   "sendFailure.identityChanged": "このチャットの誰かが別の場所でサインインしたため、本人確認情報が変わりました。本当に本人か確認すると、メッセージが送信されます。",
   "sendFailure.insecureDevices": "ここにいる誰かが、まだ確認していない端末でサインインしています。その端末を確認すると、メッセージが送信されます。",
   "sendFailure.server": "サーバーがこのメッセージを受け付けませんでした。",

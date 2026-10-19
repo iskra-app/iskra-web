@@ -568,6 +568,8 @@
     "one": "{count} non lu",
     "other": "{count} non lus"
   },
+  "roomList.updating": "Mise à jour…",
+  "roomList.waitingForNetwork": "En attente du réseau…",
   "sendFailure.identityChanged": "Quelqu’un dans ce chat s’est connecté ailleurs, son identité a donc changé. Vérifiez que c’est bien la même personne, et ce message partira.",
   "sendFailure.insecureDevices": "Quelqu’un ici est connecté sur un appareil que vous n’avez pas encore vérifié. Vérifiez-le, et ce message partira.",
   "sendFailure.server": "Votre serveur n’a pas accepté ce message.",

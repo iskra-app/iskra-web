@@ -560,6 +560,8 @@
   "roomList.unread": {
     "other": "{count} 条未读"
   },
+  "roomList.updating": "正在更新…",
+  "roomList.waitingForNetwork": "正在等待网络…",
   "sendFailure.identityChanged": "此对话中有人在别处重新登录，因此其身份已更改。确认确实是本人后，这条消息就会发出。",
   "sendFailure.insecureDevices": "这里有人在您尚未验证的设备上登录。验证该设备后，这条消息就会发出。",
   "sendFailure.server": "您的服务器没有接受这条消息。",

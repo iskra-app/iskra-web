@@ -566,6 +566,8 @@
     "one": "{count} unread",
     "other": "{count} unread"
   },
+  "roomList.updating": "Updating…",
+  "roomList.waitingForNetwork": "Waiting for network…",
   "sendFailure.identityChanged": "Someone in this chat signed in somewhere new, so their identity changed. Check it’s really them, and this message will go.",
   "sendFailure.insecureDevices": "Someone here is signed in on a device you haven’t verified yet. Verify it, and this message will go.",
   "sendFailure.server": "Your server turned this message away.",

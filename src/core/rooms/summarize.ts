@@ -121,6 +121,8 @@ export function summarize(room: Room, context: SummaryContext): RoomSummary | un
     ...(lastSender ? { lastSender } : {}),
     ...(lastMark ? { lastMark } : {}),
     typing,
+    memberCount: room.getJoinedMemberCount(),
+    ...(partnerId ? { counterpartId: partnerId } : {}),
     lastActivity,
   };
 }

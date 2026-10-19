@@ -566,6 +566,8 @@
     "one": "{count} ungelesen",
     "other": "{count} ungelesen"
   },
+  "roomList.updating": "Wird aktualisiert…",
+  "roomList.waitingForNetwork": "Warte auf Netz…",
   "sendFailure.identityChanged": "Jemand in diesem Chat hat sich woanders neu angemeldet, daher hat sich seine Identität geändert. Prüfen Sie, ob es wirklich diese Person ist, dann wird die Nachricht gesendet.",
   "sendFailure.insecureDevices": "Jemand hier ist auf einem Gerät angemeldet, das Sie noch nicht verifiziert haben. Verifizieren Sie es, dann wird die Nachricht gesendet.",
   "sendFailure.server": "Ihr Server hat diese Nachricht nicht angenommen.",

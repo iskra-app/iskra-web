@@ -65,6 +65,10 @@ export interface RoomSummary {
   lastMark?: LastMark;
   /** Кто-то, кроме меня, сейчас печатает. */
   typing: boolean;
+  /** Сколько вошло — для «N участников» под именем в шапке чата. */
+  memberCount: number;
+  /** Собеседник личного чата — его Matrix ID под именем в шапке. */
+  counterpartId?: string;
   /** Мс с эпохи — по нему сортировка. */
   lastActivity: number;
 }

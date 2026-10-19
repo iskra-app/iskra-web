@@ -568,6 +568,8 @@
     "one": "{count} sin leer",
     "other": "{count} sin leer"
   },
+  "roomList.updating": "Actualizando…",
+  "roomList.waitingForNetwork": "Esperando red…",
   "sendFailure.identityChanged": "Alguien de este chat ha iniciado sesión en otro sitio, así que su identidad ha cambiado. Compruebe que de verdad es esa persona y el mensaje se enviará.",
   "sendFailure.insecureDevices": "Alguien aquí ha iniciado sesión en un dispositivo que aún no ha verificado. Verifíquelo y el mensaje se enviará.",
   "sendFailure.server": "Su servidor no ha aceptado este mensaje.",
