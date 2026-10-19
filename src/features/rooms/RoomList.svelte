@@ -26,6 +26,7 @@
   import { roomName } from './text';
   import Menu from '../../design/Menu.svelte';
   import FolderMembership from './FolderMembership.svelte';
+  import ChatPeek, { type PeekAction } from './ChatPeek.svelte';
   import { hasUnread } from '../../core/rooms/types';
 
   let { session }: { session: UserSession } = $props();
@@ -87,13 +88,45 @@
   let menu = $state<{ room: RoomSummary; at: { x: number; y: number }; sheet: boolean } | null>(null);
   let choosingFolders = $state<RoomSummary | null>(null);
 
-  /** Пункт меню: закрыть меню, сделать, не вышло — сказать. */
-  function act(task: (room: RoomSummary) => Promise<boolean> | void, failed?: TextKey) {
-    const room = menu?.room;
+  let peeking = $state<RoomSummary | null>(null);
+
+  /** Подглядеть: меню уступает место карточке. */
+  function peekAt(room: RoomSummary) {
     menu = null;
-    if (!room) return;
-    const result = task(room);
-    if (result && failed) void result.then((ok) => !ok && (failure = failed));
+    peeking = room;
+  }
+
+  /**
+   * Что можно сделать со строкой — пункты «подглядывания» нативной, по порядку: под карточкой
+   * и в меню одни и те же. Каждый закрывает то, откуда нажат; не вышло — сказать.
+   */
+  function rowActions(room: RoomSummary): PeekAction[] {
+    const rooms = session.rooms;
+    const act = (task: () => Promise<boolean> | void, failed?: TextKey) => () => {
+      menu = null;
+      peeking = null;
+      const result = task();
+      if (result && failed) void result.then((ok) => !ok && (failure = failed));
+    };
+    return [
+      { label: t('roomList.peek.open'), run: act(() => open(room)) },
+      hasUnread(room)
+        ? { label: t('roomList.peek.markRead'), run: act(() => rooms.markRead(room.id), 'roomAction.readFailed') }
+        : { label: t('roomList.peek.markUnread'), run: act(() => rooms.markUnread(room.id), 'roomAction.readFailed') },
+      {
+        label: t(room.isFavourite ? 'roomList.swipe.unpin' : 'roomList.swipe.pin'),
+        run: act(() => rooms.setPinned(room.id, !room.isFavourite), 'roomAction.pinFailed'),
+      },
+      ...(room.kind === 'space'
+        ? []
+        : [
+            {
+              label: t(room.isLowPriority ? 'roomList.swipe.unarchive' : 'roomList.swipe.archive'),
+              run: act(() => rooms.setArchived(room.id, !room.isLowPriority), 'roomAction.archiveFailed'),
+            },
+          ]),
+      ...(folders.length > 0 ? [{ label: t('folders.addToFolder'), run: act(() => void (choosingFolders = room)) }] : []),
+    ];
   }
 
   /** ↑/↓ — по строкам списка. */
@@ -154,7 +187,7 @@
           {now}
           selected={room.id === selectedId}
           onopen={() => open(room)}
-          onmenu={(at, sheet) => (menu = { room, at, sheet })}
+          onmenu={(at, sheet) => (sheet && room.kind !== 'space' ? (peeking = room) : (menu = { room, at, sheet }))}
         />
       {/if}
     {/each}
@@ -171,26 +204,16 @@
 >
   {#if menu}
     {@const room = menu.room}
-    {@const rooms = session.rooms}
-    <button type="button" role="menuitem" onclick={() => act(open)}>{t('roomList.peek.open')}</button>
-    {#if hasUnread(room)}
-      <button type="button" role="menuitem" onclick={() => act((r) => rooms.markRead(r.id), 'roomAction.readFailed')}>{t('roomList.peek.markRead')}</button>
-    {:else}
-      <button type="button" role="menuitem" onclick={() => act((r) => rooms.markUnread(r.id), 'roomAction.readFailed')}>{t('roomList.peek.markUnread')}</button>
-    {/if}
-    <button type="button" role="menuitem" onclick={() => act((r) => rooms.setPinned(r.id, !r.isFavourite), 'roomAction.pinFailed')}>
-      {t(room.isFavourite ? 'roomList.swipe.unpin' : 'roomList.swipe.pin')}
-    </button>
     {#if room.kind !== 'space'}
-      <button type="button" role="menuitem" onclick={() => act((r) => rooms.setArchived(r.id, !r.isLowPriority), 'roomAction.archiveFailed')}>
-        {t(room.isLowPriority ? 'roomList.swipe.unarchive' : 'roomList.swipe.archive')}
-      </button>
+      <button type="button" role="menuitem" onclick={() => peekAt(room)}>{t('roomList.peek.peek')}</button>
     {/if}
-    {#if folders.length > 0}
-      <button type="button" role="menuitem" onclick={() => act((r) => void (choosingFolders = r))}>{t('folders.addToFolder')}</button>
-    {/if}
+    {#each rowActions(room) as action (action.label)}
+      <button type="button" role="menuitem" onclick={action.run}>{action.label}</button>
+    {/each}
   {/if}
 </Menu>
+
+<ChatPeek room={peeking} {session} actions={peeking ? rowActions(peeking) : []} onclose={() => (peeking = null)} />
 
 <FolderMembership room={choosingFolders} {session} onclose={() => (choosingFolders = null)} />
 

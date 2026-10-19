@@ -88,6 +88,8 @@
   --size-attachment-tile: 4.5rem; /* 72 — вложение в лотке над полем */
   --size-wallpaper-tile-width: 3.5rem; /* 56 — плитка обоев: вытянута, как экран */
   --size-wallpaper-tile-height: 5rem; /* 80 */
+  --size-peek-height: 40rem; /* 640 — Theme.Size.peekHeight: лента «подглядывания» */
+  --size-peek-fit: 50dvh; /* и не выше, чем оставляют действия под ней */
   --size-gallery-tile: 6rem; /* 96 — наименьшая клетка сетки «Фото и видео», как у RoomMediaGrid */
 
   /* Колонки. Список чатов — Theme.Size.sidebarMinimum/Ideal/Maximum. */

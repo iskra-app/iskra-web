@@ -34,8 +34,10 @@
     /** Режим выбора: ключи отмеченных. `null` — обычная лента. */
     selection?: ReadonlySet<string> | null;
     ontoggle?: (message: Message) => void;
+    /** `false` — подглядывание из списка: лента не отмечает прочитанным ничего, сколько ни смотри. */
+    reads?: boolean;
   }
-  let { store, session, showSenders, actions, selection = null, ontoggle }: Props = $props();
+  let { store, session, showSenders, actions, selection = null, ontoggle, reads = true }: Props = $props();
 
   /** Имя строки-галочки: содержимое под ней `inert` и скринридеру не видно. */
   function spoken(message: Message): string {
@@ -125,7 +127,7 @@
 
   // Прочитано: чат на экране, окно в фокусе, человек внизу.
   function maybeMarkRead() {
-    if (anchor?.atBottom && document.visibilityState === 'visible' && document.hasFocus()) store.markRead();
+    if (reads && anchor?.atBottom && document.visibilityState === 'visible' && document.hasFocus()) store.markRead();
   }
   $effect(() => {
     void store.messages;
