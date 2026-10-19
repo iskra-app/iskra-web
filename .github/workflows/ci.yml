@@ -36,6 +36,14 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm exec playwright install --with-deps ${{ matrix.engine }}
+      # У раннера нет звуковой карты, и Firefox, в отличие от Chromium и WebKit, без неё звук
+      # не играет: голосовое обрывается с `OnMediaSinkAudioError`. PulseAudio даёт пустой выход.
+      - name: Пустой звуковой выход для Firefox
+        if: matrix.engine == 'firefox'
+        run: |
+          sudo apt-get install -y --no-install-recommends pulseaudio
+          pulseaudio --start --exit-idle-time=-1
+          pactl info | grep 'Default Sink'
       - run: pnpm e2e
         env:
           PW_ENGINES: ${{ matrix.engine }}
