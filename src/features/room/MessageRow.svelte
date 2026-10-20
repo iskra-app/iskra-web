@@ -507,9 +507,9 @@
     padding: var(--space-tight) var(--space-close) 0;
   }
   /* Подпись альбома — с воздухом над и под ней: под мозаикой из нескольких фото прижатая
-     строка терялась. Снизу вместе с краем пузыря выходит столько же, сколько сверху. */
+     строка терялась. Сверху чуть меньше, чем снизу вместе с краем пузыря: подпись — к фото. */
   .bubble.visual .album-caption {
-    padding: var(--space-normal) var(--space-close) var(--space-close);
+    padding: var(--space-close) var(--space-close) var(--space-close);
   }
   /* Стикер и «кружочек» — без пузыря: у них своя форма. */
   .bubble.bare,
