@@ -69,6 +69,7 @@
     remove: noop,
     block: noop,
     retry: noop,
+    sendAnyway: noop,
     discard: noop,
     openMedia: noop,
     openMenu: noop,

@@ -24,6 +24,8 @@ export interface MessageActions {
   /** Спросить «заблокировать?» — и заблокировать отправителя. */
   block(message: Message): void;
   retry(key: string): void;
+  /** «Отправить всё равно» — только для `identityChanged` и `insecureDevices`. */
+  sendAnyway(key: string): void;
   discard(key: string): void;
   /** Просмотрщик — с этого фото или видео. */
   openMedia(message: Message): void;

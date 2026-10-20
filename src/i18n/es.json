@@ -230,6 +230,8 @@
   "message.delivery.failed": "No enviado",
   "message.delivery.read": "Leído",
   "message.delivery.sendAgain": "Volver a enviar",
+  "message.delivery.sendAnyway": "Enviar de todos modos",
+  "message.delivery.sendAnywayFailed": "El mensaje sigue sin enviarse. Compruebe la conexión e inténtelo de nuevo.",
   "message.delivery.sending": "Enviando",
   "message.delivery.sent": "Enviado",
   "message.edited": "editado",

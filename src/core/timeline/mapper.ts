@@ -335,10 +335,17 @@ function deliveryOf(event: MatrixEvent): Delivery {
   }
 }
 
-function failureOf(error: unknown): SendFailure {
-  const name = (error as { name?: string } | null)?.name ?? '';
-  if (name === 'UnknownDeviceError') return 'insecureDevices';
-  if (/identity/i.test(name)) return 'identityChanged';
+/**
+ * Почему не ушло. Две причины — от Rust-крипто в строгом режиме изоляции устройств
+ * (`AllDevicesIsolationMode(true)`): у проверенного собеседника — устройство, которое он сам
+ * не подписал, или другая личность. Это обычный `Error`, отличить можно только по тексту —
+ * `SessionRecipientCollectionError` в matrix-sdk-crypto.
+ */
+export function failureOf(error: unknown): SendFailure {
+  const message = (error as { message?: unknown } | null)?.message;
+  if (typeof message !== 'string') return 'server';
+  if (message.includes('verified users have unsigned devices')) return 'insecureDevices';
+  if (message.includes('users that were verified have changed their identity')) return 'identityChanged';
   return 'server';
 }
 

@@ -421,6 +421,7 @@
     remove: (message) => (deleting = message),
     block: (message) => (blocking = message),
     retry: (key) => store?.retry(key),
+    sendAnyway: (key) => store?.sendAnyway(key),
     discard: (key) => store?.discard(key),
     openMenu: (message, at, sheet) => (menu = { message, at, sheet }),
     openMedia: (message) => {
@@ -510,7 +511,7 @@
     {/if}
     {#if store?.failure}
       <div class="failure" role="alert">
-        <span>{t(`timeline.${store.failure}`)}</span>
+        <span>{store.failure === 'sendAnywayFailed' ? t('message.delivery.sendAnywayFailed') : t(`timeline.${store.failure}`)}</span>
         <button type="button" onclick={() => store?.dismissFailure()}>{t('timeline.dismiss')}</button>
       </div>
     {/if}

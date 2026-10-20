@@ -347,11 +347,20 @@ export class DemoHomeserver {
     const anya = asked.includes(demoUsers.anya) ? anyaIdentities[this.account.anyaNewKeys ? 1 : 0]! : undefined;
     return json(200, {
       device_keys,
-      master_keys: { ...byUser('master_key'), ...(anya ? { [demoUsers.anya]: anya.master_key } : {}) },
+      master_keys: { ...byUser('master_key'), ...(anya ? { [demoUsers.anya]: this.signedByAlice(anya.master_key) } : {}) },
       self_signing_keys: { ...byUser('self_signing_key'), ...(anya ? { [demoUsers.anya]: anya.self_signing_key } : {}) },
       user_signing_keys: byUser('user_signing_key'),
       failures: {},
     });
+  }
+
+  /** Главный ключ Ани — с подписью Алисы, если она его проверила. */
+  private signedByAlice(key: Record<string, unknown>): Record<string, unknown> {
+    const id = Object.keys(key['keys'] as Record<string, string>)[0]!.slice('ed25519:'.length);
+    const mine = this.account.anyaSignatures?.[id];
+    if (!mine) return key;
+    const signatures = key['signatures'] as Record<string, Record<string, string>> | undefined;
+    return { ...key, signatures: { ...signatures, [demoUsers.alice]: mine } };
   }
 
   /**
@@ -382,7 +391,15 @@ export class DemoHomeserver {
 
   private uploadSignatures({ body }: DemoRequest): Response {
     const uploads = (body ?? {}) as Record<string, Record<string, { signatures?: Record<string, Record<string, string>> }>>;
-    for (const [userId, signed] of Object.entries(uploads)) mergeSignatures(this.account, userId, signed);
+    for (const [userId, signed] of Object.entries(uploads)) {
+      if (userId !== demoUsers.anya) {
+        mergeSignatures(this.account, userId, signed);
+        continue;
+      }
+      // Алиса проверила Аню: подпись её ключом пользователей под главным ключом Ани.
+      const anya = (this.account.anyaSignatures ??= {});
+      for (const [id, key] of Object.entries(signed)) anya[id] = { ...anya[id], ...key.signatures?.[demoUsers.alice] };
+    }
     this.save();
     return json(200, { failures: {} });
   }

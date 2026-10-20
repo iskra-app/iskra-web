@@ -230,7 +230,11 @@
           <span>{t(`sendFailure.${failed.reason}`)}</span>
           <span class="actions">
             <button type="button" onclick={() => actions.discard(message.key)}>{t('message.delivery.discard')}</button>
-            <button type="button" class="again" onclick={() => actions.retry(message.key)}>{t('message.delivery.sendAgain')}</button>
+            {#if failed.reason === 'identityChanged' || failed.reason === 'insecureDevices'}
+              <button type="button" class="again" onclick={() => actions.sendAnyway(message.key)}>{t('message.delivery.sendAnyway')}</button>
+            {:else}
+              <button type="button" class="again" onclick={() => actions.retry(message.key)}>{t('message.delivery.sendAgain')}</button>
+            {/if}
           </span>
         </div>
       {/if}

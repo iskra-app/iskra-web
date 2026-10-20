@@ -230,6 +230,8 @@
   "message.delivery.failed": "Не отправлено",
   "message.delivery.read": "Прочитано",
   "message.delivery.sendAgain": "Отправить заново",
+  "message.delivery.sendAnyway": "Отправить всё равно",
+  "message.delivery.sendAnywayFailed": "Сообщение всё ещё не ушло. Проверьте связь и попробуйте ещё раз.",
   "message.delivery.sending": "Отправляется",
   "message.delivery.sent": "Отправлено",
   "message.edited": "изменено",

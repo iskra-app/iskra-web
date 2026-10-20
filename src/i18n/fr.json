@@ -230,6 +230,8 @@
   "message.delivery.failed": "Non envoyé",
   "message.delivery.read": "Lu",
   "message.delivery.sendAgain": "Renvoyer",
+  "message.delivery.sendAnyway": "Envoyer quand même",
+  "message.delivery.sendAnywayFailed": "Le message n’est toujours pas parti. Vérifiez la connexion et réessayez.",
   "message.delivery.sending": "Envoi en cours",
   "message.delivery.sent": "Envoyé",
   "message.edited": "modifié",

@@ -230,6 +230,8 @@
   "message.delivery.failed": "未送信",
   "message.delivery.read": "既読",
   "message.delivery.sendAgain": "もう一度送信",
+  "message.delivery.sendAnyway": "このまま送信",
+  "message.delivery.sendAnywayFailed": "メッセージはまだ送れていません。接続を確認して、もう一度お試しください。",
   "message.delivery.sending": "送信中",
   "message.delivery.sent": "送信済み",
   "message.edited": "編集済み",

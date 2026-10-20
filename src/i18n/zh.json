@@ -230,6 +230,8 @@
   "message.delivery.failed": "未发送",
   "message.delivery.read": "已读",
   "message.delivery.sendAgain": "重新发送",
+  "message.delivery.sendAnyway": "仍然发送",
+  "message.delivery.sendAnywayFailed": "消息还是没发出去。请检查网络后再试一次。",
   "message.delivery.sending": "正在发送",
   "message.delivery.sent": "已发送",
   "message.edited": "已编辑",

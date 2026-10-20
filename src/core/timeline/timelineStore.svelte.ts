@@ -35,7 +35,8 @@ import { markdownContent } from './composerMarkdown';
 import { currentMarker, rememberMovedMarker } from './readMarker';
 import { canSendPoll, pollEndContent, pollStartContent, type PollDraft } from './poll';
 import { mentionsMarkdown, rankCandidates, unlinkMentions, type ComposerMention, type RankedCandidate } from './composerMentions';
-import { mapEvent, type MapperContext } from './mapper';
+import { failureOf, mapEvent, type MapperContext } from './mapper';
+import { trustUnsignedDevices, withdrawChangedVerifications } from '../encryption/sendAnyway';
 import { isMarkedUnread, MARKED_UNREAD } from '../rooms/summarize';
 import { layout, SHOW_ALL_SERVICE, type ServiceHiding, type TimelineItem } from './layout';
 import type { Message, Reaction } from './message';
@@ -54,8 +55,8 @@ export interface Upload {
   state: 'uploading' | 'failed';
 }
 
-/** Что не получилось — ключи текстов нативной Искры (`timeline.*Failed`). */
-export type TimelineFailure = 'reactionFailed' | 'deleteFailed' | 'editFailed' | 'pinFailed' | 'pollFailed' | 'reportFailed';
+/** Что не получилось — ключи текстов нативной Искры (`timeline.*Failed`; `sendAnywayFailed` — из `message.delivery.*`). */
+export type TimelineFailure = 'reactionFailed' | 'deleteFailed' | 'editFailed' | 'pinFailed' | 'pollFailed' | 'reportFailed' | 'sendAnywayFailed';
 
 /** Кто поставил реакцию и какую — `Reactor` нативной. */
 export interface Reactor {
@@ -757,6 +758,25 @@ export class TimelineStore {
     if (!event || !room || event.status !== EventStatus.NOT_SENT) return;
     this.client.resendEvent(event, room).catch(() => this.schedule());
     this.schedule();
+  }
+
+  /**
+   * «Отправить всё равно» — на не ушедшее из-за проверенного, который больше не сходится
+   * (`identityChanged`, `insecureDevices`). Сначала решение о доверии (`sendAnyway.ts`),
+   * потом то же, что «Отправить заново». Не вышло — строка остаётся «не отправлено», а над
+   * лентой — «всё ещё не ушло», как в нативной.
+   */
+  sendAnyway(key: string): void {
+    const event = this.pendingByKey(key);
+    const room = this.room;
+    if (!event || !room || event.status !== EventStatus.NOT_SENT) return;
+    const reason = failureOf(event.error);
+    if (reason !== 'identityChanged' && reason !== 'insecureDevices') return;
+    this.act('sendAnywayFailed', async () => {
+      if (reason === 'identityChanged') await withdrawChangedVerifications(this.client, room);
+      else if (!(await trustUnsignedDevices(this.client, room))) throw new Error('no olm machine');
+      if (event.status === EventStatus.NOT_SENT) await this.client.resendEvent(event, room);
+    });
   }
 
   /** «Удалить» не ушедшее — оно и не уходило, удалять нечего, кроме строки. */

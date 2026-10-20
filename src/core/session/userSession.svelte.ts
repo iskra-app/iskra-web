@@ -20,6 +20,7 @@ import {
   type MatrixClient,
   type ValidatedAuthMetadata,
 } from 'matrix-js-sdk';
+import { AllDevicesIsolationMode } from 'matrix-js-sdk/lib/crypto-api';
 import { fetchFor } from '../auth/server';
 import { MediaLoader } from '../media/media';
 import { sendAttachment, uploadClientFor, type OutgoingFile } from '../media/upload';
@@ -484,6 +485,10 @@ export class UserSession {
         cryptoDatabasePrefix: names.cryptoPrefix,
         useIndexedDB: persistent,
       });
+      // Как нативная: у проверенного собеседника сменилась личность или появилось не
+      // подписанное им устройство — сообщение не уходит, пока читающий не решит
+      // «Отправить всё равно» (`TimelineStore.sendAnyway`). По умолчанию SDK молча шифрует.
+      client.getCrypto()?.setDeviceIsolationMode(new AllDevicesIsolationMode(true));
     }
 
     const session = new UserSession(client, account, keys);
