@@ -270,3 +270,30 @@ test('«Удалить» из меню строки — сначала вопр�
   await question.getByRole('button', { name: 'Выйти' }).click();
   await expect(rows(/^Дом 14/)).toHaveCount(0, { timeout: 10_000 });
 });
+
+test('«Новый вход в аккаунт»: прежние сеансы — не новость; новый — вопрос; «Да, это я» — больше не спрашивать', async ({ page }) => {
+  await signInToDemo(page);
+  const banner = page.getByRole('region', { name: 'Новый вход в аккаунт' });
+  await expect(page.getByRole('link', { name: /^Выходные/ })).toBeVisible();
+  await page.waitForTimeout(500);
+  await expect(banner).toHaveCount(0);
+
+  // В демо после перезагрузки в аккаунте появляется новый сеанс.
+  await page.reload({ waitUntil: 'domcontentloaded' });
+  await expect(banner).toBeVisible({ timeout: 20_000 });
+  await expect(banner).toContainText('Chrome на Windows · 192.0.2.44');
+  await banner.getByRole('button', { name: 'Это не я' }).click();
+  await expect(page.getByRole('heading', { name: 'Безопасность', level: 1 })).toBeVisible();
+  await expect(page.getByRole('region', { name: 'Активные сеансы' })).toContainText('Chrome на Windows');
+
+  await page.goto('/#/', { waitUntil: 'domcontentloaded' });
+  await expect(banner).toBeVisible({ timeout: 20_000 });
+  await banner.getByRole('button', { name: 'Да, это я' }).click();
+  await expect(banner).toHaveCount(0);
+  // Запись в IndexedDB — не мгновенно; перезагрузить в ту же миллисекунду человек не успеет.
+  await page.waitForTimeout(500);
+  await page.reload({ waitUntil: 'domcontentloaded' });
+  await expect(page.getByRole('link', { name: /^Выходные/ })).toBeVisible({ timeout: 20_000 });
+  await page.waitForTimeout(500);
+  await expect(banner).toHaveCount(0);
+});

@@ -59,6 +59,11 @@ const draftsOf = (userId: string) => IDBKeyRange.bound([userId, ''], [userId, '\
 interface StoredAccount extends Account {
   key: CryptoKey;
   sealed: Sealed;
+  /**
+   * Сеансы аккаунта, которые это устройство уже видело (`newSignIns.svelte.ts`): ID и имя. Не
+   * секрет — сервер раздаёт их всем сеансам аккаунта, — и уходят вместе с записью при выходе.
+   */
+  knownDevices?: string[];
 }
 
 export type NewAccount = Omit<Account, 'signedInAt'> & Omit<AccountSecrets, 'cryptoStorageKey'>;
@@ -80,7 +85,7 @@ async function withDb<T>(body: (db: IDBDatabase) => Promise<T>): Promise<T> {
   }
 }
 
-function publicPart({ key: _key, sealed: _sealed, ...account }: StoredAccount): Account {
+function publicPart({ key: _key, sealed: _sealed, knownDevices: _known, ...account }: StoredAccount): Account {
   return account;
 }
 
@@ -128,6 +133,22 @@ export const vault = {
       transact(db, ACCOUNTS, 'readonly', (s) => s.get(userId) as IDBRequest<StoredAccount | undefined>),
     );
     return stored ? unseal<AccountSecrets>(stored.key, stored.sealed) : undefined;
+  },
+
+  /** Какие сеансы аккаунта это устройство уже видело; `undefined` — ещё ни разу не смотрело. */
+  async knownDevices(userId: string): Promise<string[] | undefined> {
+    return withDb(async (db) => {
+      const stored = await transact(db, ACCOUNTS, 'readonly', (s) => s.get(userId) as IDBRequest<StoredAccount | undefined>);
+      return stored?.knownDevices;
+    });
+  },
+
+  async setKnownDevices(userId: string, known: string[]): Promise<void> {
+    await withDb(async (db) => {
+      const stored = await transact(db, ACCOUNTS, 'readonly', (s) => s.get(userId) as IDBRequest<StoredAccount | undefined>);
+      if (!stored) return;
+      await transact(db, ACCOUNTS, 'readwrite', (s) => s.put({ ...stored, knownDevices: [...known].sort() }));
+    });
   },
 
   /** Новые токены после обновления — под тем же ключом. */

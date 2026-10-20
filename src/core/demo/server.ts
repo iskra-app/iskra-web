@@ -120,6 +120,11 @@ export class DemoHomeserver {
     this.slowDelayMs = options.slowDelayMs ?? 1_500;
     this.storage = options.storage;
     this.account = this.storage?.load() ?? emptyAccount();
+    // Вкладку перезагрузили после того, как список устройств уже видели, — в нём новый вход:
+    // так в демо видно «Новый вход в аккаунт — это вы?».
+    if (this.account.sawDevices) {
+      this.otherSessions.unshift({ device_id: 'CHROMEDEMO', display_name: 'Chrome на Windows', last_seen_ip: '192.0.2.44', last_seen_ts: Date.now() - 5 * 60_000 });
+    }
     const world = buildDemoWorld(options.now ?? Date.now());
     this.rooms = new Map(world.rooms.map((room) => [room.roomId, room]));
     this.invites = world.invites;
@@ -1125,6 +1130,10 @@ export class DemoHomeserver {
   }
 
   private devices(): Response {
+    if (!this.account.sawDevices) {
+      this.account.sawDevices = true;
+      this.save();
+    }
     const devices = Object.keys(this.account.devices).map((id) => ({ device_id: id, display_name: 'Iskra Web', last_seen_ts: Date.now() }));
     return json(200, { devices: [...devices, ...this.otherSessions] });
   }

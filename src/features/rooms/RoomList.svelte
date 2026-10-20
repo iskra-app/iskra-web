@@ -12,6 +12,8 @@
 <script lang="ts">
   import EmptyState from '../../design/EmptyState.svelte';
   import ConfirmDialog from '../../design/ConfirmDialog.svelte';
+  import NewSignInBanner from './NewSignInBanner.svelte';
+  import { NewSignIns } from '../../core/session/newSignIns.svelte.ts';
   import ProblemPanel from '../../design/ProblemPanel.svelte';
   import IconButton from '../../design/IconButton.svelte';
   import Icon from '../../design/Icon.svelte';
@@ -90,6 +92,19 @@
   let choosingFolders = $state<RoomSummary | null>(null);
 
   let peeking = $state<RoomSummary | null>(null);
+  /**
+   * Новые входы в аккаунт — при запуске и при каждом возвращении на вкладку: вход — то, что
+   * случается, пока вкладка в фоне.
+   */
+  const signIns = $derived(new NewSignIns(session.userId, () => session.devices()));
+  $effect(() => {
+    const store = signIns;
+    void store.check();
+    const onvisible = () => document.visibilityState === 'visible' && void store.check();
+    document.addEventListener('visibilitychange', onvisible);
+    return () => document.removeEventListener('visibilitychange', onvisible);
+  });
+
   /** Из какого чата выйти — ждёт ответа на вопрос. */
   let leaving = $state<RoomSummary | null>(null);
 
@@ -154,6 +169,16 @@
     next.scrollIntoView({ block: 'nearest' });
   }
 </script>
+
+{#if view.kind === 'all' && signIns.sessions[0]}
+  {@const device = signIns.sessions[0]}
+  <NewSignInBanner
+    {device}
+    more={signIns.sessions.length - 1}
+    onconfirm={() => void signIns.confirm(device)}
+    ondeny={() => router.go({ name: 'settings', section: 'security' })}
+  />
+{/if}
 
 {#if view.kind === 'all' && folders.length > 0}
   <FolderTabs {folders} list={organized.list} archived={organized.archived} selected={folder?.id ?? ''} onselect={(id) => (folderSelection.id = id)} />

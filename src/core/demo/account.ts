@@ -28,6 +28,8 @@ export interface DemoAccountState {
   nextDevice: number;
   /** Аня уже сменила ключи (`identities.ts`): вторая личность вместо первой. */
   anyaNewKeys?: boolean;
+  /** Список устройств уже показывали — в следующую загрузку вкладки в нём «новый вход». */
+  sawDevices?: boolean;
 }
 
 export interface DemoStorage {
