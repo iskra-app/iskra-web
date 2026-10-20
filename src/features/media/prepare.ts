@@ -7,6 +7,7 @@
  */
 import type { OutgoingFile, OutgoingKind } from '../../core/media/upload';
 import { photoPlan, renamed, type MediaSendSettings } from './mediaSettings';
+import { stripMp4Metadata } from '../../core/media/mp4Metadata';
 
 /** Длинная сторона миниатюры, px. */
 const THUMBNAIL_SIDE = 800;
@@ -31,7 +32,7 @@ export async function prepareFile(file: File, settings: MediaSendSettings): Prom
   const base: OutgoingFile = { blob: file, name: file.name || nameFor(mimetype), mimetype, kind };
   try {
     if (kind === 'image') return await image(base, settings);
-    if (kind === 'video') return { ...base, ...(await videoInfo(file)) };
+    if (kind === 'video') return { ...(await videoWithoutMetadata(base, settings)), ...(await videoInfo(file)) };
     if (kind === 'audio') return { ...base, ...(await audioInfo(file)) };
   } catch {
     // Не разобрали — отправим без размеров: получатель просто не узнает их заранее.
@@ -107,6 +108,17 @@ async function drawThumbnail(source: CanvasImageSource, width: number, height: n
   const h = Math.max(1, Math.round(height * scale));
   const blob = await draw(source, w, h, 'image/jpeg', 0.8);
   return blob ? { blob, width: w, height: h, mimetype: 'image/jpeg' } : undefined;
+}
+
+/**
+ * Видео без метаданных, если так велят настройки: MP4 и MOV правятся на месте, без
+ * перекодирования (`mp4Metadata.ts`). Другой контейнер или не разобрали — уходит как есть, как
+ * и фото, которое не удалось перекодировать.
+ */
+async function videoWithoutMetadata(base: OutgoingFile, settings: MediaSendSettings): Promise<OutgoingFile> {
+  if (!settings.stripMetadata || !/^video\/(mp4|quicktime)$/.test(base.mimetype)) return base;
+  const stripped = stripMp4Metadata(new Uint8Array(await base.blob.arrayBuffer()));
+  return stripped ? { ...base, blob: new Blob([stripped], { type: base.mimetype }) } : base;
 }
 
 /** Размеры, длительность и кадр для миниатюры — у `<video>` без звука и без показа. */
