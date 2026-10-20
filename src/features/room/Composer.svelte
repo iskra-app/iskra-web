@@ -391,7 +391,13 @@
   function grow() {
     if (!field) return;
     field.style.height = 'auto';
-    field.style.height = `${field.scrollHeight}px`;
+    // `scrollHeight` — без рамки, а высота у `border-box` — с ней: без этих двух пикселей текст
+    // не помещался и поле прокручивалось на них. Прокрутка — только у потолка, иначе дробная
+    // высота строки давала бы ещё полпикселя хода.
+    const border = field.offsetHeight - field.clientHeight;
+    const wanted = field.scrollHeight + border;
+    field.style.height = `${wanted}px`;
+    field.style.overflowY = wanted > field.offsetHeight ? 'auto' : 'hidden';
   }
   $effect(() => {
     void text;
@@ -705,13 +711,13 @@
     flex: 1;
     min-height: var(--size-navigation-bar);
     max-height: 40vh;
-    padding: calc((var(--size-navigation-bar) - 1lh) / 2) var(--space-roomy);
+    padding: calc((var(--size-navigation-bar) - 1lh) / 2 - var(--border-hairline)) var(--space-roomy);
     border: var(--border-hairline) solid var(--color-separator);
     border-radius: var(--radius-bubble);
     background: var(--color-background);
     resize: none;
     line-height: var(--line-height-body);
-    overflow-y: auto;
+    overflow-y: hidden;
   }
   textarea.with-stickers {
     padding-inline-end: var(--size-navigation-bar);
