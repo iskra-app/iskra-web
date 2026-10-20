@@ -95,13 +95,13 @@ test('своя комната: изменить название, дать ро�
   await panel.getByRole('button', { name: 'Назад' }).click();
   await expect(panel.getByRole('button', { name: /Борис.*Модератор/ })).toBeVisible({ timeout: 10_000 });
 
+  // «Пригласить» — галочкой из знакомых, как в нативной; кто уже здесь — серым.
   await panel.getByRole('button', { name: 'Пригласить' }).click();
-  const invite = page.getByRole('dialog', { name: 'Кого пригласить?' });
-  await invite.getByRole('textbox').fill('аня');
-  await invite.getByRole('button', { name: 'Пригласить' }).click();
-  await expect(invite).toContainText('Проверьте адрес');
-  await invite.getByRole('textbox').fill('@anya:demo.iskra.invalid');
-  await invite.getByRole('button', { name: 'Пригласить' }).click();
+  const invite = page.getByRole('dialog', { name: 'Пригласить' });
+  await expect(invite.getByRole('button', { name: 'Пригласить', exact: true })).toBeDisabled();
+  await invite.getByRole('checkbox', { name: /^Аня/ }).click();
+  await expect(invite.getByRole('checkbox', { name: /^Аня/ })).toHaveAttribute('aria-checked', 'true');
+  await invite.getByRole('button', { name: 'Пригласить (1)' }).click();
   await expect(invite).toBeHidden();
   await expect(panel.getByRole('button', { name: /Аня.*Приглашение отправлено/ })).toBeVisible({ timeout: 10_000 });
 });

@@ -445,7 +445,7 @@
   {/if}
 
   <RoomEditDialog open={editing} {details} {session} onclose={() => (editing = false)} />
-  <InviteDialog open={inviting} {details} onclose={() => (inviting = false)} />
+  <InviteDialog open={inviting} {session} {details} onclose={() => (inviting = false)} />
 
   <ConfirmDialog
     open={leaving}
