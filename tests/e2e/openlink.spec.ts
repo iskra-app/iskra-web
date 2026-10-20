@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { signInToDemo } from './helpers';
+import { openApp, signInToDemo } from './helpers';
 
 const lena = '@lena:demo.iskra.invalid';
 const lounge = '#lounge:demo.iskra.invalid';
@@ -30,7 +30,8 @@ test('ссылка s.iskra.wtf: человеку — «Написать», в к
 });
 
 test('ссылка до входа ждёт входа, даже если вход вернул на корень; «Отмена» — к списку', async ({ page }) => {
-  await page.goto(`/#/open/${encodeURIComponent(lena)}`, { waitUntil: 'domcontentloaded' });
+  // Через `openApp`: первый переход Firefox изредка теряет, а там он повторяется.
+  await openApp(page, `/#/open/${encodeURIComponent(lena)}`);
   // `signInToDemo` открывает `/` — как возврат со страницы входа: адреса нет, ссылка ждёт.
   await signInToDemo(page);
   const dialog = page.getByRole('dialog');

@@ -101,16 +101,17 @@ export async function submitAddress(page: Page, address: string): Promise<void> 
 }
 
 /**
- * Открыть приложение с `/`. Firefox под Playwright изредка теряет сам переход — повторяем
- * его здесь, одним местом, а не в каждом тесте (подробности — ниже, у повтора).
+ * Открыть приложение — с `/` или с другого адреса (`/#/open/…`). Firefox под Playwright
+ * изредка теряет сам первый переход — повторяем его здесь, одним местом, а не в каждом тесте
+ * (подробности — ниже, у повтора). Первый переход теста — только через эту функцию.
  */
-export async function openApp(page: Page): Promise<void> {
+export async function openApp(page: Page, path = '/'): Promise<void> {
   await calmEntrance(page);
   const log = recordConsole(page);
   // Не ждём `load`: приложению он не нужен, а Firefox в CI изредка его так и не присылает.
   try {
     try {
-      await page.goto('/', { waitUntil: 'domcontentloaded', timeout: 10_000 });
+      await page.goto(path, { waitUntil: 'domcontentloaded', timeout: 10_000 });
     } catch (error) {
       // Firefox под Playwright изредка теряет сам переход: документ запрошен и получен, а
       // страница так и не переключилась на него — ни `framenavigated`, ни строки нашего
@@ -120,7 +121,7 @@ export async function openApp(page: Page): Promise<void> {
       // DOMContentLoaded не пришёл, — это уже наше, и повтора нет.
       if (log.some((line) => line.startsWith('[navigated] http'))) throw error;
       log.push(`[retry] переход не состоялся; запросы: ${(requests.get(page) ?? []).join(', ') || '—'}`);
-      await page.goto('/', { waitUntil: 'domcontentloaded', timeout: 20_000 });
+      await page.goto(path, { waitUntil: 'domcontentloaded', timeout: 20_000 });
     }
   } catch (error) {
     // Firefox в CI однажды не дождался и DOMContentLoaded. Он приходит после того, как
