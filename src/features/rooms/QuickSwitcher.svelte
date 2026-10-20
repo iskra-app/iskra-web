@@ -9,6 +9,7 @@
   import { searchRooms } from '../../core/rooms/organize';
   import type { UserSession } from '../../core/session/userSession.svelte.ts';
   import { router } from '../../core/navigation/router.svelte.ts';
+  import { backdropClose } from '../../design/backdropClose';
   import { t } from '../../i18n/index.svelte.ts';
   import RoomFace from './RoomFace.svelte';
   import { previewText, roomName } from './text';
@@ -64,7 +65,7 @@
   }
 </script>
 
-<dialog bind:this={dialog} data-motion="pop" class="switcher" aria-label={t('quickSwitch.label')} {onclose}>
+<dialog bind:this={dialog} use:backdropClose={onclose} data-motion="pop" class="switcher" aria-label={t('quickSwitch.label')} {onclose}>
   <input
     bind:this={input}
     bind:value={query}

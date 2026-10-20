@@ -1,11 +1,12 @@
 <!--
-  Окно с формой: нативный `<dialog>` с `showModal()` — фокус внутри, `Esc` закрывает,
-  фокус возвращается туда, откуда открыли. Содержимое и кнопки — у того, кто открыл.
+  Окно с формой: нативный `<dialog>` с `showModal()` — фокус внутри, `Esc` и щелчок по подложке
+  закрывают, фокус возвращается туда, откуда открыли. Содержимое и кнопки — у того, кто открыл.
 -->
 <script lang="ts">
   import type { Snippet } from 'svelte';
   import Icon from './Icon.svelte';
   import IconButton from './IconButton.svelte';
+  import { backdropClose } from './backdropClose';
   import { whenClosed } from './motion';
 
   interface Props {
@@ -45,7 +46,7 @@
   }
 </script>
 
-<dialog bind:this={dialog} data-motion="pop" aria-labelledby="{id}-title" {onclose} {oncancel}>
+<dialog bind:this={dialog} use:backdropClose={onclose} data-motion="pop" aria-labelledby="{id}-title" {onclose} {oncancel}>
   {#if open || shown}
     {#if back}
       <div class="heading">

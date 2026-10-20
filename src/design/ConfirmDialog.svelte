@@ -3,6 +3,7 @@
   возвращает его, когда закрыт, и закрывается по `Esc`.
 -->
 <script lang="ts">
+  import { backdropClose } from './backdropClose';
   interface Props {
     open: boolean;
     title: string;
@@ -26,7 +27,7 @@
   });
 </script>
 
-<dialog bind:this={dialog} data-motion="pop" aria-labelledby="{id}-title" aria-describedby="{id}-message" {onclose}>
+<dialog bind:this={dialog} use:backdropClose={onclose} data-motion="pop" aria-labelledby="{id}-title" aria-describedby="{id}-message" {onclose}>
   <h2 id="{id}-title">{title}</h2>
   <p id="{id}-message">{message}</p>
   <div class="actions">
