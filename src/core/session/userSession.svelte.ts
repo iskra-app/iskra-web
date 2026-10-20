@@ -145,8 +145,8 @@ export class UserSession {
   }
 
   /** Лента комнаты. Живёт, пока открыт чат: тот, кто открыл, её и `destroy()`. */
-  timeline(roomId: string): TimelineStore {
-    return new TimelineStore(this.client, roomId, uploadClientFor(this.client, this.account.method === 'demo' ? fetchFor(true) : undefined));
+  timeline(roomId: string, threadRootId?: string): TimelineStore {
+    return new TimelineStore(this.client, roomId, uploadClientFor(this.client, this.account.method === 'demo' ? fetchFor(true) : undefined), threadRootId);
   }
 
   /** Где собеседник — «в сети», «был(а) …». Живёт, пока открыт его чат. */

@@ -64,6 +64,8 @@ export interface DemoRoom {
   tags?: Record<string, Record<string, unknown>>;
   /** Данные комнаты, кроме тегов и маркера, — метка «непрочитано» (`m.marked_unread`). */
   accountData?: Record<string, unknown>;
+  /** Сколько вошло — для сводки синхронизации, если комната «больше», чем её участники в демо. */
+  joinedCount?: number;
 }
 
 export interface DemoInvite {
@@ -278,6 +280,37 @@ export function buildDemoWorld(now: number): { rooms: DemoRoom[]; invites: DemoI
     // Отправлены разом: через четыре секунды друг за другом, а не через полчаса, как прочее.
     index > 2 && index < 5 ? { ...event, origin_server_ts: all[2]!.origin_server_ts! + (index - 2) * 4_000 } : event,
   );
+  // Тред под «собранием»: чат подъезда большой (`joinedCount`), и ответы собираются под сообщением.
+  const meetingId = quietTimeline[0]!.event_id!;
+  const meetingTs = quietTimeline[0]!.origin_server_ts!;
+  const meetingReplies = (
+    [
+      [vera, 'Во сколько?'],
+      [boris, 'В семь, во дворе'],
+      [vera, 'Приду'],
+    ] as const
+  ).map(([sender, body], index): DemoEvent => ({
+    type: 'm.room.message',
+    sender,
+    event_id: `$quiet-thread-${index}`,
+    origin_server_ts: meetingTs + (index + 1) * 5 * MINUTE,
+    content: {
+      msgtype: 'm.text',
+      body,
+      'm.relates_to': {
+        rel_type: 'm.thread',
+        event_id: meetingId,
+        is_falling_back: true,
+        'm.in_reply_to': { event_id: index ? `$quiet-thread-${index - 1}` : meetingId },
+      },
+    },
+  }));
+  // Сводка на корне — как её кладёт настоящий сервер (`unsigned.m.relations.m.thread`).
+  quietTimeline[0] = {
+    ...quietTimeline[0]!,
+    unsigned: { 'm.relations': { 'm.thread': { count: meetingReplies.length, latest_event: meetingReplies.at(-1), current_user_participated: false } } },
+  };
+  quietTimeline.splice(1, 0, ...meetingReplies);
 
   const history = demoRooms.history;
   const historyTimeline = stamp(
@@ -334,6 +367,7 @@ export function buildDemoWorld(now: number): { rooms: DemoRoom[]; invites: DemoI
           { type: 'm.room.name', sender: boris, state_key: '', content: { name: 'Дом 14, подъезд 2' }, event_id: `$name-${quiet}` },
         ]),
         timeline: quietTimeline,
+        joinedCount: 128,
         // Беззвучный: сервер уведомлений не считает, но новые сообщения есть.
         unread: { notifications: 0, highlights: 0 },
       },

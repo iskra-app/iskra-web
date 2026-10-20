@@ -20,7 +20,8 @@ import {
   requestPersistence,
   type PersistenceAdvice,
 } from '../storage/persistence';
-import { vault, type Account, type NewAccount } from '../storage/vault';
+import { vault, type Account, type AccountSecrets, type NewAccount } from '../storage/vault';
+import { errorDetail } from '../support/errorDetail';
 import { SessionLock } from './lock';
 import { wallpaperPhoto } from '../storage/wallpaper';
 import { UserSession, wipeUserData } from './userSession.svelte.ts';
@@ -28,7 +29,7 @@ import { forgetMovedMarkers } from '../timeline/readMarker';
 
 export type Phase =
   | { name: 'loading' }
-  | { name: 'signed-out'; problem?: SignInProblem; ended?: boolean }
+  | { name: 'signed-out'; problem?: SignInProblem; detail?: string; ended?: boolean }
   | { name: 'elsewhere'; userId: string }
   | { name: 'signed-in'; session: UserSession };
 
@@ -70,8 +71,8 @@ export class AppState {
     let account: Account | undefined;
     try {
       account = await vault.current();
-    } catch {
-      this.phase = { name: 'signed-out', problem: 'storageUnavailable' };
+    } catch (error) {
+      this.phase = { name: 'signed-out', problem: 'storageUnavailable', detail: errorDetail(error) };
       return;
     }
     if (!account) {
@@ -123,25 +124,46 @@ export class AppState {
   }
 
   private async startSession(account: Account): Promise<void> {
-    const secrets = await vault.secrets(account.userId).catch(() => undefined);
+    let secrets: AccountSecrets | undefined;
+    let secretsError: unknown;
+    try {
+      secrets = await vault.secrets(account.userId);
+    } catch (error) {
+      secretsError = error;
+    }
     if (!secrets) {
       this.releaseLock();
-      this.phase = { name: 'signed-out', problem: 'storageUnavailable' };
+      this.phase = {
+        name: 'signed-out',
+        problem: 'storageUnavailable',
+        ...(secretsError ? { detail: errorDetail(secretsError) } : {}),
+      };
       return;
     }
-    let session: UserSession;
-    try {
-      session = await UserSession.start(account, secrets, {
-        onTokensRefreshed: (tokens) => vault.updateTokens(account.userId, tokens),
-        onLoggedOut: () => void this.sessionEnded(),
-      });
-    } catch {
+    let session: UserSession | undefined;
+    let failure: unknown;
+    for (let attempt = 0; attempt < START_ATTEMPTS && !session; attempt++) {
+      if (attempt > 0) await new Promise((resolve) => setTimeout(resolve, START_RETRY_DELAY_MS));
+      try {
+        session = await UserSession.start(account, secrets, {
+          onTokensRefreshed: (tokens) => vault.updateTokens(account.userId, tokens),
+          onLoggedOut: () => void this.sessionEnded(),
+        });
+      } catch (error) {
+        failure = error;
+      }
+    }
+    if (!session) {
       // Не поднялось криптохранилище или база синхронизации. Аккаунт не трогаем:
       // следующая попытка может пройти, а удалить ключи — необратимо.
+      // Загрузку WASM SDK запоминает вместе с неудачей и в этой вкладке не повторит —
+      // значит, один раз перезагружаем страницу (не больше: вечного цикла быть не должно).
+      if (reloadOnce()) return;
       this.releaseLock();
-      this.phase = { name: 'signed-out', problem: 'storageUnavailable' };
+      this.phase = { name: 'signed-out', problem: 'storageUnavailable', detail: errorDetail(failure) };
       return;
     }
+    clearReloadMark();
     this.phase = { name: 'signed-in', session };
     void this.checkPersistence();
     // Где стоит переписка — для плашки «Старая переписка заблокирована». На новом входе
@@ -225,6 +247,31 @@ export class AppState {
   private releaseLock(): void {
     this.lock?.release();
     this.lock = null;
+  }
+}
+
+/** Сколько раз пробуем поднять сессию, прежде чем сдаться, и пауза между попытками. */
+const START_ATTEMPTS = 2;
+const START_RETRY_DELAY_MS = 1000;
+const RELOAD_MARK = 'iskra-start-reloaded';
+
+/** Перезагружает страницу, если ещё не перезагружали после сбоя. `true` — перезагрузка пошла. */
+function reloadOnce(): boolean {
+  try {
+    if (sessionStorage.getItem(RELOAD_MARK)) return false;
+    sessionStorage.setItem(RELOAD_MARK, '1');
+  } catch {
+    return false;
+  }
+  window.location.reload();
+  return true;
+}
+
+function clearReloadMark(): void {
+  try {
+    sessionStorage.removeItem(RELOAD_MARK);
+  } catch {
+    // Нет sessionStorage — метки не было.
   }
 }
 

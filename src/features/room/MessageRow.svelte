@@ -33,6 +33,7 @@
   import VoiceMessage from '../media/VoiceMessage.svelte';
   import MediaPreview from '../media/MediaPreview.svelte';
   import AlbumView from './AlbumView.svelte';
+  import ThreadLine from './ThreadLine.svelte';
   import type { MediaLoader } from '../../core/media/media';
   import { attachmentLabel, serviceText } from './text';
 
@@ -209,6 +210,10 @@
           </div>
         {/if}
       </div>
+      {#if message.thread && actions.openThread}
+        {@const open = actions.openThread}
+        <ThreadLine thread={message.thread} onopen={() => open(message)} />
+      {/if}
       {#if message.reactions.length}
         <ul class="reactions" aria-label={t('message.reactions')}>
           {#each message.reactions as reaction (reaction.key)}

@@ -32,9 +32,11 @@
 
   interface Props {
     problem?: SignInProblem | 'noRegistration';
+    /** Что на самом деле сломалось — мелким текстом под сообщением. */
+    detail?: string;
     ended?: boolean;
   }
-  let { problem: initialProblem, ended = false }: Props = $props();
+  let { problem: initialProblem, detail: initialDetail, ended = false }: Props = $props();
 
   let address = $state('');
   let username = $state('');
@@ -49,6 +51,8 @@
   // Пропы — только начальное значение: дальше экран ведёт их сам.
   // svelte-ignore state_referenced_locally
   let problem = $state<Props['problem']>(initialProblem);
+  // svelte-ignore state_referenced_locally
+  let detail = $state<string | undefined>(initialDetail);
   // svelte-ignore state_referenced_locally
   let showEnded = $state(ended);
 
@@ -65,11 +69,13 @@
   async function run(task: () => Promise<void>) {
     busy = true;
     problem = undefined;
+    detail = undefined;
     showEnded = false;
     try {
       await task();
     } catch (error) {
       problem = error instanceof SignInError ? error.problem : 'unreachable';
+      detail = error instanceof SignInError && error.detail ? error.detail : undefined;
     } finally {
       busy = false;
       pending = null;
@@ -175,7 +181,7 @@
           {redirectWay ? t('signIn.signInWithPassword') : t('signIn.signIn')}
         </PrimaryButton>
         {#if problem}
-          <ProblemPanel message={t(problemKey(problem))} />
+          <ProblemPanel message={t(problemKey(problem))} {detail} />
         {/if}
       </form>
     {:else}
@@ -204,7 +210,7 @@
             invalid={!!problem}
           />
           {#if problem}
-            <ProblemPanel message={t(problemKey(problem))} />
+            <ProblemPanel message={t(problemKey(problem))} {detail} />
           {/if}
           <PrimaryButton type="submit" wide {busy} disabled={!address.trim()}>{t('signIn.next')}</PrimaryButton>
           <PlainButton disabled={busy} onclick={() => (pickingServer = true)}>{t('signIn.chooseServer')}</PlainButton>
@@ -213,7 +219,7 @@
       {:else}
         <div class="step">
           {#if problem}
-            <ProblemPanel message={t(problemKey(problem))} />
+            <ProblemPanel message={t(problemKey(problem))} {detail} />
           {/if}
           <PrimaryButton wide busy={pending === 'signIn'} disabled={busy} onclick={signIn}>{t('signIn.signIn')}</PrimaryButton>
           <PlainButton busy={pending === 'createAccount'} disabled={busy} onclick={createAccount}>{t('signIn.createAccount')}</PlainButton>

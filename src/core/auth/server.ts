@@ -8,6 +8,7 @@
 import { createClient, type ValidatedAuthMetadata } from 'matrix-js-sdk';
 import { DEMO_BASE_URL, DEMO_SERVER } from '../demo/fixtures';
 import { demoServer } from '../demo/instance';
+import { errorDetail } from '../support/errorDetail';
 import { quietLogger } from '../support/logger';
 
 export type SignInProblem =
@@ -26,6 +27,11 @@ export class SignInError extends Error {
   ) {
     super(problem, options);
     this.name = 'SignInError';
+  }
+
+  /** Что на самом деле сломалось — для мелкой строки под сообщением. */
+  get detail(): string {
+    return errorDetail(this.cause);
   }
 }
 

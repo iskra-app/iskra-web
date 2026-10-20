@@ -54,6 +54,8 @@ export interface UploadClient {
 export interface SendOptions {
   caption?: string;
   replyTo?: { eventId: string; senderId: string; own: boolean };
+  /** Связь целиком — у ответа в треде (`m.thread`); иначе её строит `replyTo`. */
+  relatesTo?: Record<string, unknown>;
   onProgress?: (fraction: number) => void;
   signal?: AbortSignal;
 }
@@ -84,10 +86,7 @@ export async function sendAttachment(client: UploadClient, roomId: string, file:
 
   if (file.sticker && !encrypted) {
     const sticker: Record<string, unknown> = { body: file.sticker.body, url: main.url, info };
-    if (options.replyTo) {
-      sticker['m.relates_to'] = { 'm.in_reply_to': { event_id: options.replyTo.eventId } };
-      sticker['m.mentions'] = options.replyTo.own ? {} : { user_ids: [options.replyTo.senderId] };
-    }
+    relate(sticker, options);
     await client.send(roomId, sticker, 'm.sticker');
     return;
   }
@@ -108,11 +107,14 @@ export async function sendAttachment(client: UploadClient, roomId: string, file:
     };
     content['org.matrix.msc3245.voice'] = {};
   }
-  if (options.replyTo) {
-    content['m.relates_to'] = { 'm.in_reply_to': { event_id: options.replyTo.eventId } };
-    content['m.mentions'] = options.replyTo.own ? {} : { user_ids: [options.replyTo.senderId] };
-  }
+  relate(content, options);
   await client.send(roomId, content);
+}
+
+function relate(content: Record<string, unknown>, options: SendOptions): void {
+  if (options.relatesTo) content['m.relates_to'] = options.relatesTo;
+  else if (options.replyTo) content['m.relates_to'] = { 'm.in_reply_to': { event_id: options.replyTo.eventId } };
+  if (options.replyTo) content['m.mentions'] = options.replyTo.own ? {} : { user_ids: [options.replyTo.senderId] };
 }
 
 async function put(

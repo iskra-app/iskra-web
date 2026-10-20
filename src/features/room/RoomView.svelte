@@ -23,6 +23,8 @@
   import VideoNoteCapture from './VideoNoteCapture.svelte';
   import Viewer, { type ViewerItem } from '../media/Viewer.svelte';
   import type { Message } from '../../core/timeline/message';
+  import { router } from '../../core/navigation/router.svelte.ts';
+  import { threadsShownIn } from './threads';
   import type { UserSession } from '../../core/session/userSession.svelte.ts';
   import type { Reactor, TimelineStore } from '../../core/timeline/timelineStore.svelte.ts';
   import { i18n, t } from '../../i18n/index.svelte.ts';
@@ -55,8 +57,12 @@
     roomId: string;
     /** Лента чата — наружу, для вкладок «О чате»: они читают то, что она загрузила. */
     store?: TimelineStore;
+    /** Это тред под сообщением (ID корня), а не сам чат: та же лента, только его ответы. */
+    thread?: string;
   }
-  let { session, roomId, store = $bindable() }: Props = $props();
+  let { session, roomId, store = $bindable(), thread }: Props = $props();
+  /** Черновик треда — свой, рядом с черновиком чата. */
+  const draftKey = $derived(thread ? `${roomId}#${thread}` : roomId);
 
   const DRAFT_SAVE_MS = 400;
 
@@ -147,8 +153,8 @@
   });
 
   $effect(() => {
-    const id = roomId;
-    const created = session.timeline(id);
+    const id = draftKey;
+    const created = session.timeline(roomId, thread);
     store = created;
     text = '';
     context = null;
@@ -181,6 +187,8 @@
   /** Кто здесь сменил ключи — живёт, пока открыт чат, как и лента. */
   let identities = $state<IdentityChangesStore | null>(null);
   $effect(() => {
+    // В треде о сменивших ключи не говорим: это сказано над самим чатом.
+    if (thread) return;
     const created = session.identityChanges(roomId);
     identities = created;
     return () => {
@@ -201,6 +209,12 @@
   }
 
   const room = $derived(session.rooms.get(roomId));
+  /** Треды в этом чате — `ThreadSettings` нативной: не в личном, и по настройке «Чаты». */
+  const usesThreads = $derived(!thread && !!room && room.kind !== 'direct' && threadsShownIn(room.memberCount));
+  $effect(() => {
+    store?.setThreads({ enabled: usesThreads, hidesReplies: preferences.threadsHideReplies });
+  });
+
   /** Собеседник личного чата, если вы его заблокировали: в группе один заблокированный писать не мешает. */
   const blockedId = $derived(room?.kind === 'direct' && room.counterpartId && session.blocked.has(room.counterpartId) ? room.counterpartId : undefined);
   const canSend = $derived(room?.membership === 'join' || (!room && session.canSend(roomId)));
@@ -218,7 +232,7 @@
       else store?.typingStopped();
     }
     clearTimeout(saveTimer);
-    const id = roomId;
+    const id = draftKey;
     saveTimer = setTimeout(() => void session.saveDraft(id, draftText()), DRAFT_SAVE_MS);
   }
 
@@ -243,7 +257,7 @@
     }
     context = null;
     clearTimeout(saveTimer);
-    void session.saveDraft(roomId, text);
+    void session.saveDraft(draftKey, text);
   }
 
   /**
@@ -420,6 +434,9 @@
     get showsReactors() {
       return room?.kind !== 'direct';
     },
+    get openThread() {
+      return usesThreads ? (message: Message) => message.eventId && router.go({ name: 'room', roomId, thread: message.eventId }) : undefined;
+    },
     reactors: (message) => (reactorsOf = store?.reactors(message) ?? []),
     report: (message) => (reporting = message),
     get canPin() {
@@ -514,7 +531,7 @@
       <IdentityBanner change={identityChange} onacknowledge={() => void acknowledgeIdentity()} />
     {/key}
   {/if}
-  {#if store && store.pinnedIds.length}
+  {#if store && store.pinnedIds.length && !thread}
     <PinnedStrip
       message={store.pinnedMessage}
       canUnpin={store.canPin}
@@ -592,8 +609,8 @@
     {attachments}
     onfiles={(files) => void addFiles(files)}
     onremoveattachment={(index) => (attachments = attachments.filter((_, i) => i !== index))}
-    onlocation={locate}
-    onpoll={room?.kind === 'direct' ? undefined : () => (creatingPoll = true)}
+    onlocation={thread ? undefined : locate}
+    onpoll={room?.kind === 'direct' || thread ? undefined : () => (creatingPoll = true)}
     onstickers={showsStickers() ? (at) => (stickerPanel = at) : undefined}
     {onvoice}
     {videoNote}

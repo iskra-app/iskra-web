@@ -25,7 +25,7 @@
   import type { UserSession } from '../../core/session/userSession.svelte.ts';
   import { isPersisted, requestPersistence } from '../../core/storage/persistence';
   import { i18n, t, type TextKey } from '../../i18n/index.svelte.ts';
-  import { faceModes, fonts, preferences, type Appearance, type FaceMode, type Font } from '../app/preferences.svelte.ts';
+  import { faceModes, fonts, preferences, type Appearance, type FaceMode, type Font, threadPlaces, type ThreadPlace } from '../app/preferences.svelte.ts';
   import { fileSize } from '../media/files';
   import RecoveryCode from '../recovery/RecoveryCode.svelte';
   import AccentSwatches from './AccentSwatches.svelte';
@@ -228,6 +228,7 @@
   };
   const fontLabel = (font: Font): TextKey => `appearance.font.${font}`;
   const languages = languageChoices;
+  const threadPlaceLabels: Record<ThreadPlace, TextKey> = { always: 'chats.threadsAlways', inLargeRooms: 'chats.threadsLargeRooms', never: 'chats.threadsNever' };
 
   // ————— Об Iskra —————
 
@@ -488,6 +489,20 @@
   {:else if section === 'folders'}
     <FoldersSettings {session} />
   {:else if section === 'chats'}
+    <!-- Варианты строками с галочкой, а не меню: «В чатах больше 100 человек» рядом с подписью на телефоне не помещается. -->
+    <h3 id="threads-title">{t('chats.threads')}</h3>
+    <div class="options" role="radiogroup" aria-labelledby="threads-title">
+      {#each threadPlaces as place (place)}
+        <button type="button" role="radio" aria-checked={preferences.threadsShown === place} onclick={() => (preferences.threadsShown = place)}>
+          {t(threadPlaceLabels[place])}
+        </button>
+      {/each}
+    </div>
+    <label class="switch">
+      <span>{t('chats.threadsHideReplies')}</span>
+      <input type="checkbox" role="switch" bind:checked={preferences.threadsHideReplies} disabled={preferences.threadsShown === 'never'} />
+    </label>
+    <p class="secondary">{t('chats.threadsHelpWeb')}</p>
     <h3>{t('chats.serviceSection')}</h3>
     <label class="switch">
       <span>{t('chats.hideNameChanges')}</span>

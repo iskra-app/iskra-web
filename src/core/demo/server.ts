@@ -178,6 +178,7 @@ export class DemoHomeserver {
       ['PUT', re(`${c}/v3/rooms/([^/]+)/redact/([^/]+)/([^/]+)`), (r) => this.redact(r)],
       ['PUT', re(`${c}/v3/rooms/([^/]+)/state/([^/]+)/?([^/]*)`), (r) => this.putState(r)],
       ['GET', re(`${c}/v3/rooms/([^/]+)/event/([^/]+)`), (r) => this.event(r)],
+      ['GET', re(`${c}/v1/rooms/([^/]+)/relations/([^/]+)/([^/]+)(?:/[^/]+)?`), (r) => this.relations(r)],
       ['GET', re(`${c}/v3/rooms/([^/]+)/members`), (r) => this.members(r.params[0]!)],
       ['GET', re(`${c}/v3/rooms/([^/]+)/joined_members`), (r) => this.joinedMembers(r.params[0]!)],
       ['PUT', re(`${c}/v3/rooms/([^/]+)/typing/([^/]+)`), () => json(200, {})],
@@ -660,9 +661,8 @@ export class DemoHomeserver {
           highlight_count: room.unread?.highlights ?? 0,
         },
         summary: {
-          'm.joined_member_count': room.state.filter(
-            (e) => e.type === 'm.room.member' && e.content['membership'] === 'join',
-          ).length,
+          'm.joined_member_count':
+            room.joinedCount ?? room.state.filter((e) => e.type === 'm.room.member' && e.content['membership'] === 'join').length,
           'm.invited_member_count': 0,
         },
       };
@@ -1247,6 +1247,22 @@ export class DemoHomeserver {
   }
 
   /** `/messages` назад по истории: токен `t<n>` — «всё, что раньше n-го события». */
+  /** Связанные с событием — тред (`m.thread`) и прочее; новые первыми, одной страницей. */
+  private relations({ params }: DemoRequest): Response {
+    const room = this.rooms.get(decodeURIComponent(params[0] ?? ''));
+    if (!room) return json(403, { errcode: 'M_FORBIDDEN', error: 'Not in room' });
+    const target = decodeURIComponent(params[1] ?? '');
+    const relType = decodeURIComponent(params[2] ?? '');
+    const chunk = room.timeline
+      .filter((e) => {
+        const relation = e.content['m.relates_to'] as { rel_type?: unknown; event_id?: unknown } | undefined;
+        return relation?.rel_type === relType && relation.event_id === target;
+      })
+      .reverse()
+      .map((e) => withDefaults(e));
+    return json(200, { chunk });
+  }
+
   private messages({ params, url }: DemoRequest): Response {
     const room = this.rooms.get(params[0] ?? '');
     if (!room) return json(403, { errcode: 'M_FORBIDDEN', error: 'Not in room' });

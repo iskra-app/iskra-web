@@ -33,6 +33,10 @@ const DEFAULT_DIMMING = 0.25;
 export const layouts = ['bubbles', 'compact'] as const;
 export type MessageLayout = (typeof layouts)[number];
 
+/** Где треды — `ThreadSettings.Shown` нативной: всегда, в больших чатах (по умолчанию), никогда. */
+export const threadPlaces = ['always', 'inLargeRooms', 'never'] as const;
+export type ThreadPlace = (typeof threadPlaces)[number];
+
 /** Язык: как в браузере или выбранный вручную (план: «с выбором вручную в настройках»). */
 export type LanguageChoice = 'system' | Locale;
 
@@ -60,6 +64,8 @@ const keys = {
   stickersBuiltIn: 'stickers.showsBuiltIn',
   stickersRoomPack: 'stickers.showsRoomPack',
   stickersMine: 'stickers.showsMine',
+  threadsShown: 'chats.threads.shown',
+  threadsHideReplies: 'chats.threads.hidesReplies',
 } as const;
 
 function read(key: string): string | null {
@@ -127,6 +133,9 @@ class Preferences {
   stickersBuiltIn = $state<boolean>(read(keys.stickersBuiltIn) !== 'false');
   stickersRoomPack = $state<boolean>(read(keys.stickersRoomPack) !== 'false');
   stickersMine = $state<boolean>(read(keys.stickersMine) !== 'false');
+  threadsShown = $state<ThreadPlace>(oneOf(read(keys.threadsShown), threadPlaces, 'inLargeRooms'));
+  /** Ответы в тредах — только в треде, не в чате. Выключено: ответы видны и там, и там. */
+  threadsHideReplies = $state<boolean>(read(keys.threadsHideReplies) === 'true');
   /** Что ставит двойное касание сообщения — любая эмодзи, ключ нативной (`QuickReaction`). */
   quickReaction = $state<string>(emojiOr(read(keys.quickReaction), defaultQuickReaction));
   /** Недавние реакции — наверху панели «Больше эмодзи» (`RecentEmoji` нативной, тот же ключ). */
@@ -157,6 +166,8 @@ class Preferences {
       $effect(() => write(keys.stickersBuiltIn, String(this.stickersBuiltIn)));
       $effect(() => write(keys.stickersRoomPack, String(this.stickersRoomPack)));
       $effect(() => write(keys.stickersMine, String(this.stickersMine)));
+      $effect(() => write(keys.threadsShown, this.threadsShown));
+      $effect(() => write(keys.threadsHideReplies, String(this.threadsHideReplies)));
       $effect(() => {
         write(keys.language, this.language);
         i18n.locale = this.language === 'system' ? preferredLocale(navigator.languages ?? []) : this.language;

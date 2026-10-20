@@ -100,6 +100,11 @@
     {#if actions.canReply}
       <button type="button" role="menuitem" onclick={() => run(actions.reply)}>{t('message.menu.reply')}</button>
     {/if}
+    {#if actions.openThread && actions.canReply && message.eventId && !message.threadRootId && message.kind.type !== 'deleted'}
+      <!-- В треде, а не в чате: тот же тред, что открывает строка под сообщением; нет его — начнётся. -->
+      {@const open = actions.openThread}
+      <button type="button" role="menuitem" onclick={() => run(open)}>{t('thread.replyInThread')}</button>
+    {/if}
     {#if openPoll && openPoll.mine.length > 0}
       <!-- Пустой ответ — голоса нет (MSC3381). -->
       <button type="button" role="menuitem" onclick={() => run((m) => actions.vote(m, []))}>{t('poll.retract')}</button>

@@ -49,6 +49,11 @@
 
   let panelOpen = $state(false);
   const roomId = $derived(router.route.name === 'room' ? router.route.roomId : null);
+  /** Открытый тред — на месте «О чате»: справа на широком экране, листом поверх чата на узком. */
+  const threadId = $derived(router.route.name === 'room' ? router.route.thread : undefined);
+  function closeThread() {
+    if (roomId) router.go({ name: 'room', roomId });
+  }
   const room = $derived(roomId ? session.rooms.get(roomId) : undefined);
   // Чат, которого нет в списке (чужая ссылка, ещё не синхронизирован), — показываем ID.
   const title = $derived(room ? roomName(room) : (roomId ?? ''));
@@ -173,7 +178,8 @@
       case 'escape':
         // Открытое окно или меню закрывается само (`<dialog>`); это — когда закрывать нечего.
         if (document.querySelector('dialog[open]')) return;
-        if (panelOpen) panelOpen = false;
+        if (threadId) closeThread();
+        else if (panelOpen) panelOpen = false;
         else if (roomId) {
           if (!roomView?.escape()) closeRoom();
         } else if (router.route.name === 'settings') settingsBack();
@@ -230,8 +236,8 @@
 <Columns
   bind:listWidth={preferences.listWidth}
   showMain={roomId !== null || router.route.name === 'settings'}
-  panelOpen={panelOpen && roomId !== null}
-  onClosePanel={() => (panelOpen = false)}
+  panelOpen={(panelOpen || !!threadId) && roomId !== null}
+  onClosePanel={() => (threadId ? closeThread() : (panelOpen = false))}
   resizeLabel={t('layout.resizeList')}
 >
   {#snippet list()}
@@ -267,7 +273,14 @@
           {@render face()}
         {/snippet}
         {#snippet trailing()}
-          <IconButton label={t('room.info')} pressed={panelOpen} onclick={() => (panelOpen = !panelOpen)}>
+          <IconButton
+            label={t('room.info')}
+            pressed={panelOpen && !threadId}
+            onclick={() => {
+              if (threadId) closeThread();
+              panelOpen = threadId ? true : !panelOpen;
+            }}
+          >
             <Icon name="info" />
           </IconButton>
         {/snippet}
@@ -307,6 +320,18 @@
   {/snippet}
 
   {#snippet panel()}
+    {#if roomId && threadId}
+      <div class="panel-column">
+        <Bar title={t('thread.title')} subtitle={title}>
+          {#snippet trailing()}
+            <IconButton label={t('thread.close')} onclick={closeThread}><Icon name="close" /></IconButton>
+          {/snippet}
+        </Bar>
+        {#key `${roomId} ${threadId}`}
+          <RoomView {session} {roomId} thread={threadId} />
+        {/key}
+      </div>
+    {:else}
     <div class="panel-column">
       <Bar title={t('room.info')}>
         {#snippet trailing()}
@@ -328,6 +353,7 @@
         {/key}
       {/if}
     </div>
+    {/if}
   {/snippet}
 </Columns>
 

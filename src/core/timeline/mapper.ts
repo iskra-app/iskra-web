@@ -12,7 +12,7 @@ import { isStickerImage } from '../stickers/imagePack';
 import { parseGeoUri } from './location';
 import { firstLineOf } from './words';
 import { forwardOriginOf } from './forward';
-import type { Attachment, Delivery, EncryptedFileKey, MediaSource, Message, MessageKind, Poll, Reaction, ReplyPreview, SendFailure, ServiceEvent } from './message';
+import type { Attachment, Delivery, EncryptedFileKey, MediaSource, Message, MessageKind, Poll, Reaction, ReplyPreview, SendFailure, ServiceEvent, ThreadSummary } from './message';
 
 export interface MapperContext {
   ownUserId: string;
@@ -30,6 +30,14 @@ export interface MapperContext {
   canRedactOthers: (event: MatrixEvent) => boolean;
   /** Заблокирован ли отправитель: его сообщений не видно, служебные строки о нём — видно. */
   isBlocked: (userId: string) => boolean;
+  /** Тред под событием — строка «N ответов». Нет — тредов в этой ленте не показывают. */
+  threadOf?: (eventId: string) => ThreadSummary | undefined;
+}
+
+/** Корень треда, если событие — ответ в нём (`m.thread`). Связь лежит открытой и у зашифрованного. */
+export function threadRootOf(event: MatrixEvent): string | undefined {
+  const relation = event.getWireContent()['m.relates_to'] as { rel_type?: unknown; event_id?: unknown } | undefined;
+  return relation?.rel_type === 'm.thread' && typeof relation.event_id === 'string' ? relation.event_id : undefined;
 }
 
 const POLL_START = new Set(['m.poll.start', 'org.matrix.msc3381.poll.start']);
@@ -52,6 +60,8 @@ export function mapEvent(event: MatrixEvent, context: MapperContext): Message | 
   const live = kind.type !== 'deleted' && kind.type !== 'service';
   // Пометка — в исходном содержимом: правка пересланного её не повторяет.
   const forwarded = live ? forwardOriginOf(event.getOriginalContent()) : undefined;
+  const threadRootId = threadRootOf(event);
+  const thread = eventId && live && !threadRootId ? context.threadOf?.(eventId) : undefined;
   return {
     key: context.keyOf(event),
     ...(eventId ? { eventId } : {}),
@@ -67,6 +77,8 @@ export function mapEvent(event: MatrixEvent, context: MapperContext): Message | 
     ...(forwarded ? { forwarded } : {}),
     reactions: eventId && live ? context.reactionsOf(eventId) : [],
     pinned: !!eventId && live && context.isPinned(eventId),
+    ...(thread ? { thread } : {}),
+    ...(threadRootId ? { threadRootId } : {}),
     canEdit: own && !!eventId && delivery.state === 'sent' && (kind.type === 'text' || kind.type === 'emote' || kind.type === 'notice'),
     canDelete: !!eventId && live && (own || context.canRedactOthers(event)),
   };
@@ -314,6 +326,10 @@ function serviceEvent(event: MatrixEvent, context: MapperContext): ServiceEvent 
 }
 
 function replyOf(event: MatrixEvent, context: MapperContext): ReplyPreview | undefined {
+  // Ответ в треде несёт `m.in_reply_to` на предыдущий ответ — подпорку для клиентов без тредов
+  // (`is_falling_back`). Это не цитата: иначе каждый ответ в треде рисовался бы цитатой соседа.
+  const relation = event.getWireContent()['m.relates_to'] as { rel_type?: unknown; is_falling_back?: unknown } | undefined;
+  if (relation?.rel_type === 'm.thread' && relation.is_falling_back === true) return undefined;
   const eventId = event.getContent()['m.relates_to']?.['m.in_reply_to']?.event_id ?? event.replyEventId;
   if (typeof eventId !== 'string') return undefined;
   const original = context.eventById(eventId);

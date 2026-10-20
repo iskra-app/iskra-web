@@ -40,6 +40,11 @@ export interface MessageActions {
    */
   stickerIsMine(message: Message): boolean | undefined;
   toggleSticker(message: Message): void;
+  /**
+   * Открыть тред под этим сообщением — «Ответить в треде» и строка «N ответов». Нет — тредов
+   * здесь не бывает: личный чат, настройки, или это уже лента треда.
+   */
+  openThread?: (message: Message) => void;
   /** Меню: у точки — для мыши, листом — для пальца. */
   openMenu(message: Message, at: { x: number; y: number }, sheet: boolean): void;
 }

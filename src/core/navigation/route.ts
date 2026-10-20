@@ -13,7 +13,8 @@ const movedSections: Record<string, SettingsSection> = { devices: 'security', bl
 
 export type Route =
   | { name: 'home' }
-  | { name: 'room'; roomId: string }
+  /** `thread` — открыт тред под этим сообщением (ID корня): на широком экране — панелью справа. */
+  | { name: 'room'; roomId: string; thread?: string }
   | { name: 'settings'; section?: SettingsSection }
   /**
    * Чужая ссылка — `s.iskra.wtf/<id>` ведёт сюда: `#/open/<id>?via=…`. Человек, адрес
@@ -23,11 +24,12 @@ export type Route =
 
 export function parseRoute(hash: string): Route {
   const path = hash.replace(/^#/, '');
-  const match = /^\/room\/([^/?#]+)$/.exec(path);
+  const match = /^\/room\/([^/?#]+)(?:\/thread\/([^/?#]+))?$/.exec(path);
   if (match?.[1]) {
     try {
       const roomId = decodeURIComponent(match[1]);
-      if (isRoomId(roomId)) return { name: 'room', roomId };
+      const thread = match[2] ? decodeURIComponent(match[2]) : undefined;
+      if (isRoomId(roomId)) return thread && isEventId(thread) ? { name: 'room', roomId, thread } : { name: 'room', roomId };
     } catch {
       // Битая percent-кодировка — это просто неизвестный адрес.
     }
@@ -58,7 +60,7 @@ export function formatRoute(route: Route): string {
     case 'home':
       return '#/';
     case 'room':
-      return `#/room/${encodeURIComponent(route.roomId)}`;
+      return `#/room/${encodeURIComponent(route.roomId)}${route.thread ? `/thread/${encodeURIComponent(route.thread)}` : ''}`;
     case 'settings':
       return route.section ? `#/settings/${route.section}` : '#/settings';
     case 'open': {
@@ -66,6 +68,11 @@ export function formatRoute(route: Route): string {
       return `#/open/${encodeURIComponent(route.target)}${via ? `?${via}` : ''}`;
     }
   }
+}
+
+/** `$opaque` — ID события, без пробелов и управляющих символов. */
+export function isEventId(value: string): boolean {
+  return /^\$[^\s/]+$/.test(value);
 }
 
 /** `!opaque:server` — и больше ничего: ни пробелов, ни управляющих символов. */

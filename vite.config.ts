@@ -115,6 +115,9 @@ export default defineConfig({
           },
         ],
         cleanupOutdatedCaches: true,
+        // `sw.js` отдаётся с боевой CSP, где Trusted Types запрещают строку в `importScripts`:
+        // Workbox кладём прямо в него, отдельным файлом он не подгрузится.
+        inlineWorkboxRuntime: true,
       },
     }),
     staticHeaders(),
