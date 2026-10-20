@@ -5,7 +5,9 @@
  * `TrustedScriptURL`, и строкой его не передать. Политика `iskra-sw` пропускает ровно
  * один адрес — наш `sw.js` — и больше ничего.
  *
- * Новая версия ждёт: `skipWaiting` только по нажатию, не сама посреди набора сообщения.
+ * Новая версия ждёт: `skipWaiting` — по нажатию «Обновить» или сам, когда вкладка ушла в
+ * фон (человек отвернулся, набор сообщения не прерывается; черновики лежат в хранилище).
+ * Новую версию ищем, не дожидаясь перезагрузки: при возвращении на вкладку и раз в час.
  */
 import { Workbox } from 'workbox-window';
 
@@ -25,23 +27,50 @@ function scriptUrl(): string | TrustedScriptURL {
   return policy.createScriptURL(SW_URL);
 }
 
+/** Не чаще одного запроса к серверу за раз в это время — и раз в столько же, пока вкладка открыта. */
+const CHECK_EVERY_MS = 60 * 60 * 1000;
+
 class AppUpdate {
   available = $state(false);
   private workbox: Workbox | undefined;
+  private applying = false;
+  private checkedAt = Date.now();
 
   register(): void {
     if (!import.meta.env.PROD || !('serviceWorker' in navigator) || this.workbox) return;
     this.workbox = new Workbox(scriptUrl() as string, { scope: SCOPE });
-    this.workbox.addEventListener('waiting', () => (this.available = true));
+    this.workbox.addEventListener('waiting', () => {
+      this.available = true;
+      this.applyIfHidden();
+    });
     // Без service worker'а приложение работает, просто без офлайна. Ничего не логируем.
     this.workbox.register().catch(() => {});
+
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'hidden') this.applyIfHidden();
+      else this.check();
+    });
+    setInterval(() => this.check(), CHECK_EVERY_MS);
   }
 
   apply(): void {
     const workbox = this.workbox;
-    if (!workbox) return;
+    if (!workbox || this.applying) return;
+    this.applying = true;
     workbox.addEventListener('controlling', () => window.location.reload());
     workbox.messageSkipWaiting();
+  }
+
+  /** Вкладка не на виду — обновляем без спроса: человек этого не заметит. */
+  private applyIfHidden(): void {
+    if (this.available && document.visibilityState === 'hidden') this.apply();
+  }
+
+  /** Спрашивает сервер, нет ли нового `sw.js`. Найдётся — придёт `waiting`, как обычно. */
+  private check(): void {
+    if (Date.now() - this.checkedAt < CHECK_EVERY_MS / 6) return;
+    this.checkedAt = Date.now();
+    this.workbox?.update().catch(() => {});
   }
 }
 
