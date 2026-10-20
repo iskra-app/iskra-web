@@ -34,6 +34,12 @@ export interface MessageActions {
   reactors(message: Message): void;
   /** «Пожаловаться» — окно с необязательной причиной. */
   report(message: Message): void;
+  /**
+   * Стикер из сообщения — в свой набор: `true` — уже там («Убрать»), `false` — нет («Добавить»),
+   * `undefined` — не стикер или зашифрованный, такой в набор не положить.
+   */
+  stickerIsMine(message: Message): boolean | undefined;
+  toggleSticker(message: Message): void;
   /** Меню: у точки — для мыши, листом — для пальца. */
   openMenu(message: Message, at: { x: number; y: number }, sheet: boolean): void;
 }

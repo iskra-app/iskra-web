@@ -11,7 +11,12 @@
   import ConfirmDialog from '../../design/ConfirmDialog.svelte';
   import type { OutgoingFile } from '../../core/media/upload';
   import { fileSize } from '../media/files';
-  import { prepareFile } from '../media/prepare';
+  import { prepareFile, stickerFile } from '../media/prepare';
+  import Menu from '../../design/Menu.svelte';
+  import { viewport } from '../../design/viewport.svelte.ts';
+  import { stickerOf, type Sticker } from '../../core/stickers/imagePack';
+  import StickerPanel from './StickerPanel.svelte';
+  import { showsStickers } from './stickers';
   import type { Recording } from '../media/voiceRecorder.svelte.ts';
   import { VideoNoteRecorder } from '../media/videoNoteRecorder.svelte.ts';
   import { VIDEO_NOTE_SIDE } from '../media/videoNote';
@@ -299,6 +304,20 @@
     if (replyTo) context = null;
   }
 
+  /** Панель стикеров — у кнопки в поле, где её нажали. */
+  let stickerPanel = $state<{ x: number; y: number } | null>(null);
+
+  /** Стикер выбран: панель закрывается сразу, стикер уходит следом — с ответом, если отвечали. */
+  async function sendSticker(sticker: Sticker) {
+    stickerPanel = null;
+    const target = store;
+    if (!target) return;
+    const replyTo = context?.kind === 'reply' ? context.message : undefined;
+    if (replyTo) context = null;
+    const sent = await target.sendSticker(sticker, replyTo, async () => stickerFile(await session.media.blob({ mxc: sticker.url }, sticker.mimetype ?? 'image/png'), sticker.body));
+    if (sent) session.stickers.used(sticker);
+  }
+
   function cancelVideoNote() {
     videoHolding = false;
     composer?.cancelRecording();
@@ -424,6 +443,15 @@
     sendAnyway: (key) => store?.sendAnyway(key),
     discard: (key) => store?.discard(key),
     openMenu: (message, at, sheet) => (menu = { message, at, sheet }),
+    stickerIsMine: (message) => {
+      const sticker = message.kind.type === 'sticker' ? stickerOf(message.kind.attachment) : undefined;
+      return sticker ? session.stickers.isMine(sticker.url) : undefined;
+    },
+    toggleSticker: (message) => {
+      const sticker = message.kind.type === 'sticker' ? stickerOf(message.kind.attachment) : undefined;
+      if (!sticker) return;
+      void (session.stickers.isMine(sticker.url) ? session.stickers.remove(sticker) : session.stickers.add(sticker));
+    },
     openMedia: (message) => {
       // Листается всё, что в комнате загружено: фото, видео, «кружочки» — по порядку ленты.
       const items: ViewerItem[] = (store?.messages ?? []).flatMap((m) =>
@@ -515,6 +543,12 @@
         <button type="button" onclick={() => store?.dismissFailure()}>{t('timeline.dismiss')}</button>
       </div>
     {/if}
+    {#if session.stickers.failure}
+      <div class="failure" role="alert">
+        <span>{t(`stickers.${session.stickers.failure}Failed`)}</span>
+        <button type="button" onclick={() => session.stickers.dismissFailure()}>{t('timeline.dismiss')}</button>
+      </div>
+    {/if}
     {#if session.blocked.failure === 'blockFailed'}
       <div class="failure" role="alert">
         <span>{t('account.blockFailed')}</span>
@@ -560,6 +594,7 @@
     onremoveattachment={(index) => (attachments = attachments.filter((_, i) => i !== index))}
     onlocation={locate}
     onpoll={room?.kind === 'direct' ? undefined : () => (creatingPoll = true)}
+    onstickers={showsStickers() ? (at) => (stickerPanel = at) : undefined}
     {onvoice}
     {videoNote}
     bind:videoHolding
@@ -568,6 +603,12 @@
   />
   {/if}
 </div>
+
+<Menu open={!!stickerPanel} x={stickerPanel?.x ?? 0} y={stickerPanel?.y ?? 0} sheet={!viewport.finePointer} label={t('stickers.title')} onclose={() => (stickerPanel = null)}>
+  {#if stickerPanel}
+    <StickerPanel library={session.stickers} media={session.media} {roomId} onpick={(sticker) => void sendSticker(sticker)} />
+  {/if}
+</Menu>
 
 {#if viewing}
   <Viewer items={viewing.items} start={viewing.start} media={session.media} onclose={() => (viewing = null)} />

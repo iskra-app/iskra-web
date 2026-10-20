@@ -8,6 +8,8 @@
 import type { OutgoingFile, OutgoingKind } from '../../core/media/upload';
 import { photoPlan, renamed, type MediaSendSettings } from './mediaSettings';
 import { stripMp4Metadata } from '../../core/media/mp4Metadata';
+import { isWebP, stripWebPMetadata } from '../../core/media/webpMetadata';
+import { t } from '../../i18n/index.svelte.ts';
 
 /** Длинная сторона миниатюры, px. */
 const THUMBNAIL_SIDE = 800;
@@ -31,6 +33,11 @@ export async function prepareFile(file: File, settings: MediaSendSettings): Prom
   const kind = kindOf(mimetype);
   const base: OutgoingFile = { blob: file, name: file.name || nameFor(mimetype), mimetype, kind };
   try {
+    // WebP — это стикер, как у Telegram: без пузыря, своим размером, с прозрачностью (`StickerPicture` нативной).
+    if (mimetype === 'image/webp') {
+      const sticker = await stickerFile(file, t('preview.sticker'));
+      if (sticker) return sticker;
+    }
     if (kind === 'image') return await image(base, settings);
     if (kind === 'video') return { ...(await videoWithoutMetadata(base, settings)), ...(await videoInfo(file)) };
     if (kind === 'audio') return { ...base, ...(await audioInfo(file)) };
@@ -38,6 +45,38 @@ export async function prepareFile(file: File, settings: MediaSendSettings): Prom
     // Не разобрали — отправим без размеров: получатель просто не узнает их заранее.
   }
   return base;
+}
+
+/**
+ * Картинка, которая уходит стикером. Настройки сжатия не при чём — стикер и так мал, а
+ * сжатый в JPEG стикер — стикер на чёрном квадрате. Метаданные — всегда долой: WebP режется
+ * до чанков картинки (анимация и прозрачность целы), остальное перерисовывается в PNG.
+ * `null` — не вышло ни то ни другое: такой не отправляется.
+ */
+export async function stickerFile(blob: Blob, body: string): Promise<OutgoingFile | null> {
+  try {
+    const bytes = new Uint8Array(await blob.arrayBuffer());
+    let out: Blob | undefined;
+    let mimetype = 'image/png';
+    if (isWebP(bytes)) {
+      const stripped = stripWebPMetadata(bytes);
+      if (stripped) {
+        out = new Blob([stripped], { type: 'image/webp' });
+        mimetype = 'image/webp';
+      }
+    }
+    const decoded = await decodeImage(out ?? blob);
+    try {
+      out ??= (await draw(decoded.source, decoded.width, decoded.height, 'image/png', 1)) ?? undefined;
+      if (!out) return null;
+      const ext = mimetype === 'image/webp' ? 'webp' : 'png';
+      return { blob: out, name: `sticker.${ext}`, mimetype, kind: 'image', width: decoded.width, height: decoded.height, sticker: { body } };
+    } finally {
+      decoded.release();
+    }
+  } catch {
+    return null;
+  }
 }
 
 /** Вставка из буфера приходит без имени: «image.png» — лучше, чем ничего. */

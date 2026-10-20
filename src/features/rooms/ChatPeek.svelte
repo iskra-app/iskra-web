@@ -73,6 +73,8 @@
     discard: noop,
     openMedia: noop,
     openMenu: noop,
+    stickerIsMine: () => undefined,
+    toggleSticker: noop,
     showsReactors: false,
     reactors: noop,
     report: noop,

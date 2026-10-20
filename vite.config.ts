@@ -98,6 +98,8 @@ export default defineConfig({
         // Только оболочка: HTML, JS, CSS, WASM, иконки. Никаких ответов API и медиа —
         // медиа в кэше SW лежало бы расшифрованным.
         globPatterns: ['**/*.{html,js,css,wasm,svg,png,webmanifest}'],
+        // «Искорки» нужны раз на аккаунт — загрузить на сервер; держать их в кэше незачем.
+        globIgnores: ['stickers/**'],
         // Rust-крипто в WASM весит несколько мегабайт.
         maximumFileSizeToCacheInBytes: 16 * 1024 * 1024,
         navigateFallback: 'index.html',

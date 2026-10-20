@@ -30,6 +30,7 @@ import {
   type Room,
 } from 'matrix-js-sdk';
 import { sendAttachment, uploadClientFor, type OutgoingFile, type UploadClient } from '../media/upload';
+import { stickerContent, type Sticker } from '../stickers/imagePack';
 import { geoUri, type Place } from './location';
 import { markdownContent } from './composerMarkdown';
 import { currentMarker, rememberMovedMarker } from './readMarker';
@@ -56,7 +57,7 @@ export interface Upload {
 }
 
 /** Что не получилось — ключи текстов нативной Искры (`timeline.*Failed`; `sendAnywayFailed` — из `message.delivery.*`). */
-export type TimelineFailure = 'reactionFailed' | 'deleteFailed' | 'editFailed' | 'pinFailed' | 'pollFailed' | 'reportFailed' | 'sendAnywayFailed';
+export type TimelineFailure = 'reactionFailed' | 'deleteFailed' | 'editFailed' | 'pinFailed' | 'pollFailed' | 'reportFailed' | 'sendAnywayFailed' | 'stickerFailed';
 
 /** Кто поставил реакцию и какую — `Reactor` нативной. */
 export interface Reactor {
@@ -463,6 +464,34 @@ export class TimelineStore {
     };
     this.client.sendMessage(this.roomId, content as never).catch(() => this.schedule());
     this.schedule();
+  }
+
+  /**
+   * Стикер из набора. Два пути — по комнате, как в нативной:
+   * - **открытая** — `m.sticker` со ссылкой на картинку набора; любой клиент нарисует стикер;
+   * - **зашифрованная** — а это почти любой настоящий разговор: картинку скачивают и отправляют
+   *   зашифрованным `m.image` по имени `sticker.<ext>` (`sealed` готовит экран — он же чистит
+   *   метаданные). `m.sticker` здесь отдал бы картинку серверу открытой.
+   */
+  async sendSticker(sticker: Sticker, replyTo: Message | undefined, sealed: () => Promise<OutgoingFile | null>): Promise<boolean> {
+    this.typingStopped();
+    this.failure = null;
+    try {
+      if (await this.uploader.isEncrypted(this.roomId)) {
+        const file = await sealed();
+        if (!file) throw new Error('sticker not prepared');
+        this.sendFiles([file], undefined, replyTo);
+        return true;
+      }
+      const content = stickerContent(sticker, replyTo?.eventId);
+      if (replyTo?.eventId) content['m.mentions'] = replyTo.own ? {} : { user_ids: [replyTo.senderId] };
+      this.client.sendEvent(this.roomId, EventType.Sticker, content as never).catch(() => this.schedule());
+      this.schedule();
+      return true;
+    } catch {
+      this.failure = 'stickerFailed';
+      return false;
+    }
   }
 
   // ————— Вложения —————

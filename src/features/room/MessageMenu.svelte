@@ -116,15 +116,21 @@
         {t('message.menu.copy')}
       </button>
     {/if}
+    {#if canForward(message)}
+      <button type="button" role="menuitem" onclick={() => run(actions.forward)}>{t('message.menu.forward')}</button>
+    {/if}
+    {#if actions.stickerIsMine(message) !== undefined}
+      <!-- Свой набор пополняется ссылкой: картинка уже на сервере, загружать нечего. -->
+      <button type="button" role="menuitem" class:danger={actions.stickerIsMine(message)} onclick={() => run(actions.toggleSticker)}>
+        {actions.stickerIsMine(message) ? t('stickers.remove') : t('stickers.add')}
+      </button>
+    {/if}
     {#if actions.canPin}
       {#if message.pinned}
         <button type="button" role="menuitem" onclick={() => run(actions.unpin)}>{t('message.menu.unpin')}</button>
       {:else}
         <button type="button" role="menuitem" onclick={() => run(actions.pin)}>{t('message.menu.pin')}</button>
       {/if}
-    {/if}
-    {#if canForward(message)}
-      <button type="button" role="menuitem" onclick={() => run(actions.forward)}>{t('message.menu.forward')}</button>
     {/if}
     {#if isSelectable(message)}
       <!-- Несколько сразу: скопировать одним куском, удалить пачку ошибок. -->

@@ -32,6 +32,12 @@ export interface OutgoingFile {
    * MSC1767/MSC3245 — как у нативной Искры и Element.
    */
   voice?: { waveform: number[] };
+  /**
+   * Стикер, а не фото: без пузыря, своим размером, с прозрачностью. В открытом чате уходит
+   * `m.sticker` (`body` — слова вместо картинки), в зашифрованном — зашифрованным `m.image`
+   * с именем `sticker.<ext>`: `m.sticker` отдал бы картинку серверу открытой.
+   */
+  sticker?: { body: string };
 }
 
 /** Волна в событии — целые 0…1024, как шлёт нативная Искра (`TimelineMapper.waveformScale`). */
@@ -41,7 +47,8 @@ export interface UploadClient {
   isEncrypted(roomId: string): Promise<boolean>;
   /** Загрузить байты, вернуть `mxc://`. */
   upload(body: Blob, options: { name?: string; type: string; onProgress?: (loaded: number, total: number) => void; signal?: AbortSignal }): Promise<string>;
-  send(roomId: string, content: Record<string, unknown>): Promise<unknown>;
+  /** `type` — для событий не `m.room.message`: стикер. */
+  send(roomId: string, content: Record<string, unknown>, type?: string): Promise<unknown>;
 }
 
 export interface SendOptions {
@@ -74,6 +81,16 @@ export async function sendAttachment(client: UploadClient, roomId: string, file:
     };
   }
   const main = await put(client, file.blob, file.mimetype, file.name, encrypted, options.signal, options.onProgress);
+
+  if (file.sticker && !encrypted) {
+    const sticker: Record<string, unknown> = { body: file.sticker.body, url: main.url, info };
+    if (options.replyTo) {
+      sticker['m.relates_to'] = { 'm.in_reply_to': { event_id: options.replyTo.eventId } };
+      sticker['m.mentions'] = options.replyTo.own ? {} : { user_ids: [options.replyTo.senderId] };
+    }
+    await client.send(roomId, sticker, 'm.sticker');
+    return;
+  }
 
   const caption = options.caption?.trim();
   const content: Record<string, unknown> = {
@@ -164,6 +181,6 @@ export function uploadClientFor(client: MatrixClient, viaFetch?: typeof globalTh
       });
       return response.content_uri;
     },
-    send: (roomId, content) => client.sendMessage(roomId, content as never),
+    send: (roomId, content, type) => (type ? client.sendEvent(roomId, type as never, content as never) : client.sendMessage(roomId, content as never)),
   };
 }

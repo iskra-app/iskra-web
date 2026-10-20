@@ -19,6 +19,7 @@ import {
   DEMO_SERVER,
   buildDemoWorld,
   demoCredentials,
+  demoAccountData,
   demoDirect,
   demoDirectory,
   demoMutedRooms,
@@ -407,7 +408,7 @@ export class DemoHomeserver {
   // ————— Данные аккаунта —————
 
   private getAccountData(type: string): Response {
-    const content = this.account.accountData[type];
+    const content = this.account.accountData[type] ?? demoAccountData[type];
     return content === undefined ? json(404, { errcode: 'M_NOT_FOUND', error: 'Account data not found' }) : json(200, content);
   }
 
@@ -676,7 +677,7 @@ export class DemoHomeserver {
       account_data: {
         events: [
           { type: 'm.direct', content: demoDirect },
-          ...Object.entries(this.account.accountData).map(([type, content]) => ({ type, content })),
+          ...Object.entries({ ...demoAccountData, ...this.account.accountData }).map(([type, content]) => ({ type, content })),
         ],
       },
       presence: { events: [] },
@@ -903,8 +904,18 @@ export class DemoHomeserver {
     return json(200, { content_uri: demoMxc(id) });
   }
 
-  private downloadMedia({ params }: DemoRequest): Response {
-    const media = this.media.get(params[1] ?? '');
+  private async downloadMedia({ params }: DemoRequest): Promise<Response> {
+    const id = params[1] ?? '';
+    // «Искорки» — те же файлы, что у приложения: берутся из его же `public/stickers` при первом спросе.
+    if (!this.media.has(id) && /^sticker-[a-z]+$/.test(id)) {
+      try {
+        const response = await globalThis.fetch(`${import.meta.env.BASE_URL}stickers/${id}.png`);
+        if (response.ok) this.media.set(id, { bytes: new Uint8Array(await response.arrayBuffer()), type: 'image/png' });
+      } catch {
+        // Не браузер (юнит-тесты) — картинки нет, как нет её у сервера без файла.
+      }
+    }
+    const media = this.media.get(id);
     if (!media) return json(404, { errcode: 'M_NOT_FOUND', error: 'Not found' });
     return new Response(media.bytes.slice(), {
       status: 200,

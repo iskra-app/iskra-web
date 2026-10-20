@@ -240,6 +240,8 @@ export function buildDemoWorld(now: number): { rooms: DemoRoom[]; invites: DemoI
       // Реакции от других — на фото озера и голосовое Веры.
       { type: 'm.reaction', sender: boris, content: { 'm.relates_to': { rel_type: 'm.annotation', event_id: '$weekend-6', key: '🔥' } } },
       { type: 'm.reaction', sender: boris, content: { 'm.relates_to': { rel_type: 'm.annotation', event_id: '$weekend-9', key: '❤️' } } },
+      // Стикер из набора «Выходных» — у Алисы его нет, можно добавить себе.
+      { type: 'm.sticker', sender: boris, event_id: '$weekend-sticker', content: demoStickerImage('connected') },
       text(vera, 'Алиса, ты с нами?', {
         format: 'org.matrix.custom.html',
         formatted_body: `<a href="https://matrix.to/#/${alice}">Алиса</a>, ты с нами?`,
@@ -315,6 +317,13 @@ export function buildDemoWorld(now: number): { rooms: DemoRoom[]; invites: DemoI
           { type: 'm.room.name', sender: boris, state_key: '', content: { name: 'Выходные' }, event_id: `$name-${weekend}` },
           // Закреплено Борисом; Алиса здесь не админ — закреплять сама не может.
           { type: 'm.room.pinned_events', sender: boris, state_key: '', content: { pinned: ['$weekend-2'] }, event_id: `$pinned-${weekend}` },
+          {
+            type: 'im.ponies.room_emotes',
+            sender: boris,
+            state_key: '',
+            content: { pack: { display_name: 'Искра', usage: ['sticker'] }, images: demoStickerPack(['connected', 'unlocked', 'surprise', 'bypass']) },
+            event_id: `$stickers-${weekend}`,
+          },
         ]),
         timeline: weekendTimeline,
         unread: { notifications: 3, highlights: 1 },
@@ -381,6 +390,29 @@ export function buildDemoWorld(now: number): { rooms: DemoRoom[]; invites: DemoI
     ],
   };
 }
+
+/**
+ * Стикеры демо — «Искорки» приложения (`public/stickers`), как в `MockWorld` нативной: одни
+ * картинки и в наборах, и в переписке. Четыре — свои у Алисы, четыре других — набор
+ * «Выходных», чтобы в чате попался стикер, которого у неё *ещё нет*, и его можно было добавить.
+ */
+const STICKER_EMOJI: Record<string, string> = {
+  hello: '👋', joy: '🎉', love: '❤️', curious: '🤔', surprise: '😮', sleepy: '😴',
+  sad: '😢', grumpy: '😒', loading: '⏳', unlocked: '🔓', bypass: '🏃', connected: '📶',
+};
+
+function demoStickerImage(code: string) {
+  return { url: `mxc://${DEMO_SERVER}/sticker-${code}`, body: STICKER_EMOJI[code] ?? code, info: { w: 512, h: 512, mimetype: 'image/png' } };
+}
+
+function demoStickerPack(codes: readonly string[]) {
+  return Object.fromEntries(codes.map((code) => [code, demoStickerImage(code)]));
+}
+
+/** Данные аккаунта Алисы до первой правки: свой набор стикеров. */
+export const demoAccountData: Record<string, unknown> = {
+  'im.ponies.user_emotes': { images: demoStickerPack(['hello', 'love', 'joy', 'sleepy']) },
+};
 
 /** `m.direct` Алисы: с кем какие личные чаты. */
 export const demoDirect = { [demoUsers.anya]: [demoRooms.anya] };

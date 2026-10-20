@@ -44,6 +44,7 @@ import { quietLogger } from '../support/logger';
 import { BlockList } from './blockList.svelte.ts';
 import { NotificationRules } from './notificationRules.svelte.ts';
 import { ChatFolders } from './chatFolders.svelte.ts';
+import { StickerLibrary } from '../stickers/stickerLibrary.svelte.ts';
 import { LocalNames } from '../rooms/localNames.svelte.ts';
 
 export type Connection = 'connecting' | 'online' | 'offline';
@@ -110,6 +111,8 @@ export class UserSession {
   readonly folders: ChatFolders;
   /** Как я зову собеседников на этом устройстве. */
   readonly localNames: LocalNames;
+  /** Стикеры аккаунта: свой набор, подписки, недавние, «Искорки». */
+  readonly stickers: StickerLibrary;
   private readonly client: MatrixClient;
   private readonly account: Account;
   private readonly detach: Array<() => void> = [];
@@ -137,6 +140,8 @@ export class UserSession {
     this.blocked = new BlockList(client);
     this.notificationRules = new NotificationRules(client);
     this.folders = new ChatFolders(client);
+    const uploader = uploadClientFor(client, account.method === 'demo' ? fetchFor(true) : undefined);
+    this.stickers = new StickerLibrary(client, (blob, type) => uploader.upload(blob, { type }));
   }
 
   /** Лента комнаты. Живёт, пока открыт чат: тот, кто открыл, её и `destroy()`. */
@@ -556,6 +561,7 @@ export class UserSession {
     this.blocked.destroy();
     this.notificationRules.destroy();
     this.folders.destroy();
+    this.stickers.destroy();
     this.verification?.destroy();
     this.thumbnails.clear();
     this.media.clear();

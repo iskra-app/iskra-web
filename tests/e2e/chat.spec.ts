@@ -434,6 +434,8 @@ test('лента с клавиатуры: одна остановка Tab, ст�
 
   await page.keyboard.press('Tab');
   expect(await focused()).toMatch(/^article:.*Алиса, ты с нами/);
+  // Выше — стикер Бориса, ещё выше — прогноз.
+  await page.keyboard.press('ArrowUp');
   await page.keyboard.press('ArrowUp');
   expect(await focused()).toMatch(/^article:.*Прогноз на субботу/);
   await page.keyboard.press('Enter');

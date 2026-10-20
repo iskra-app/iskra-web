@@ -32,6 +32,7 @@
   import AppearancePreview from './AppearancePreview.svelte';
   import { settingsTitles } from './sections';
   import QuickReactionPicker from './QuickReactionPicker.svelte';
+  import StickerSettings from './StickerSettings.svelte';
   import { builtOn, describeDevice, iskraLicence, type Licence } from './licences';
   import FoldersSettings from './FoldersSettings.svelte';
   import DevicesSection from './DevicesSection.svelte';
@@ -482,6 +483,7 @@
     <h3 id="quick-reaction-title">{t('reactions.quick')}</h3>
     <QuickReactionPicker labelledby="quick-reaction-title" />
     <p class="secondary">{t('reactions.quickHelp')}</p>
+    <StickerSettings {session} />
   {:else if section === 'folders'}
     <FoldersSettings {session} />
   {:else if section === 'chats'}

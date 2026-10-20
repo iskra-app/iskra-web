@@ -8,6 +8,7 @@
  */
 import { EventStatus, EventType, MsgType, type MatrixEvent } from 'matrix-js-sdk';
 import { isVideoNote } from '../rooms/preview';
+import { isStickerImage } from '../stickers/imagePack';
 import { parseGeoUri } from './location';
 import { firstLineOf } from './words';
 import { forwardOriginOf } from './forward';
@@ -114,8 +115,13 @@ function messageKind(event: MatrixEvent): MessageKind {
       return { type: 'emote', body: text, ...withHtml };
     case MsgType.Notice:
       return { type: 'notice', body: text, ...withHtml };
-    case MsgType.Image:
-      return { type: 'image', attachment: attachmentOf(content) };
+    case MsgType.Image: {
+      // WebP — стикер, как бы ни пришёл; и картинка, которую отправили как стикер (`sticker.png`):
+      // в зашифрованном чате стикер уходит зашифрованным `m.image` — см. `isStickerImage`.
+      const attachment = attachmentOf(content);
+      const filename = typeof content['filename'] === 'string' ? content['filename'] : body;
+      return { type: isStickerImage(attachment.mimetype, filename) ? 'sticker' : 'image', attachment };
+    }
     case MsgType.Video: {
       const attachment = attachmentOf(content);
       return { type: isVideoNote(content as { info?: unknown }) ? 'videoNote' : 'video', attachment };

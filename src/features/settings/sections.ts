@@ -8,7 +8,7 @@ export const settingsParent: Partial<Record<SettingsSection, SettingsSection>> =
 export const settingsTitles: Record<SettingsSection, TextKey> = {
   profile: 'account.editTitle',
   appearance: 'settings.appearance',
-  reactions: 'settings.reactionsWeb',
+  reactions: 'settings.reactions',
   chats: 'settings.chats',
   folders: 'folders.title',
   notifications: 'settings.notifications',

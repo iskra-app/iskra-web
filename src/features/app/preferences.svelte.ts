@@ -57,6 +57,9 @@ const keys = {
   sendWithModEnter: 'composer.sendsWithCommandReturn',
   hidePresence: 'privacy.hidesPresence',
   hideTyping: 'privacy.hidesTyping',
+  stickersBuiltIn: 'stickers.showsBuiltIn',
+  stickersRoomPack: 'stickers.showsRoomPack',
+  stickersMine: 'stickers.showsMine',
 } as const;
 
 function read(key: string): string | null {
@@ -120,6 +123,10 @@ class Preferences {
    */
   hidePresence = $state<boolean>(read(keys.hidePresence) === 'true');
   hideTyping = $state<boolean>(read(keys.hideTyping) === 'true');
+  /** Какие наборы в панели стикеров — `StickerSettings` нативной; все включены, пока не выключили. */
+  stickersBuiltIn = $state<boolean>(read(keys.stickersBuiltIn) !== 'false');
+  stickersRoomPack = $state<boolean>(read(keys.stickersRoomPack) !== 'false');
+  stickersMine = $state<boolean>(read(keys.stickersMine) !== 'false');
   /** Что ставит двойное касание сообщения — любая эмодзи, ключ нативной (`QuickReaction`). */
   quickReaction = $state<string>(emojiOr(read(keys.quickReaction), defaultQuickReaction));
   /** Недавние реакции — наверху панели «Больше эмодзи» (`RecentEmoji` нативной, тот же ключ). */
@@ -147,6 +154,9 @@ class Preferences {
       $effect(() => write(keys.sendWithModEnter, String(this.sendWithModEnter)));
       $effect(() => write(keys.hidePresence, String(this.hidePresence)));
       $effect(() => write(keys.hideTyping, String(this.hideTyping)));
+      $effect(() => write(keys.stickersBuiltIn, String(this.stickersBuiltIn)));
+      $effect(() => write(keys.stickersRoomPack, String(this.stickersRoomPack)));
+      $effect(() => write(keys.stickersMine, String(this.stickersMine)));
       $effect(() => {
         write(keys.language, this.language);
         i18n.locale = this.language === 'system' ? preferredLocale(navigator.languages ?? []) : this.language;
