@@ -634,3 +634,29 @@ test('устройства: «Активные сеансы» — заверши
   await expect(sessions).toContainText('Других сеансов нет', { timeout: 10_000 });
   await expect(page.getByRole('button', { name: 'Завершить все другие сеансы' })).toHaveCount(0);
 });
+
+test('«Роли и разрешения»: кому что можно; назначить модератора и снять роль', async ({ page }) => {
+  await signInToDemo(page);
+  await openRoom(page, /^Длинная история/);
+  const panel = await openPanel(page);
+  await panel.getByRole('button', { name: 'Изменить' }).click();
+  await page.getByRole('dialog', { name: 'Изменить чат' }).getByRole('button', { name: 'Роли и разрешения' }).click();
+  const rules = page.getByRole('dialog', { name: 'Роли и разрешения' });
+  const staff = rules.getByRole('region', { name: 'Управляют чатом' });
+  await expect(staff.getByRole('listitem').first()).toContainText('Алиса');
+
+  const rename = rules.getByRole('combobox', { name: 'Менять название' });
+  await expect(rename).toHaveValue('moderator');
+  await rename.selectOption('administrator');
+  await expect(rename).toHaveValue('administrator');
+  await expect(rules.getByRole('combobox', { name: 'Писать сообщения' })).toHaveValue('member');
+
+  await staff.getByRole('button', { name: 'Добавить' }).click();
+  await expect(page.getByRole('dialog', { name: 'Назначить' })).toBeVisible();
+  await page.getByRole('dialog', { name: 'Назначить' }).getByRole('button', { name: 'Борис' }).click();
+  await page.getByRole('dialog', { name: 'Что может Борис?' }).getByRole('radio', { name: 'Модератор' }).click();
+  const boris = rules.getByRole('region', { name: 'Управляют чатом' }).getByRole('listitem').filter({ hasText: 'Борис' });
+  await expect(boris).toContainText('Модератор', { timeout: 10_000 });
+  await boris.getByRole('button', { name: 'Снять роль' }).click();
+  await expect(boris).toHaveCount(0, { timeout: 10_000 });
+});

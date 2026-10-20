@@ -18,6 +18,7 @@
   import type { UserSession } from '../../core/session/userSession.svelte.ts';
   import { t } from '../../i18n/index.svelte.ts';
   import { roomFailureText } from './text';
+  import RoomRulesDialog from './RoomRulesDialog.svelte';
 
   let { open, details, session, onclose }: { open: boolean; details: RoomDetailsStore; session: UserSession; onclose: () => void } = $props();
 
@@ -30,6 +31,8 @@
   let listed = $state(false);
   /** Кого пускают обратно — ждёт ответа на вопрос. */
   let unbanning = $state<MemberSummary | null>(null);
+  /** «Роли и разрешения» поверх. */
+  let rulesOpen = $state(false);
   const historyKey = (h: HistoryAccess) => (h === 'world_readable' ? 'room.access.history.worldReadable' : (`room.access.history.${h}` as const));
   let picker: HTMLInputElement | undefined = $state();
   const id = $props.id();
@@ -155,6 +158,9 @@
           </label>
         {/if}
       {/if}
+      {#if details.permissions.canChangeRoles}
+        <PlainButton onclick={() => (rulesOpen = true)}>{t('room.rules.title')}</PlainButton>
+      {/if}
       {#if details.permissions.canBan && details.banned.length > 0}
         <fieldset class="field">
           <legend>{t('room.access.banned')}</legend>
@@ -177,6 +183,8 @@
     <PlainButton onclick={onclose}>{t('room.manage.cancel')}</PlainButton>
   </form>
 </Dialog>
+
+<RoomRulesDialog open={rulesOpen} {details} onclose={() => (rulesOpen = false)} />
 
 <ConfirmDialog
   open={!!unbanning}

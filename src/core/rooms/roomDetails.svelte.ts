@@ -90,10 +90,43 @@ export type RoomActionFailure =
   | 'history'
   | 'address'
   | 'addressTaken'
-  | 'directory';
+  | 'directory'
+  | 'rules';
 
 /** Уровни ролей — как их пишут Element и нативная Искра. */
 export const ROLE_LEVEL: Record<RoomRole, number> = { administrator: 100, moderator: 50, member: 0 };
+
+/**
+ * Что в комнате кому можно — `RoomRule` нативной: восемь порогов `m.room.power_levels`, каждый
+ * показан нижней ступенью, которой можно: все, модераторы, администраторы.
+ */
+export const roomRules = ['sendMessages', 'invite', 'remove', 'ban', 'deleteOthers', 'rename', 'changeTopic', 'changePicture'] as const;
+export type RoomRule = (typeof roomRules)[number];
+
+/** Где порог правила живёт в power levels и чему он равен, если его нет (спецификация). */
+const RULE_LEVELS: Record<RoomRule, { key: string; event?: string; fallback: (powers: Record<string, unknown>) => number }> = {
+  sendMessages: { key: 'events_default', fallback: () => 0 },
+  invite: { key: 'invite', fallback: () => 0 },
+  remove: { key: 'kick', fallback: () => 50 },
+  ban: { key: 'ban', fallback: () => 50 },
+  deleteOthers: { key: 'redact', fallback: () => 50 },
+  rename: { key: 'events', event: EventType.RoomName, fallback: stateDefault },
+  changeTopic: { key: 'events', event: EventType.RoomTopic, fallback: stateDefault },
+  changePicture: { key: 'events', event: EventType.RoomAvatar, fallback: stateDefault },
+};
+
+function stateDefault(powers: Record<string, unknown>): number {
+  return typeof powers['state_default'] === 'number' ? powers['state_default'] : 50;
+}
+
+function ruleLevel(powers: Record<string, unknown>, rule: RoomRule): number {
+  const { key, event, fallback } = RULE_LEVELS[rule];
+  const value = event ? ((powers['events'] ?? {}) as Record<string, unknown>)[event] : powers[key];
+  return typeof value === 'number' ? value : fallback(powers);
+}
+
+const roleAt = (level: number): RoomRole =>
+  level >= ROLE_LEVEL.administrator ? 'administrator' : level >= ROLE_LEVEL.moderator ? 'moderator' : 'member';
 
 /** Версии комнат, где создатель — вне чисел (MSC4289). */
 const CREATOR_IS_UNLIMITED = new Set(['12', 'org.matrix.hydra.11']);
@@ -134,6 +167,11 @@ export class RoomDetailsStore {
   history = $state<HistoryAccess>('shared');
   /** Главный адрес комнаты, `#имя:сервер`; нет — нет. */
   alias = $state<string | undefined>(undefined);
+  /** Кому что можно — нижней ступенью; `null` — power levels ещё не пришли. */
+  rules = $state.raw<Record<RoomRule, RoomRole> | null>(null);
+  /** Порог каждого правила числом — чтобы знать, можно ли его тронуть. */
+  private ruleLevels: Record<string, number> = {};
+  private powers: Record<string, unknown> = {};
   /** В каталоге сервера? Знает только сервер, и спрашивают его только из настроек: `undefined`. */
   inDirectory = $state<boolean | undefined>(undefined);
   permissions = $state.raw<RoomPermissions>(DENIED);
@@ -257,6 +295,10 @@ export class RoomDetailsStore {
     this.history = visibility === 'invited' || visibility === 'joined' || visibility === 'world_readable' ? visibility : 'shared';
     const alias = state.getStateEvents(EventType.RoomCanonicalAlias, '')?.getContent()['alias'];
     this.alias = typeof alias === 'string' ? alias : undefined;
+
+    this.powers = powers;
+    this.ruleLevels = Object.fromEntries(roomRules.map((rule) => [rule, ruleLevel(powers, rule)]));
+    this.rules = Object.fromEntries(roomRules.map((rule) => [rule, roleAt(this.ruleLevels[rule]!)])) as Record<RoomRule, RoomRole>;
 
     this.ownAuthority = authorityOf(this.me);
     const level = (key: string, fallback: number) => (typeof powers[key] === 'number' ? (powers[key] as number) : fallback);
@@ -426,6 +468,36 @@ export class RoomDetailsStore {
       if (add) await this.client.addPushRule('global', add.kind as never, add.ruleId, add.body as never);
     }).then((ok) => {
       if (!ok) this.alerts = previous;
+      return ok;
+    });
+  }
+
+  /** Кто управляет чатом — администраторы и модераторы. */
+  get staff(): MemberSummary[] {
+    return this.members.filter((m) => m.role !== 'member' && !m.invited);
+  }
+
+  /**
+   * Какие ступени можно поставить правилу. Пусто — правило не тронуть: оно выше моей ступени
+   * (или менять роли нельзя вовсе), и экран показывает его как факт.
+   */
+  rolesForRule(rule: RoomRule): RoomRole[] {
+    if (!this.permissions.canChangeRoles || (this.ruleLevels[rule] ?? 0) > this.ownAuthority) return [];
+    return (['member', 'moderator', 'administrator'] as const).filter((role) => ROLE_LEVEL[role] <= this.ownAuthority);
+  }
+
+  /** Сменить, кому можно одно дело. Сразу на экране; сервер отказал — обратно. */
+  setRule(rule: RoomRule, role: RoomRole): Promise<boolean> {
+    if (!this.rules || this.rules[rule] === role || !this.rolesForRule(rule).includes(role)) return Promise.resolve(true);
+    const before = this.rules;
+    this.rules = { ...before, [rule]: role };
+    const { key, event } = RULE_LEVELS[rule];
+    const level = ROLE_LEVEL[role];
+    const content = event
+      ? { ...this.powers, events: { ...((this.powers['events'] ?? {}) as Record<string, unknown>), [event]: level } }
+      : { ...this.powers, [key]: level };
+    return this.act('rules', () => this.client.sendStateEvent(this.roomId, EventType.RoomPowerLevels, content as never, '')).then((ok) => {
+      if (!ok) this.rules = before;
       return ok;
     });
   }
