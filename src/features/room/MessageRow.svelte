@@ -176,8 +176,9 @@
           {:else if kind.type === 'poll'}
             <PollView poll={kind.poll} canVote={!!message.eventId} own={message.own && !compact} onvote={(ids) => actions.vote(message, ids)} />
           {:else if message.album}
-            <AlbumView items={message.album} {media} onopen={(item) => actions.openMedia(item)} />
-            {#if (kind.type === 'image' || kind.type === 'video') && kind.attachment.caption}<span class="caption text"><LinkedText text={kind.attachment.caption} /></span>{/if}
+            {@const albumCaption = (kind.type === 'image' || kind.type === 'video') && kind.attachment.caption ? kind.attachment.caption : ''}
+            <AlbumView items={message.album} {media} captioned={!!albumCaption} onopen={(item) => actions.openMedia(item)} />
+            {#if albumCaption}<span class="caption album-caption text"><LinkedText text={albumCaption} /></span>{/if}
           {:else if kind.type === 'image' || kind.type === 'video' || kind.type === 'videoNote' || kind.type === 'sticker'}
             <MediaPreview kind={kind.type} attachment={kind.attachment} {media} own={message.own} onopen={() => actions.openMedia(message)} />
             {#if kind.attachment.caption}<span class="caption text"><LinkedText text={kind.attachment.caption} /></span>{/if}
@@ -504,6 +505,11 @@
   .bubble.visual .caption {
     display: block;
     padding: var(--space-tight) var(--space-close) 0;
+  }
+  /* Подпись альбома — с воздухом над и под ней: под мозаикой из нескольких фото прижатая
+     строка терялась. Снизу вместе с краем пузыря выходит столько же, сколько сверху. */
+  .bubble.visual .album-caption {
+    padding: var(--space-normal) var(--space-close) var(--space-close);
   }
   /* Стикер и «кружочек» — без пузыря: у них своя форма. */
   .bubble.bare,
