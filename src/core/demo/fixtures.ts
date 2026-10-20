@@ -5,10 +5,10 @@
  * реакциями, группа с опросом, беззвучный чат, приглашение и длинная комната для
  * подгрузки истории. Время — от «сейчас», чтобы «вчера» было вчера.
  */
+import { DEMO_SERVER } from './address';
 import { demoVoice } from './voice';
 
-export const DEMO_SERVER = 'demo.iskra.invalid';
-export const DEMO_BASE_URL = `https://${DEMO_SERVER}`;
+export { DEMO_BASE_URL, DEMO_SERVER } from './address';
 
 export const demoUsers = {
   alice: `@alice:${DEMO_SERVER}`,

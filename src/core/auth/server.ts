@@ -6,8 +6,7 @@
  * `@me:example.org` или полный адрес, — а мы находим сервер сами.
  */
 import { createClient, type ValidatedAuthMetadata } from 'matrix-js-sdk';
-import { DEMO_BASE_URL, DEMO_SERVER } from '../demo/fixtures';
-import { demoServer } from '../demo/instance';
+import { DEMO_BASE_URL, DEMO_SERVER } from '../demo/address';
 import { errorDetail } from '../support/errorDetail';
 import { quietLogger } from '../support/logger';
 
@@ -50,8 +49,16 @@ export interface ServerInfo {
   canRegister: boolean;
 }
 
+/**
+ * Чем ходить в сеть. Демо — свой сервер в странице; он и его мир грузятся при первом запросе
+ * к нему, а не в каждой сборке, которая его никогда не увидит.
+ */
 export function fetchFor(demo: boolean): typeof globalThis.fetch {
-  return demo ? demoServer().fetch : globalThis.fetch.bind(globalThis);
+  if (!demo) return globalThis.fetch.bind(globalThis);
+  return async (input, init) => {
+    const { demoServer } = await import('../demo/instance');
+    return demoServer().fetch(input, init);
+  };
 }
 
 export interface ParsedAddress {
