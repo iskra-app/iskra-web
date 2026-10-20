@@ -27,6 +27,7 @@
   import InviteDialog from './InviteDialog.svelte';
   import RoleDialog from './RoleDialog.svelte';
   import RoomSearchDialog from './RoomSearchDialog.svelte';
+  import MatrixIdField from './MatrixIdField.svelte';
   import type { TimelineStore } from '../../core/timeline/timelineStore.svelte.ts';
   import { roomTimestamp } from '../../design/time';
   import { viewport } from '../../design/viewport.svelte.ts';
@@ -314,6 +315,11 @@
       <div class="failure">
         <ProblemPanel message={roomFailureText(details.failure)} />
       </div>
+    {/if}
+
+    {#if details.direct && counterpart}
+      <!-- То, ради чего страницу собеседника открывают чаще всего, — его ID, с «Скопировать». -->
+      <MatrixIdField userId={counterpart.id} />
     {/if}
 
     {#if details.topic}

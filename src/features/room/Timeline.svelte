@@ -49,12 +49,12 @@
     return `${message.own ? t('message.spoken.you') : message.senderName}: ${words}`;
   }
 
-  /** Меню сообщения с клавиатуры — под пузырём, как от «ещё». С удалённым делать нечего. */
+  /** Меню сообщения с клавиатуры — под пузырём, как от «ещё». У удалённого — только когда что было. */
   function menuByKey(key: string, stop: HTMLElement) {
     const item = store.items.find((entry) => entry.key === key);
     if (!item || item.kind !== 'message') return;
     const message = item.message;
-    if (!message.eventId || message.kind.type === 'deleted' || message.kind.type === 'service') return;
+    if (!message.eventId || message.kind.type === 'service') return;
     const rect = stop.getBoundingClientRect();
     actions.openMenu(message, { x: rect.left, y: rect.bottom }, !viewport.finePointer);
   }

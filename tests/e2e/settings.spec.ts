@@ -158,14 +158,14 @@ test('настройки по разделам: имя, язык, тема, шр
   await expect(page.getByText('Алиса Петровна', { exact: true })).toBeVisible({ timeout: 10_000 });
   await page.getByRole('link', { name: 'Безопасность' }).click();
   await expect(page.getByText('Это устройство', { exact: true })).toBeVisible();
-  await expect(page.getByRole('region', { name: 'Заблокированные' })).toBeVisible();
+  await expect(page.getByRole('region', { name: 'Заблокированные пользователи' })).toBeVisible();
   await back.click();
   await page.getByRole('link', { name: 'Хранилище' }).click();
   await expect(page.getByRole('heading', { name: 'Хранилище', level: 1 })).toBeVisible();
   await back.click();
   await page.getByRole('link', { name: 'Внешний вид' }).click();
 
-  await page.getByRole('radio', { name: 'Тёмное' }).click();
+  await page.getByRole('radio', { name: 'Тёмная' }).click();
   await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark');
   // Inter — по умолчанию и из своих файлов под боевой CSP: кириллица и латиница загрузились.
   await expect(page.getByRole('radio', { name: 'Inter' })).toHaveAttribute('aria-checked', 'true');
@@ -221,7 +221,7 @@ test('заблокировать из меню сообщения — сообщ
   await expect(page.getByRole('link', { name: /^Дом 14/ })).not.toContainText('Лифт опять');
 
   await openSettings(page, 'Безопасность');
-  const section = page.getByRole('region', { name: 'Заблокированные' });
+  const section = page.getByRole('region', { name: 'Заблокированные пользователи' });
   await expect(section).toContainText('@vera:demo.iskra.invalid');
   await section.getByRole('button', { name: 'Разблокировать' }).click();
   await expect(section).toContainText('Никто не заблокирован', { timeout: 10_000 });
@@ -289,7 +289,7 @@ test('локальное имя личного чата: видно везде, 
 
   panel = await openPanel(page);
   await panel.getByRole('button', { name: 'Изменить' }).click();
-  await page.getByRole('dialog', { name: 'Изменить чат' }).getByRole('button', { name: 'Вернуть настоящее имя' }).click();
+  await page.getByRole('dialog', { name: 'Изменить чат' }).getByRole('button', { name: 'Вернуть «Аня»' }).click();
   await expect(panel.getByRole('heading', { name: 'Аня' })).toBeVisible();
   // На телефоне панель — лист поверх чата: сначала закрыть её.
   await page.getByRole('button', { name: 'Закрыть', exact: true }).click();
@@ -451,7 +451,7 @@ test('«Реакции»: быстрая реакция — из шести ил
     await page.getByRole('log').getByRole('button', { name: 'Реакция 👍' }).first().click();
   }
   // Реакций в демо до этого ни у кого не было: «👍 1» — та, что поставили сейчас, и своя.
-  await expect(page.getByRole('log').getByRole('list', { name: 'Реакции' }).getByRole('button', { name: '👍 1', pressed: true })).toBeVisible({ timeout: 10_000 });
+  await expect(page.getByRole('log').getByRole('list', { name: 'Реакции' }).getByRole('button', { name: '👍, 1 человек', pressed: true })).toBeVisible({ timeout: 10_000 });
 
   // Не из шести — из каталога: встаёт в ряд последней и подсвечена.
   await openSettings(page, 'Реакции');
@@ -598,8 +598,8 @@ test('своя комната: история для новых, адрес (з�
 
   // Заблокировать Веру — и пустить обратно из настроек.
   await panel.getByRole('button', { name: /^Вера/ }).click();
-  await page.getByRole('menuitem', { name: 'Заблокировать' }).click();
-  await page.getByRole('dialog').getByRole('button', { name: 'Заблокировать' }).click();
+  await page.getByRole('menuitem', { name: 'Заблокировать в чате' }).click();
+  await page.getByRole('dialog').getByRole('button', { name: 'Заблокировать в чате' }).click();
   await expect(panel.getByRole('button', { name: /^Вера/ })).toHaveCount(0, { timeout: 10_000 });
   edit = await openEdit();
   await edit.getByRole('button', { name: 'Разблокировать' }).click();

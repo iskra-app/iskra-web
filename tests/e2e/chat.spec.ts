@@ -33,7 +33,7 @@ test('меню сообщения: реакция ставится из меню
   await menu.getByRole('menuitemcheckbox', { name: 'Реакция 👍' }).click();
   await expect(menu).toBeHidden();
 
-  const chip = page.getByRole('list', { name: 'Реакции' }).getByRole('button', { name: '👍 1' });
+  const chip = page.getByRole('list', { name: 'Реакции' }).getByRole('button', { name: '👍, 1 человек' });
   await expect(chip).toHaveAttribute('aria-pressed', 'true', { timeout: 10_000 });
   // Снять — нажать на свою же. Дождаться, пока она уйдёт на сервер: снимают её, а не эхо.
   await expect(page.getByRole('img', { name: 'Отправляется' })).toHaveCount(0);
@@ -404,7 +404,7 @@ test('«Больше эмодзи»: панель с разделами, реа�
   await menu.getByRole('button', { name: 'Еда и напитки' }).click();
   await menu.getByRole('menuitemcheckbox', { name: 'Реакция 🍕' }).click();
   await expect(menu).toBeHidden();
-  await expect(page.getByRole('list', { name: 'Реакции' }).getByRole('button', { name: '🍕 1' })).toBeVisible({ timeout: 10_000 });
+  await expect(page.getByRole('list', { name: 'Реакции' }).getByRole('button', { name: '🍕, 1 человек' })).toBeVisible({ timeout: 10_000 });
 
   menu = await menuOf(page, 'Я — пирог');
   await menu.getByRole('menuitem', { name: 'Больше эмодзи' }).click();

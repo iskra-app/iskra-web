@@ -21,7 +21,7 @@
   import { clock } from '../../design/time';
   import { viewport } from '../../design/viewport.svelte.ts';
   import type { Message } from '../../core/timeline/message';
-  import { i18n, t } from '../../i18n/index.svelte.ts';
+  import { i18n, plural, t } from '../../i18n/index.svelte.ts';
   import { preferences } from '../app/preferences.svelte.ts';
   import type { MessageActions } from './actions';
   import { touchGestures } from './gestures';
@@ -58,6 +58,8 @@
   const failed = $derived(message.delivery.state === 'failed' ? message.delivery : null);
   /** С ушедшим можно что-то делать; с удалённым и служебным — нет. */
   const interactive = $derived(!!message.eventId && kind.type !== 'deleted' && kind.type !== 'service');
+  /** Меню — и у удалённого: действий в нём нет, но когда отправили и когда удалили — есть. */
+  const hasMenu = $derived(!!message.eventId && kind.type !== 'service');
   /** Картинка во весь пузырь: отступы пузыря — тоньше, фон — у самой картинки. */
   const visual = $derived(kind.type === 'image' || kind.type === 'video' || kind.type === 'videoNote' || kind.type === 'sticker');
 
@@ -73,7 +75,7 @@
   }
 
   function oncontextmenu(event: MouseEvent) {
-    if (!interactive) return;
+    if (!hasMenu) return;
     const target = event.target as Element | null;
     const hadSelection = selectedBefore ?? selected();
     selectedBefore = null;
@@ -92,7 +94,7 @@
   const gestures = $derived({
     ondoubletap: () => interactive && actions.react(message, preferences.quickReaction),
     onswipe: () => interactive && actions.canReply && actions.reply(message),
-    onlongpress: (at: { x: number; y: number }) => interactive && actions.openMenu(message, at, true),
+    onlongpress: (at: { x: number; y: number }) => hasMenu && actions.openMenu(message, at, true),
   });
 </script>
 
@@ -218,12 +220,15 @@
         <ul class="reactions" aria-label={t('message.reactions')}>
           {#each message.reactions as reaction (reaction.key)}
             <li>
+              <!-- Число — когда есть что считать: одного человека и так говорит эмодзи. -->
               <button
                 type="button"
                 class:mine={reaction.mine}
                 aria-pressed={reaction.mine}
+                aria-label={plural('message.menu.reaction', reaction.count, { emoji: reaction.key })}
                 disabled={!interactive}
-                onclick={() => actions.react(message, reaction.key)}>{reaction.key} {reaction.count}</button
+                onclick={() => actions.react(message, reaction.key)}
+                >{reaction.key}{#if reaction.count > 1}<span class="count">{reaction.count}</span>{/if}</button
               >
             </li>
           {/each}
@@ -439,9 +444,18 @@
   .reactions button:active:not(:disabled) {
     transform: scale(var(--motion-scale-from));
   }
+  /* Своя — тоном серого, а не рамкой: заметно, когда ищешь, и не кричит, когда нет. Число своей — акцентом. */
   .reactions button.mine {
-    border-color: var(--accent);
     background: var(--color-own-reaction);
+  }
+  .count {
+    margin-inline-start: var(--space-tight);
+    color: var(--color-text-secondary);
+    font-variant-numeric: tabular-nums;
+    font-weight: 500;
+  }
+  .mine .count {
+    color: var(--accent);
   }
   .reactions button:disabled {
     cursor: default;

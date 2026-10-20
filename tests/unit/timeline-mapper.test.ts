@@ -104,6 +104,8 @@ describe('TimelineMapper', () => {
 
   it('удалённое сообщение — «удалено», удалённое служебное — ничего', () => {
     expect(map({ type: 'm.room.message', content: {}, unsigned: { redacted_because: { type: 'm.room.redaction' } as never } })?.kind).toEqual({ type: 'deleted' });
+    // Когда удалили — для меню удалённого: «Удалено …».
+    expect(map({ type: 'm.room.message', content: {}, unsigned: { redacted_because: { type: 'm.room.redaction', origin_server_ts: 1234 } as never } })?.kind).toEqual({ type: 'deleted', at: 1234 });
     expect(map({ type: 'm.room.topic', state_key: '', content: {}, unsigned: { redacted_because: { type: 'm.room.redaction' } as never } })).toBeUndefined();
   });
 

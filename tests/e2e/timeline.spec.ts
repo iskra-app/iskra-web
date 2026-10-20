@@ -18,7 +18,7 @@ test('лента чата: сообщения, серии, служебные с
   await openRoom(page, /^Аня/);
   await expect(page.getByRole('log')).toContainText('В десять у метро');
   await expect(page.getByRole('log')).toContainText('изменено');
-  await expect(page.getByRole('list', { name: 'Реакции' })).toContainText('🔥 1');
+  await expect(page.getByRole('list', { name: 'Реакции' }).getByRole('button', { name: '🔥, 1 человек' })).toBeVisible();
   expect(problems).toEqual([]);
 });
 

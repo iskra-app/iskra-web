@@ -35,7 +35,9 @@ test('треды: строка под корнем, тред панелью, о�
   await page.getByRole('radio', { name: 'Никогда' }).click();
   await expect(page.getByRole('switch', { name: 'Скрывать ответы из чата' })).toBeDisabled();
   await openRoom(page, /^Дом 14/);
-  await expect(page.getByRole('log').getByText('Напоминаю: собрание дома в четверг')).toBeVisible();
+  // Тредов нет — ответы стоят в чате с цитатой корня, как в нативной.
+  await expect(page.getByRole('log').getByText('Напоминаю: собрание дома в четверг').first()).toBeVisible();
+  await expect(page.getByRole('log').getByRole('article').filter({ hasText: 'Во сколько?' }).first()).toContainText('Напоминаю');
   await expect(page.getByRole('log').getByRole('button', { name: /ответ/ })).toHaveCount(0);
   expect(problems).toEqual([]);
 });

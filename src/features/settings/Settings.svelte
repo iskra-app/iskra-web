@@ -268,6 +268,20 @@
 
   let confirmingSignOut = $state(false);
   let showingCode = $state(false);
+  let linkCopied = $state(false);
+
+  /** Своя ссылка: на телефоне — системным «Поделиться», на десктопе — в буфер, как в «О чате». */
+  async function shareMe() {
+    const link = shareLink(me.id);
+    if (typeof navigator.share === 'function' && !viewport.finePointer) {
+      await navigator.share({ url: link }).catch(() => {});
+      return;
+    }
+    await navigator.clipboard
+      .writeText(link)
+      .then(() => (linkCopied = true))
+      .catch(() => {});
+  }
 </script>
 
 {#snippet licenceRow(licence: Licence)}
@@ -287,11 +301,18 @@
       <span class="avatar big"><Avatar name={me.name} seed={me.id} photo={photo.url} mode={preferences.faces} /></span>
       <strong class="profile-name">{me.name}</strong>
       <span class="secondary selectable">{me.id}</span>
-      <!-- Свой QR-код — `ProfileActionTile` нативной в шапке профиля. -->
-      <button type="button" class="tile" onclick={() => (showingCode = true)}>
-        <Icon name="qr" />
-        <span>{t('qr.title')}</span>
-      </button>
+      <!-- «Поделиться» и свой QR-код — `ProfileActionTile` нативной в шапке профиля. -->
+      <div class="tiles">
+        <button type="button" class="tile" onclick={() => void shareMe()}>
+          <Icon name="share" />
+          <span>{t('profile.share')}</span>
+        </button>
+        <button type="button" class="tile" onclick={() => (showingCode = true)}>
+          <Icon name="qr" />
+          <span>{t('qr.title')}</span>
+        </button>
+      </div>
+      {#if linkCopied}<p class="secondary" role="status">{t('room.linkCopiedWeb')}</p>{/if}
     </div>
     <QrCodeDialog
       open={showingCode}
@@ -759,6 +780,10 @@
   .big {
     --avatar-size: var(--size-avatar-profile);
     margin-block-end: var(--space-close);
+  }
+  .tiles {
+    display: flex;
+    gap: var(--space-close);
   }
   .tile {
     display: flex;

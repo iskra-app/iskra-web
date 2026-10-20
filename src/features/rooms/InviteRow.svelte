@@ -5,8 +5,6 @@
   комнате, и то, что туда напишете, сервер не примет.
 -->
 <script lang="ts">
-  import QuietButton from '../../design/QuietButton.svelte';
-  import PrimaryButton from '../../design/PrimaryButton.svelte';
   import type { RoomSummary } from '../../core/rooms/types';
   import type { UserSession } from '../../core/session/userSession.svelte.ts';
   import { t } from '../../i18n/index.svelte.ts';
@@ -20,6 +18,7 @@
   }
   let { room, session, onfailure }: Props = $props();
   let busy = $state<'accept' | 'decline' | null>(null);
+  const offline = $derived(session.connection === 'offline');
 
   async function answer(kind: 'accept' | 'decline') {
     busy = kind;
@@ -41,11 +40,16 @@
     <span class="from">
       {room.invitedBy ? t('roomList.invite.from', { name: room.invitedBy }) : t('roomList.invite.unattributed')}
     </span>
+    <!-- Два настоящих ответа, равные: зелёный и красный, по размеру своих слов, у начала строки
+         (`AnswerStyle` нативной). Не «главная кнопка и выход»: ни один не подталкивает. -->
     <div class="actions">
-      <QuietButton disabled={!!busy} onclick={() => void answer('decline')}>{t('roomList.invite.decline')}</QuietButton>
-      <PrimaryButton busy={busy === 'accept'} disabled={!!busy} onclick={() => void answer('accept')}>
-        {t('roomList.invite.accept')}
-      </PrimaryButton>
+      <!-- Без сети — серые: ответ уходит прямо на сервер, в очередь он не встаёт. -->
+      <button type="button" class="answer yes" disabled={!!busy || offline} aria-busy={busy === 'accept'} onclick={() => void answer('accept')}>
+        <span>{t('roomList.invite.accept')}</span>
+      </button>
+      <button type="button" class="answer no" disabled={!!busy || offline} aria-busy={busy === 'decline'} onclick={() => void answer('decline')}>
+        <span>{t('roomList.invite.decline')}</span>
+      </button>
     </div>
   </div>
 </div>
@@ -76,7 +80,37 @@
   }
   .actions {
     display: flex;
-    justify-content: flex-end;
-    gap: var(--space-close);
+    gap: var(--space-tight);
+  }
+  /* Капсула меньше, чем цель: нажимается на всю высоту пальца, а видна строкой под текстом. */
+  .answer {
+    display: grid;
+    place-items: center;
+    min-height: var(--tap-target);
+    padding: 0;
+    border: none;
+    background: none;
+    font: inherit;
+    cursor: pointer;
+  }
+  .answer span {
+    padding: var(--space-tight) var(--space-normal);
+    border-radius: var(--radius-circle);
+    color: var(--color-on-answer);
+    font-size: var(--font-size-caption);
+    font-weight: 600;
+    white-space: nowrap;
+  }
+  .yes span {
+    background: var(--color-answer-yes);
+  }
+  .no span {
+    background: var(--color-answer-no);
+  }
+  .answer:disabled {
+    cursor: default;
+  }
+  .answer:disabled span {
+    opacity: 0.5;
   }
 </style>

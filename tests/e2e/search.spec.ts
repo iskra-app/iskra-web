@@ -22,7 +22,7 @@ test('поиск по сообщениям: над списком — найде
   await expect(hit).toContainText('Борис');
   await hit.click();
   await expect(page).toHaveURL(/#\/room\/!quiet/);
-  await expect(page.getByRole('log').getByText('Напоминаю: собрание дома в четверг')).toBeVisible();
+  await expect(page.getByRole('log').getByText('Напоминаю: собрание дома в четверг').first()).toBeVisible();
   expect(problems).toEqual([]);
 });
 

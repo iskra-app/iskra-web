@@ -86,7 +86,8 @@ export type MessageKind =
   | { type: 'location'; body: string; uri: string; place: Place }
   | { type: 'poll'; poll: Poll }
   | { type: 'service'; event: ServiceEvent }
-  | { type: 'deleted' }
+  /** `at` — когда удалили, если сервер сказал (`redacted_because`). */
+  | { type: 'deleted'; at?: number }
   | { type: 'unreadable' }
   | { type: 'unsupported' };
 

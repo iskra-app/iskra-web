@@ -60,6 +60,8 @@ describe('треды', () => {
     await started();
     const store = open(demoRooms.quiet);
     expect(store.messages.find((m) => m.eventId === ROOT)?.thread).toBeUndefined();
+    // Тредов в чате не показывают — запасная цитата и есть связь с корнем, как в нативной.
+    expect(store.messages.find((m) => m.eventId === '$quiet-thread-0')?.replyTo?.eventId).toBe(ROOT);
     store.setThreads({ enabled: true, hidesReplies: false });
     store.rebuild();
     const root = store.messages.find((m) => m.eventId === ROOT)!;

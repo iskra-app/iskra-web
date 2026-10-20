@@ -99,7 +99,7 @@
           onclick={async () => {
             await details.renameLocally(null);
             onclose();
-          }}>{t('room.localName.reset')}</PlainButton
+          }}>{t('room.localName.reset', { name: details.serverName })}</PlainButton
         >
       {/if}
     {:else}

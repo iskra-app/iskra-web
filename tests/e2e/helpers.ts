@@ -170,13 +170,13 @@ async function passRecoveryStep(page: Page): Promise<string | null> {
   return null;
 }
 
-/** Экран «Сохраните код»: забрать код, поставить галочку, «Я сохранил код». */
+/** Экран «Сохраните код»: забрать код, поставить галочку, «Код сохранён». */
 export async function saveRecoveryCode(page: Page): Promise<string> {
   const code = (await page.getByTestId('recovery-code').innerText()).trim();
-  const saved = page.getByRole('button', { name: 'Я сохранил код' });
+  const saved = page.getByRole('button', { name: 'Код сохранён' });
   // Без галочки кнопка не нажимается: сначала прочитать предупреждение.
   await expect(saved).toBeDisabled();
-  await page.getByRole('switch', { name: 'Я записал код в надёжное место' }).check();
+  await page.getByRole('switch', { name: 'Код записан, он в надёжном месте' }).check();
   await saved.click();
   return code;
 }

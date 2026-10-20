@@ -427,6 +427,7 @@ export class TimelineStore {
       canRedactOthers: (event) => !!state?.maySendRedactionForEvent(event, this.ownUserId),
       isBlocked: (userId) => blocked.has(userId),
       ...(this.threads.enabled && !this.threadRootId ? { threadOf: this.threadSummaries(room, live, pending) } : {}),
+      threaded: this.threads.enabled || !!this.threadRootId,
       keyOf: (event) => {
         let key = this.keys.get(event);
         if (!key) {

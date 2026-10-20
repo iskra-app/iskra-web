@@ -32,6 +32,12 @@ export interface MapperContext {
   isBlocked: (userId: string) => boolean;
   /** Тред под событием — строка «N ответов». Нет — тредов в этой ленте не показывают. */
   threadOf?: (eventId: string) => ThreadSummary | undefined;
+  /**
+   * Треды в этой ленте видны — строкой под корнем или это лента самого треда. Тогда запасная
+   * цитата ответа в треде (`is_falling_back`) — не цитата. Не видны — она и есть связь с
+   * корнем, как в нативной: без неё ответ из треда висел бы в чате ни к чему.
+   */
+  threaded?: boolean;
 }
 
 /** Корень треда, если событие — ответ в нём (`m.thread`). Связь лежит открытой и у зашифрованного. */
@@ -92,7 +98,9 @@ function kindOf(event: MatrixEvent, context: MapperContext): MessageKind | undef
   if (event.getRelation()?.rel_type === 'm.replace') return undefined;
 
   if (event.isRedacted()) {
-    return isMessageLike(type) ? { type: 'deleted' } : undefined;
+    if (!isMessageLike(type)) return undefined;
+    const at = (event.getUnsigned().redacted_because as { origin_server_ts?: unknown } | undefined)?.origin_server_ts;
+    return typeof at === 'number' ? { type: 'deleted', at } : { type: 'deleted' };
   }
   if (event.isDecryptionFailure()) return { type: 'unreadable' };
   // Ещё расшифровывается — покажем, когда расшифруется, а не мигнём «не прочитать».
@@ -327,9 +335,10 @@ function serviceEvent(event: MatrixEvent, context: MapperContext): ServiceEvent 
 
 function replyOf(event: MatrixEvent, context: MapperContext): ReplyPreview | undefined {
   // Ответ в треде несёт `m.in_reply_to` на предыдущий ответ — подпорку для клиентов без тредов
-  // (`is_falling_back`). Это не цитата: иначе каждый ответ в треде рисовался бы цитатой соседа.
+  // (`is_falling_back`). Где треды видны, это не цитата: иначе каждый ответ в треде рисовался бы
+  // цитатой соседа.
   const relation = event.getWireContent()['m.relates_to'] as { rel_type?: unknown; is_falling_back?: unknown } | undefined;
-  if (relation?.rel_type === 'm.thread' && relation.is_falling_back === true) return undefined;
+  if (context.threaded && relation?.rel_type === 'm.thread' && relation.is_falling_back === true) return undefined;
   const eventId = event.getContent()['m.relates_to']?.['m.in_reply_to']?.event_id ?? event.replyEventId;
   if (typeof eventId !== 'string') return undefined;
   const original = context.eventById(eventId);

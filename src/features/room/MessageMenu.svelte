@@ -36,6 +36,10 @@
   });
 
   const text = $derived(message && 'body' in message.kind ? message.kind.body : '');
+  /** Пожаловаться можно на чужое и ушедшее: жалоба указывает на событие. */
+  const reportable = $derived(!!message && !message.own && !!message.eventId);
+  /** Точно, с датой и секундами: время у пузыря — только часы, а здесь — всё остальное. */
+  const exactly = (ts: number) => new Intl.DateTimeFormat(i18n.locale, { dateStyle: 'medium', timeStyle: 'medium' }).format(ts);
   /** Опрос, который ещё идёт и уже ушёл: в нём можно отозвать голос, а автору — закрыть. */
   const openPoll = $derived(message?.kind.type === 'poll' && !message.kind.poll.ended && !!message.eventId ? message.kind.poll : null);
 
@@ -64,6 +68,10 @@
 <Menu open={!!current} x={at.x} y={at.y} {sheet} label={t('message.menu.more')} {onclose}>
   {#if message && picking}
     <EmojiPanel {mine} recent={preferences.recentEmoji} onpick={react} />
+  {:else if message && message.kind.type === 'deleted'}
+    <!-- Удалённое: действий нет, а когда отправили и когда удалили — спрашивают именно у него. -->
+    <p class="fact">{t('message.menu.sentAt', { time: exactly(message.ts) })}</p>
+    {#if message.kind.at}<p class="fact">{t('message.menu.deletedAt', { time: exactly(message.kind.at) })}</p>{/if}
   {:else if message}
     <div class="reactions" role="group" aria-label={t('message.menu.addReaction')}>
       {#each quickReactions as emoji (emoji)}
@@ -93,6 +101,7 @@
         <svg viewBox={ICON_VIEWBOX} aria-hidden="true"><path d={icons.plus} /></svg>
       </button>
     </div>
+    <!-- Группы, как в нативной: что делают с сообщением — красное, необратимое, — и факты. Между ними черта. -->
     {#if actions.showsReactors && reactionCount > 0}
       <!-- Первым: кто что поставил — единственный вопрос, на который пилюля с числом не отвечает. -->
       <button type="button" role="menuitem" onclick={() => run(actions.reactors)}>{plural('message.menu.reactors', reactionCount)}</button>
@@ -100,18 +109,10 @@
     {#if actions.canReply}
       <button type="button" role="menuitem" onclick={() => run(actions.reply)}>{t('message.menu.reply')}</button>
     {/if}
-    {#if actions.openThread && actions.canReply && message.eventId && !message.threadRootId && message.kind.type !== 'deleted'}
+    {#if actions.openThread && actions.canReply && message.eventId && !message.threadRootId}
       <!-- В треде, а не в чате: тот же тред, что открывает строка под сообщением; нет его — начнётся. -->
       {@const open = actions.openThread}
       <button type="button" role="menuitem" onclick={() => run(open)}>{t('thread.replyInThread')}</button>
-    {/if}
-    {#if openPoll && openPoll.mine.length > 0}
-      <!-- Пустой ответ — голоса нет (MSC3381). -->
-      <button type="button" role="menuitem" onclick={() => run((m) => actions.vote(m, []))}>{t('poll.retract')}</button>
-    {/if}
-    {#if openPoll && message.own}
-      <!-- Закрыть может только автор: конец от другого комната не признаёт. -->
-      <button type="button" role="menuitem" onclick={() => run(actions.endPoll)}>{t('poll.end')}</button>
     {/if}
     {#if message.canEdit}
       <button type="button" role="menuitem" onclick={() => run(actions.edit)}>{t('message.menu.edit')}</button>
@@ -126,7 +127,7 @@
     {/if}
     {#if actions.stickerIsMine(message) !== undefined}
       <!-- Свой набор пополняется ссылкой: картинка уже на сервере, загружать нечего. -->
-      <button type="button" role="menuitem" class:danger={actions.stickerIsMine(message)} onclick={() => run(actions.toggleSticker)}>
+      <button type="button" role="menuitem" onclick={() => run(actions.toggleSticker)}>
         {actions.stickerIsMine(message) ? t('stickers.remove') : t('stickers.add')}
       </button>
     {/if}
@@ -141,18 +142,30 @@
       <!-- Несколько сразу: скопировать одним куском, удалить пачку ошибок. -->
       <button type="button" role="menuitem" onclick={() => run(actions.select)}>{t('message.menu.select')}</button>
     {/if}
-    {#if message.canDelete}
-      <button type="button" role="menuitem" class="danger" onclick={() => run(actions.remove)}>{t('message.menu.delete')}</button>
+    {#if openPoll && openPoll.mine.length > 0}
+      <!-- Пустой ответ — голоса нет (MSC3381). -->
+      <button type="button" role="menuitem" onclick={() => run((m) => actions.vote(m, []))}>{t('poll.retract')}</button>
     {/if}
-    {#if !message.own && message.eventId && message.kind.type !== 'deleted'}
-      <!-- Чужое, ушедшее, не удалённое: жалоба указывает на событие на сервере. -->
-      <button type="button" role="menuitem" class="danger" onclick={() => run(actions.report)}>{t('message.menu.report')}</button>
+    {#if openPoll && message.own}
+      <!-- Закрыть может только автор: конец от другого комната не признаёт. -->
+      <button type="button" role="menuitem" onclick={() => run(actions.endPoll)}>{t('poll.end')}</button>
+    {/if}
+    {#if message.canDelete || reportable}
+      <div class="rule" role="separator"></div>
+      {#if message.canDelete}
+        <button type="button" role="menuitem" class="danger" onclick={() => run(actions.remove)}>{t('message.menu.delete')}</button>
+      {/if}
+      {#if reportable}
+        <!-- Чужое, ушедшее: жалоба указывает на событие на сервере. -->
+        <button type="button" role="menuitem" class="danger" onclick={() => run(actions.report)}>{t('message.menu.report')}</button>
+      {/if}
     {/if}
     {#if !message.own}
       <button type="button" role="menuitem" class="danger" onclick={() => run(actions.block)}>{t('message.menu.block')}</button>
     {/if}
     <!-- Точно, с датой и секундами: время у пузыря — только часы, а здесь — всё остальное. -->
-    <p class="sent">{t('message.menu.sentAt', { time: new Intl.DateTimeFormat(i18n.locale, { dateStyle: 'medium', timeStyle: 'medium' }).format(message.ts) })}</p>
+    <div class="rule" role="separator"></div>
+    <p class="fact">{t('message.menu.sentAt', { time: exactly(message.ts) })}</p>
   {/if}
 </Menu>
 
@@ -183,10 +196,13 @@
   .reactions button.mine {
     background: var(--color-own-reaction);
   }
-  .sent {
-    margin: var(--space-tight) 0 0;
-    padding: var(--space-tight) var(--space-normal) 0;
+  .rule {
+    margin-block: var(--space-tight);
     border-block-start: var(--border-hairline) solid var(--color-separator);
+  }
+  .fact {
+    margin: 0;
+    padding: var(--space-tight) var(--space-normal) 0;
     font-size: var(--font-size-caption);
     color: var(--color-text-secondary);
   }

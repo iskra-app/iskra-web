@@ -54,6 +54,11 @@
   /* QR-код — чёрным по белому в любой теме: камера читает тёмное на светлом (`QRCodeImage` нативной). */
   --color-qr-ground: #ffffff;
   --color-qr-ink: #000000;
+  /* AnswerStyle — два ответа на вопрос приглашения: да зелёным, нет красным, белым по ним в обеих
+     темах. Глубже системных: белое на них держит 4,5:1. */
+  --color-answer-yes: rgb(28 125 56);
+  --color-answer-no: rgb(196 38 28);
+  --color-on-answer: #ffffff;
 
   /* Theme.Size */
   --size-avatar: 2.5rem; /* 40 */
