@@ -22,6 +22,7 @@ import {
 } from '../storage/persistence';
 import { vault, type Account, type AccountSecrets, type NewAccount } from '../storage/vault';
 import { errorDetail } from '../support/errorDetail';
+import { isWasmMimeError, refreshWasm } from '../support/wasmCache';
 import { SessionLock } from './lock';
 import { wallpaperPhoto } from '../storage/wallpaper';
 import { UserSession, wipeUserData } from './userSession.svelte.ts';
@@ -158,6 +159,9 @@ export class AppState {
       // следующая попытка может пройти, а удалить ключи — необратимо.
       // Загрузку WASM SDK запоминает вместе с неудачей и в этой вкладке не повторит —
       // значит, один раз перезагружаем страницу (не больше: вечного цикла быть не должно).
+      // Если причина — испорченный кеш WASM (сервер когда-то отдал его с чужим типом), сперва
+      // заменяем запись: иначе перезагрузка возьмёт из кеша то же самое.
+      if (isWasmMimeError(failure) && !hasReloaded()) await refreshWasm();
       if (reloadOnce()) return;
       this.releaseLock();
       this.phase = { name: 'signed-out', problem: 'storageUnavailable', detail: errorDetail(failure) };
@@ -254,6 +258,14 @@ export class AppState {
 const START_ATTEMPTS = 2;
 const START_RETRY_DELAY_MS = 1000;
 const RELOAD_MARK = 'iskra-start-reloaded';
+
+function hasReloaded(): boolean {
+  try {
+    return !!sessionStorage.getItem(RELOAD_MARK);
+  } catch {
+    return true;
+  }
+}
 
 /** Перезагружает страницу, если ещё не перезагружали после сбоя. `true` — перезагрузка пошла. */
 function reloadOnce(): boolean {
