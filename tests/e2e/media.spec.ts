@@ -171,8 +171,12 @@ async function sendAndDownload(page: Page, jpeg: Buffer, caption: string): Promi
   await page.getByRole('button', { name: 'Отправить' }).click();
   const sent = page.getByRole('log').getByRole('article').filter({ hasText: caption });
   await expect(sent.getByRole('button', { name: 'Фото' }).locator('img')).toHaveAttribute('src', /^blob:/, { timeout: 20_000 });
-  await sent.getByRole('button', { name: 'Фото' }).click();
   const viewer = page.getByRole('dialog', { name: 'Фото' });
+  // Пузырь перерисовывается, когда эхо заменяется событием сервера: клик, попавший до этого, пропадает (Gecko).
+  await expect(async () => {
+    await sent.getByRole('button', { name: 'Фото' }).click();
+    await expect(viewer).toBeVisible({ timeout: 2_000 });
+  }).toPass({ timeout: 15_000 });
   const download = page.waitForEvent('download');
   await viewer.getByRole('button', { name: 'Сохранить' }).click();
   const file = await download;
