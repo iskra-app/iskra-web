@@ -11,7 +11,15 @@ export type SettingsSection = (typeof settingsSections)[number];
 /** Прежние адреса: устройства и заблокированные переехали в «Безопасность». */
 const movedSections: Record<string, SettingsSection> = { devices: 'security', blocked: 'security' };
 
-export type Route = { name: 'home' } | { name: 'room'; roomId: string } | { name: 'settings'; section?: SettingsSection };
+export type Route =
+  | { name: 'home' }
+  | { name: 'room'; roomId: string }
+  | { name: 'settings'; section?: SettingsSection }
+  /**
+   * Чужая ссылка — `s.iskra.wtf/<id>` ведёт сюда: `#/open/<id>?via=…`. Человек, адрес
+   * или ID комнаты; что с ним делать — спрашивает оболочка, когда сессия готова.
+   */
+  | { name: 'open'; target: string; via?: string[] };
 
 export function parseRoute(hash: string): Route {
   const path = hash.replace(/^#/, '');
@@ -22,6 +30,18 @@ export function parseRoute(hash: string): Route {
       if (isRoomId(roomId)) return { name: 'room', roomId };
     } catch {
       // Битая percent-кодировка — это просто неизвестный адрес.
+    }
+  }
+  const open = /^\/open\/([^/?#]+)(?:\?([^#]*))?$/.exec(path);
+  if (open?.[1]) {
+    try {
+      const target = decodeURIComponent(open[1]);
+      if (isOpenTarget(target)) {
+        const via = new URLSearchParams(open[2] ?? '').getAll('via').filter(isServerName);
+        return via.length ? { name: 'open', target, via } : { name: 'open', target };
+      }
+    } catch {
+      // Битая percent-кодировка — неизвестный адрес.
     }
   }
   const settings = /^\/settings(?:\/([a-z]+))?$/.exec(path);
@@ -41,10 +61,24 @@ export function formatRoute(route: Route): string {
       return `#/room/${encodeURIComponent(route.roomId)}`;
     case 'settings':
       return route.section ? `#/settings/${route.section}` : '#/settings';
+    case 'open': {
+      const via = (route.via ?? []).map((server) => `via=${encodeURIComponent(server)}`).join('&');
+      return `#/open/${encodeURIComponent(route.target)}${via ? `?${via}` : ''}`;
+    }
   }
 }
 
 /** `!opaque:server` — и больше ничего: ни пробелов, ни управляющих символов. */
 export function isRoomId(value: string): boolean {
   return /^![^\s:/]+:[^\s/]+$/.test(value);
+}
+
+/** Кого или что открывает ссылка: `@local:server`, `#alias:server` или `!id:server`. */
+export function isOpenTarget(value: string): boolean {
+  return /^[@#!][^\s:/]+:[^\s/]+$/.test(value);
+}
+
+/** Имя сервера в `via` — хост с портом, без пути и пробелов. */
+export function isServerName(value: string): boolean {
+  return /^[^\s/?#@]+$/.test(value);
 }

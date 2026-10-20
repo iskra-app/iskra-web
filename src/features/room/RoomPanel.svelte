@@ -12,6 +12,7 @@
   import Menu from '../../design/Menu.svelte';
   import ProblemPanel from '../../design/ProblemPanel.svelte';
   import { router } from '../../core/navigation/router.svelte.ts';
+  import { shareLink } from '../../core/navigation/links';
   import { RoomDetailsStore, type MemberSummary, type RoomRole } from '../../core/rooms/roomDetails.svelte.ts';
   import type { RoomAlerts } from '../../core/rooms/pushRules';
   import type { UserSession } from '../../core/session/userSession.svelte.ts';
@@ -205,10 +206,10 @@
    */
   const link = $derived.by(() => {
     if (!details) return undefined;
-    if (counterpart) return `https://matrix.to/#/${encodeURIComponent(counterpart.id)}`;
+    if (counterpart) return shareLink(counterpart.id);
     if (!details.open) return undefined;
     const server = details.roomId.split(':').slice(1).join(':');
-    return `https://matrix.to/#/${encodeURIComponent(details.roomId)}${server ? `?via=${encodeURIComponent(server)}` : ''}`;
+    return shareLink(details.roomId, server ? [server] : []);
   });
   let linkCopied = $state(false);
   /** QR-код собеседника или открытой комнаты — с той же ссылкой, что «Поделиться». */

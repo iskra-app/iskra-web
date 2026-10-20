@@ -40,6 +40,12 @@ describe('formatted_body через DOMPurify', () => {
     expect(host.querySelector('.mention')?.textContent).toBe('Алиса');
   });
 
+  it('ссылка s.iskra.wtf на человека — тоже имя; на комнату — ссылка', () => {
+    const host = render('<a href="https://s.iskra.wtf/@alice:x"></a> <a href="https://s.iskra.wtf/%23room:x">комната</a>');
+    expect(host.querySelector('.mention')?.textContent).toBe('@alice:x');
+    expect(host.querySelectorAll('a')).toHaveLength(1);
+  });
+
   it('стили и цвета не проходят: CSP их всё равно не пустит, а контраст — наш', () => {
     const host = render('<span style="color:red" data-mx-color="#f00">текст</span><font color="red">ещё</font>');
     expect(host.innerHTML).not.toContain('style');

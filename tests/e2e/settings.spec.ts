@@ -36,7 +36,7 @@ test('«О чате» в личном чате: ID собеседника, «П�
   if (!isPhone(info.project.name) && info.project.name.startsWith('chromium')) {
     await panel.getByRole('button', { name: 'Поделиться' }).click();
     await expect(panel.getByRole('status')).toHaveText('Ссылка скопирована');
-    expect(await page.evaluate(() => navigator.clipboard.readText())).toBe('https://matrix.to/#/%40anya%3Ademo.iskra.invalid');
+    expect(await page.evaluate(() => navigator.clipboard.readText())).toBe('https://s.iskra.wtf/@anya:demo.iskra.invalid');
   } else {
     await expect(panel.getByRole('button', { name: 'Поделиться' })).toBeVisible();
   }

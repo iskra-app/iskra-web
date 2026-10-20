@@ -36,15 +36,22 @@ const ENCRYPTION = { type: EventType.RoomEncryption, state_key: '', content: { a
 
 export const isMatrixId = (value: string): boolean => /^@[^:\s]+:[^\s]+$/.test(value.trim());
 
-/** Личный чат с человеком. Уже есть — тот же, а не второй. */
-export async function createDirect(client: MatrixClient, userId: string): Promise<string> {
-  const id = userId.trim();
-  const direct = (client.getAccountData(EventType.Direct)?.getContent() ?? {}) as Record<string, string[]>;
-  const existing = (direct[id] ?? []).find((roomId) => {
+const directMap = (client: MatrixClient) => (client.getAccountData(EventType.Direct)?.getContent() ?? {}) as Record<string, string[]>;
+
+/** Личный чат с человеком, если он уже есть: вошли или приглашены. */
+export function existingDirect(client: MatrixClient, userId: string): string | undefined {
+  return (directMap(client)[userId.trim()] ?? []).find((roomId) => {
     const membership = client.getRoom(roomId)?.getMyMembership();
     return membership === 'join' || membership === 'invite';
   });
+}
+
+/** Личный чат с человеком. Уже есть — тот же, а не второй. */
+export async function createDirect(client: MatrixClient, userId: string): Promise<string> {
+  const id = userId.trim();
+  const existing = existingDirect(client, id);
   if (existing) return existing;
+  const direct = directMap(client);
   const { room_id: roomId } = await client.createRoom({
     is_direct: true,
     invite: [id],

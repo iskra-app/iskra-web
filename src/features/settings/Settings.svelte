@@ -19,6 +19,7 @@
   import type { IconName } from '../../design/icons.ts';
   import { formatRoute, type SettingsSection } from '../../core/navigation/route';
   import { router } from '../../core/navigation/router.svelte.ts';
+  import { shareLink } from '../../core/navigation/links';
   import type { AccountSwitch, DefaultAlerts } from '../../core/rooms/pushRules';
   import { app } from '../../core/session/app.svelte.ts';
   import type { UserSession } from '../../core/session/userSession.svelte.ts';
@@ -274,7 +275,7 @@
     </div>
     <QrCodeDialog
       open={showingCode}
-      link={`https://matrix.to/#/${encodeURIComponent(me.id)}`}
+      link={shareLink(me.id)}
       name={me.name}
       subtitle={me.id}
       seed={me.id}

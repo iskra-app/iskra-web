@@ -27,8 +27,8 @@ import { sendAttachment, uploadClientFor, type OutgoingFile } from '../media/upl
 import { ThumbnailCache } from '../media/thumbnails';
 import { RoomListStore } from '../rooms/roomListStore.svelte.ts';
 import { RoomDetailsStore } from '../rooms/roomDetails.svelte.ts';
-import { createDirect, createGroup } from '../rooms/create';
-import { joinByAddress, PublicRoomDirectory, searchPeople, type Person } from '../rooms/directory.svelte.ts';
+import { createDirect, createGroup, existingDirect } from '../rooms/create';
+import { joinByAddress, joinedRoom, profileOf, PublicRoomDirectory, searchPeople, type Person } from '../rooms/directory.svelte.ts';
 import { TimelineStore } from '../timeline/timelineStore.svelte.ts';
 import { canForward, forwardContent } from '../timeline/forward';
 import type { Message } from '../timeline/message';
@@ -299,9 +299,19 @@ export class UserSession {
     return new PublicRoomDirectory(this.client);
   }
 
-  /** Войти в комнату по адресу или ID — или из каталога. */
-  joinRoom(address: string): Promise<string> {
-    return joinByAddress(this.client, address);
+  /** Войти в комнату по адресу или ID — или из каталога; `via` — для ID из чужой ссылки. */
+  joinRoom(address: string, via: string[] = []): Promise<string> {
+    return joinByAddress(this.client, address, via);
+  }
+
+  /** Куда ссылка ведёт без вопроса: личный чат с человеком уже есть, в комнате уже состоим. */
+  existingRoomFor(target: string): string | undefined {
+    return target.startsWith('@') ? existingDirect(this.client, target) : joinedRoom(this.client, target);
+  }
+
+  /** Имя и фото человека — для вопроса «Написать …?». */
+  profileOf(userId: string): Promise<Person> {
+    return profileOf(this.client, userId);
   }
 
   // ————— Профиль, устройства, аккаунт —————

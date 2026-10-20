@@ -3,6 +3,7 @@
   уровня приложения и число непрочитанных в заголовке вкладки. Лента — этап 4.
 -->
 <script lang="ts">
+  import { untrack } from 'svelte';
   import Columns from '../../design/Columns.svelte';
   import Bar from '../../design/Bar.svelte';
   import SparkGlyph from '../../design/SparkGlyph.svelte';
@@ -31,6 +32,7 @@
   import RoomView from '../room/RoomView.svelte';
   import HotkeyHelp from './HotkeyHelp.svelte';
   import NewChatDialog from '../rooms/NewChatDialog.svelte';
+  import OpenLinkDialog from './OpenLinkDialog.svelte';
   import Settings from '../settings/Settings.svelte';
   import { settingsParent, settingsTitles } from '../settings/sections';
   import RoomPanel from '../room/RoomPanel.svelte';
@@ -90,6 +92,35 @@
     if (room.kind === 'direct') return (presence?.presence && presenceLabel(presence.presence, Date.now(), i18n.locale)) || room.counterpartId;
     return room.memberCount > 0 ? plural('room.members', room.memberCount) : undefined;
   });
+
+  /**
+   * Чужая ссылка (`#/open/…`) — когда сессия готова: раньше список чатов ещё не знает, где мы
+   * уже состоим. Свой чат с человеком и своя комната открываются сразу; остальное — вопросом.
+   */
+  let link = $state<{ target: string; via?: string[] | undefined } | null>(null);
+  let askingLink = $state(false);
+  $effect(() => {
+    const route = router.route;
+    // Ушли со ссылки сами («назад», другой чат) — и вопрос уходит.
+    if (route.name !== 'open') askingLink = false;
+    if (route.name !== 'open' || !session.ready) return;
+    untrack(() => {
+      const existing = session.existingRoomFor(route.target);
+      if (route.target === session.userId) router.replace({ name: 'home' });
+      else if (existing) router.replace({ name: 'room', roomId: existing });
+      else {
+        link = { target: route.target, via: route.via };
+        askingLink = true;
+      }
+    });
+  });
+
+  /** Открыли чат или отказались. Окно закрывается и событием `close` — второй раз ничего не делаем. */
+  function closeLink(roomId?: string) {
+    if (!askingLink) return;
+    askingLink = false;
+    router.replace(roomId ? { name: 'room', roomId } : { name: 'home' });
+  }
 
   $effect(() => {
     showBadge(session.rooms.badge, t('app.name'));
@@ -305,6 +336,9 @@
 <QuickSwitcher {session} open={switching} onclose={() => (switching = false)} />
 <HotkeyHelp open={helping} onclose={() => (helping = false)} />
 <NewChatDialog open={creating} {session} onclose={() => (creating = false)} />
+{#if link}
+  <OpenLinkDialog open={askingLink} {session} target={link.target} via={link.via} onopen={closeLink} onclose={() => closeLink()} />
+{/if}
 
 <ConfirmDialog
   open={confirmingSignOut}
