@@ -7,6 +7,7 @@
   нужно знать, когда исключить не вышло.
 -->
 <script lang="ts">
+  import { untrack } from 'svelte';
   import ConfirmDialog from '../../design/ConfirmDialog.svelte';
   import Menu from '../../design/Menu.svelte';
   import ProblemPanel from '../../design/ProblemPanel.svelte';
@@ -15,6 +16,7 @@
   import type { RoomAlerts } from '../../core/rooms/pushRules';
   import type { UserSession } from '../../core/session/userSession.svelte.ts';
   import { i18n, plural, t, type TextKey } from '../../i18n/index.svelte.ts';
+  import { roomFailureText } from './text';
   import { preferences } from '../app/preferences.svelte.ts';
   import Avatar from '../../design/Avatar.svelte';
   import RoomFace from '../rooms/RoomFace.svelte';
@@ -45,7 +47,11 @@
 
   let details = $state<RoomDetailsStore>();
   $effect(() => {
-    const store = session.roomDetails(roomId);
+    // Только от `roomId`: конструктор читает список чатов (личный ли), и без `untrack` любое его
+    // изменение — новое сообщение, эхо смены истории — пересоздавало бы стор, теряя ответ сервера
+    // и незаконченное действие.
+    const id = roomId;
+    const store = untrack(() => session.roomDetails(id));
     details = store;
     return () => store.destroy();
   });
@@ -289,7 +295,7 @@
 
     {#if details.failure}
       <div class="failure">
-        <ProblemPanel message={t(`roomAction.${details.failure}Failed` as TextKey)} />
+        <ProblemPanel message={roomFailureText(details.failure)} />
       </div>
     {/if}
 

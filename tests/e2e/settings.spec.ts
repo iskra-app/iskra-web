@@ -560,3 +560,50 @@ test('«Конфиденциальность»: скрыть время захо
   await expect(presence).toBeChecked();
   await expect(typing).toBeChecked();
 });
+
+test('своя комната: история для новых, адрес (занятый — так и сказано), каталог; заблокированного — обратно', async ({ page }) => {
+  await signInToDemo(page);
+  await openRoom(page, /^Длинная история/);
+  const panel = await openPanel(page);
+  const openEdit = async () => {
+    await panel.getByRole('button', { name: 'Изменить' }).click();
+    const dialog = page.getByRole('dialog', { name: 'Изменить чат' });
+    await expect(dialog).toBeVisible();
+    return dialog;
+  };
+
+  let edit = await openEdit();
+  await expect(edit.getByRole('radio', { name: 'Вся история' })).toBeChecked();
+  // Закрытая комната: «всем, даже без вступления» не предлагается.
+  await expect(edit.getByRole('radio', { name: 'Всем, даже без вступления' })).toHaveCount(0);
+  await edit.getByRole('radio', { name: 'С момента вступления' }).check();
+  const address = edit.getByRole('textbox', { name: 'Адрес' });
+  await address.fill('lounge');
+  await edit.getByRole('button', { name: 'Сохранить' }).click();
+  await expect(edit.getByRole('alert')).toHaveText('Этот адрес уже занят. Попробуйте другой.');
+  await address.fill('Длинная История');
+  await expect(edit).toContainText('#длинная-история:demo.iskra.invalid');
+  await edit.getByRole('button', { name: 'Сохранить' }).click();
+  await expect(edit).toBeHidden({ timeout: 10_000 });
+
+  edit = await openEdit();
+  await expect(edit.getByRole('radio', { name: 'С момента вступления' })).toBeChecked();
+  await expect(address).toHaveValue('длинная-история');
+  // Открыли для всех — появились каталог и четвёртый вариант истории.
+  await edit.getByRole('switch', { name: /^Открытый чат/ }).check();
+  await expect(edit.getByRole('radio', { name: 'Всем, даже без вступления' })).toBeVisible();
+  await edit.getByRole('switch', { name: /Показывать в каталоге сервера/ }).check();
+  await edit.getByRole('button', { name: 'Сохранить' }).click();
+  await expect(edit).toBeHidden({ timeout: 10_000 });
+
+  // Заблокировать Веру — и пустить обратно из настроек.
+  await panel.getByRole('button', { name: /^Вера/ }).click();
+  await page.getByRole('menuitem', { name: 'Заблокировать' }).click();
+  await page.getByRole('dialog').getByRole('button', { name: 'Заблокировать' }).click();
+  await expect(panel.getByRole('button', { name: /^Вера/ })).toHaveCount(0, { timeout: 10_000 });
+  edit = await openEdit();
+  await edit.getByRole('button', { name: 'Разблокировать' }).click();
+  const question = page.getByRole('dialog', { name: 'Разблокировать Вера?' });
+  await question.getByRole('button', { name: 'Разблокировать' }).click();
+  await expect(edit.getByRole('button', { name: 'Разблокировать' })).toHaveCount(0, { timeout: 10_000 });
+});

@@ -48,7 +48,7 @@ describe('«О чате» на демо-сервере', () => {
     await until(() => store!.members.length === 3);
     expect(store.permissions).toEqual({
       canRename: true, canChangeTopic: true, canChangePicture: true, canChangeVisibility: true,
-      canInvite: true, canRemove: true, canBan: true, canChangeRoles: true,
+      canInvite: true, canRemove: true, canBan: true, canChangeRoles: true, canChangeHistory: true, canChangeAddress: true,
     });
     expect(store.members.map((m) => [m.name, m.role])).toEqual([['Алиса', 'administrator'], ['Борис', 'member'], ['Вера', 'member']]);
     const boris = store.members.find((m) => m.name === 'Борис')!;
@@ -61,7 +61,7 @@ describe('«О чате» на демо-сервере', () => {
     store = new RoomDetailsStore(client, demoRooms.weekend, directOf(client));
     await until(() => store!.members.length === 3);
     // Приглашать по умолчанию может любой участник (`invite: 0`) — остальное закрыто.
-    expect(store.permissions).toMatchObject({ canRename: false, canRemove: false, canBan: false, canChangeRoles: false, canInvite: true });
+    expect(store.permissions).toMatchObject({ canRename: false, canRemove: false, canBan: false, canChangeRoles: false, canChangeHistory: false, canChangeAddress: false, canInvite: true });
     expect(store.members[0]).toMatchObject({ name: 'Борис', role: 'administrator' });
     expect(store.mayRemove(store.members[0]!)).toBe(false);
     expect(store.rolesFor(store.members.find((m) => m.name === 'Вера')!)).toEqual([]);
@@ -136,5 +136,29 @@ describe('«О чате» на демо-сервере', () => {
     expect(client.getRoom(open)!.hasEncryptionStateEvent()).toBe(false);
     expect(client.getRoom(open)!.getJoinRule()).toBe('public');
     expect(client.getRoom(closed)!.name).toBe('Книги');
+  });
+});
+
+describe('доступ к комнате', () => {
+  it('адрес: занятый — «занят», свой — в состоянии комнаты; история и каталог', async () => {
+    const { client } = await started();
+    store = new RoomDetailsStore(client, demoRooms.history, directOf(client));
+    expect(store.permissions.canChangeAddress).toBe(true);
+    // Как окно: сначала история, потом адрес — эхо истории не должно стереть ответ про адрес.
+    expect(await store.setHistory('invited')).toBe(true);
+    expect(await store.setAddress('lounge')).toBe(false);
+    expect(store.failure).toBe('addressTaken');
+    await new Promise((r) => setTimeout(r, 300));
+    expect(store.failure).toBe('addressTaken');
+    expect(await store.setAddress('Длинная История')).toBe(true);
+    await until(() => store!.alias === '#длинная-история:demo.iskra.invalid');
+    expect(store.addressName).toBe('длинная-история');
+    expect(await store.setHistory('joined')).toBe(true);
+    await until(() => (store!.read(), store!.history === 'joined'));
+    await store.loadDirectory();
+    expect(store.inDirectory).toBe(false);
+    expect(await store.setInDirectory(true)).toBe(true);
+    await store.loadDirectory();
+    expect(store.inDirectory).toBe(true);
   });
 });

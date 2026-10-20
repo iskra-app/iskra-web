@@ -11,6 +11,7 @@
 -->
 <script lang="ts">
   import EmptyState from '../../design/EmptyState.svelte';
+  import ConfirmDialog from '../../design/ConfirmDialog.svelte';
   import ProblemPanel from '../../design/ProblemPanel.svelte';
   import IconButton from '../../design/IconButton.svelte';
   import Icon from '../../design/Icon.svelte';
@@ -89,6 +90,14 @@
   let choosingFolders = $state<RoomSummary | null>(null);
 
   let peeking = $state<RoomSummary | null>(null);
+  /** Из какого чата выйти — ждёт ответа на вопрос. */
+  let leaving = $state<RoomSummary | null>(null);
+
+  async function leave(room: RoomSummary) {
+    leaving = null;
+    if (!(await session.rooms.leave(room.id))) failure = 'roomAction.leaveFailed';
+    else if (selectedId === room.id) router.go({ name: 'home' });
+  }
 
   /** Подглядеть: меню уступает место карточке. */
   function peekAt(room: RoomSummary) {
@@ -126,6 +135,8 @@
             },
           ]),
       ...(folders.length > 0 ? [{ label: t('folders.addToFolder'), run: act(() => void (choosingFolders = room)) }] : []),
+      // Смахивание «Удалить» нативной: единственное, что не отменить, — поэтому сначала вопрос.
+      { label: t('roomList.swipe.delete'), run: act(() => void (leaving = room)) },
     ];
   }
 
@@ -168,7 +179,9 @@
   {:else if nothingAtAll}
     <EmptyState title={t('roomList.emptyTitle')} message={t('roomList.emptyMessage')} />
   {:else if view.kind === 'space' && shown.length === 0}
-    <EmptyState title={t('room.spaceEmptyTitle')} />
+    <EmptyState title={t('room.spaceEmptyTitle')} message={t('room.spaceEmptyMessage')} />
+  {:else if view.kind === 'archive' && shown.length === 0}
+    <EmptyState title={t('roomList.archive.emptyTitle')} message={t('roomList.archive.emptyMessageWeb')} />
   {:else if folder && shown.length === 0}
     <EmptyState title={t('folders.emptyTitle')} message={t('folders.emptyMessage')} />
   {:else}
@@ -215,6 +228,17 @@
 </Menu>
 
 <ChatPeek room={peeking} {session} actions={peeking ? rowActions(peeking) : []} onclose={() => (peeking = null)} />
+
+<ConfirmDialog
+  open={!!leaving}
+  title={t('roomList.swipe.leaveConfirmTitle')}
+  message={t('roomList.swipe.leaveConfirmMessage')}
+  confirmLabel={t('roomList.swipe.leaveConfirm')}
+  cancelLabel={t('roomList.swipe.cancel')}
+  destructive
+  onclose={() => (leaving = null)}
+  onconfirm={() => leaving && void leave(leaving)}
+/>
 
 <FolderMembership room={choosingFolders} {session} onclose={() => (choosingFolders = null)} />
 

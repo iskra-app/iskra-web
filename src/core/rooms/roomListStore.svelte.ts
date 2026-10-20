@@ -232,6 +232,11 @@ export class RoomListStore {
     await this.client.joinRoom(roomId);
   }
 
+  /** «Удалить» из меню строки: выйти из комнаты. Удалить её целиком в Matrix нельзя. */
+  leave(roomId: string): Promise<boolean> {
+    return this.act(() => this.client.leave(roomId));
+  }
+
   /** «Отклонить» приглашение. */
   async decline(roomId: string): Promise<void> {
     await this.client.leave(roomId);

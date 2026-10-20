@@ -27,6 +27,11 @@ export interface MessageActions {
   discard(key: string): void;
   /** Просмотрщик — с этого фото или видео. */
   openMedia(message: Message): void;
+  /** «N реакций» — кто что поставил. Только в группе: в личном пилюля и так говорит, кто. */
+  showsReactors: boolean;
+  reactors(message: Message): void;
+  /** «Пожаловаться» — окно с необязательной причиной. */
+  report(message: Message): void;
   /** Меню: у точки — для мыши, листом — для пальца. */
   openMenu(message: Message, at: { x: number; y: number }, sheet: boolean): void;
 }

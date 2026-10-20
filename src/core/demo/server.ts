@@ -86,6 +86,10 @@ export class DemoHomeserver {
   private readonly storage: DemoStorage | undefined;
   /** Данные аккаунта, изменённые с прошлой синхронизации. */
   private pendingAccountData: Array<{ type: string; content: unknown }> = [];
+  /** Адреса, занятые в демо: адрес → комната. Каталожные (`demoDirectory`) заняты тоже. */
+  private readonly aliases = new Map<string, string>();
+  /** Комнаты Алисы, выставленные в каталог сервера. */
+  private readonly listed = new Set<string>();
   /** Чьи ключи сменились с прошлой синхронизации — `device_lists.changed`. */
   private pendingKeyChanges: string[] = [];
   /** Что отдать следующей синхронизацией: вход по приглашению, выход, отметки о прочтении. */
@@ -134,6 +138,12 @@ export class DemoHomeserver {
       ['POST', re(`${c}/v3/rooms/([^/]+)/invite`), (r) => this.membership(r, 'invite')],
       ['POST', re(`${c}/v3/rooms/([^/]+)/kick`), (r) => this.membership(r, 'leave')],
       ['POST', re(`${c}/v3/rooms/([^/]+)/ban`), (r) => this.membership(r, 'ban')],
+      // Разблокировать — запрет снят, а сам человек не вернулся: `leave`.
+      ['POST', re(`${c}/v3/rooms/([^/]+)/unban`), (r) => this.membership(r, 'leave')],
+      ['PUT', re(`${c}/v3/directory/room/([^/]+)`), (r) => this.claimAlias(r)],
+      ['DELETE', re(`${c}/v3/directory/room/([^/]+)`), (r) => this.releaseAlias(r)],
+      ['GET', re(`${c}/v3/directory/list/room/([^/]+)`), (r) => json(200, { visibility: this.listed.has(decodeURIComponent(r.params[0]!)) ? 'public' : 'private' })],
+      ['PUT', re(`${c}/v3/directory/list/room/([^/]+)`), (r) => this.setListed(r)],
       ['PUT', re(`${c}/v3/profile/([^/]+)/(displayname|avatar_url)`), (r) => this.putProfile(r)],
       ['GET', re(`${c}/v3/devices`), () => this.devices()],
       ['POST', re(`${c}/v3/user/([^/]+)/filter`), (r) => this.createFilter(r)],
@@ -164,6 +174,8 @@ export class DemoHomeserver {
       ['GET', re(`${c}/v3/voip/turnServer`), () => json(200, {})],
       ['PUT', re(`${c}/v3/presence/([^/]+)/status`), () => json(200, {})],
       ['GET', re(`${c}/v3/presence/([^/]+)/status`), (r) => this.presenceOf(r)],
+      // Жалоба уходит модераторам сервера — у демо их нет, но принять её он должен.
+      ['POST', re(`${c}/v3/rooms/([^/]+)/report/([^/]+)`), () => json(200, {})],
       // Звонков (MatrixRTC) в демо нет — и SDK это спрашивает на старте.
       ['GET', re(`${c}/unstable/org.matrix.msc4143/rtc/transports`), () => unrecognized()],
       ['GET', re(`${c}/v1/rtc/transports`), () => unrecognized()],
@@ -781,6 +793,12 @@ export class DemoHomeserver {
   /** Событие Алисы — в историю и в следующую синхронизацию, с её `transaction_id`. */
   private append(roomId: string, event: DemoEvent, txnId?: string): void {
     const room = this.rooms.get(roomId)!;
+    if (event.state_key !== undefined) {
+      // Как у настоящего сервера: прежнее состояние — в `unsigned.prev_content`. По нему клиент
+      // знает, как звали заблокированного, — в самом событии блокировки имени нет.
+      const prev = room.state.find((e) => e.type === event.type && e.state_key === event.state_key);
+      if (prev) event = { ...event, unsigned: { ...event.unsigned, prev_content: prev.content } };
+    }
     room.timeline.push(event);
     if (event.state_key !== undefined) {
       room.state = [...room.state.filter((e) => !(e.type === event.type && e.state_key === event.state_key)), event];
@@ -1028,6 +1046,30 @@ export class DemoHomeserver {
   }
 
   /** Пригласить, исключить, заблокировать — событие участия от имени Алисы. */
+  /** Занять адрес: уже чей-то — 409, как у настоящего сервера. */
+  private claimAlias({ params, body }: DemoRequest): Response {
+    const alias = decodeURIComponent(params[0]!);
+    const roomId = (body as { room_id?: string } | undefined)?.room_id;
+    if (!roomId) return json(400, { errcode: 'M_BAD_JSON', error: 'No room_id' });
+    if (this.aliases.has(alias) || demoDirectory.some((room) => room.alias === alias)) {
+      return json(409, { errcode: 'M_UNKNOWN', error: 'Room alias already exists' });
+    }
+    this.aliases.set(alias, roomId);
+    return json(200, {});
+  }
+
+  private releaseAlias({ params }: DemoRequest): Response {
+    this.aliases.delete(decodeURIComponent(params[0]!));
+    return json(200, {});
+  }
+
+  private setListed({ params, body }: DemoRequest): Response {
+    const roomId = decodeURIComponent(params[0]!);
+    if ((body as { visibility?: string } | undefined)?.visibility === 'public') this.listed.add(roomId);
+    else this.listed.delete(roomId);
+    return json(200, {});
+  }
+
   private membership({ params, body }: DemoRequest, membership: 'invite' | 'leave' | 'ban'): Response {
     const room = this.rooms.get(params[0] ?? '');
     if (!room) return json(403, { errcode: 'M_FORBIDDEN', error: 'Not in room' });

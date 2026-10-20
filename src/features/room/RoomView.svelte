@@ -19,13 +19,15 @@
   import Viewer, { type ViewerItem } from '../media/Viewer.svelte';
   import type { Message } from '../../core/timeline/message';
   import type { UserSession } from '../../core/session/userSession.svelte.ts';
-  import type { TimelineStore } from '../../core/timeline/timelineStore.svelte.ts';
+  import type { Reactor, TimelineStore } from '../../core/timeline/timelineStore.svelte.ts';
   import { i18n, t } from '../../i18n/index.svelte.ts';
   import type { ComposerContext, MessageActions } from './actions';
   import Composer from './Composer.svelte';
   import PollComposer from './PollComposer.svelte';
   import SelectionBar from './SelectionBar.svelte';
   import ForwardDialog from './ForwardDialog.svelte';
+  import ReactorsDialog from './ReactorsDialog.svelte';
+  import ReportDialog from './ReportDialog.svelte';
   import { canForward } from '../../core/timeline/forward';
   import { membersOf } from '../../core/timeline/album';
   import { inTimelineOrder, selectionTranscript } from '../../core/timeline/selection';
@@ -65,6 +67,10 @@
   let stashedMentions: ComposerMention[] = [];
   let menu = $state<{ message: Message; at: { x: number; y: number }; sheet: boolean } | null>(null);
   let deleting = $state<Message | null>(null);
+  /** Кто отреагировал — открытое окно; `null` — закрыто. */
+  let reactorsOf = $state<Reactor[] | null>(null);
+  /** На что жалуются; `null` — окно закрыто. */
+  let reporting = $state<Message | null>(null);
   let endingPoll = $state<Message | null>(null);
   let creatingPoll = $state(false);
   /** Выбранные сообщения — ключи, пока выбирают; `null` почти всегда. См. `selection.ts`. */
@@ -392,6 +398,11 @@
     get canReply() {
       return canSend;
     },
+    get showsReactors() {
+      return room?.kind !== 'direct';
+    },
+    reactors: (message) => (reactorsOf = store?.reactors(message) ?? []),
+    report: (message) => (reporting = message),
     get canPin() {
       return !!store?.canPin;
     },
@@ -591,6 +602,10 @@
     selection = null;
   }}
 />
+
+<ReactorsDialog reactors={reactorsOf} {session} onclose={() => (reactorsOf = null)} />
+
+<ReportDialog message={reporting} onreport={(message, reason) => store?.report(message, reason)} onclose={() => (reporting = null)} />
 
 <ForwardDialog open={!!forwarding} {session} onsend={(ids, comment) => void forwardTo(ids, comment)} onclose={() => (forwarding = null)} />
 

@@ -72,6 +72,9 @@
     discard: noop,
     openMedia: noop,
     openMenu: noop,
+    showsReactors: false,
+    reactors: noop,
+    report: noop,
   };
 </script>
 

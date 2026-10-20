@@ -55,7 +55,15 @@ export interface Upload {
 }
 
 /** Что не получилось — ключи текстов нативной Искры (`timeline.*Failed`). */
-export type TimelineFailure = 'reactionFailed' | 'deleteFailed' | 'editFailed' | 'pinFailed' | 'pollFailed';
+export type TimelineFailure = 'reactionFailed' | 'deleteFailed' | 'editFailed' | 'pinFailed' | 'pollFailed' | 'reportFailed';
+
+/** Кто поставил реакцию и какую — `Reactor` нативной. */
+export interface Reactor {
+  userId: string;
+  name: string;
+  avatarUrl?: string;
+  key: string;
+}
 
 const PINNED_EVENTS = 'm.room.pinned_events';
 /** Как долго «печатает» держится без нового нажатия — и как часто его повторять. */
@@ -598,6 +606,37 @@ export class TimelineStore {
     if (!message.canDelete || !message.eventId) return;
     const id = message.eventId;
     this.act('deleteFailed', () => this.client.redactEvent(this.roomId, id));
+  }
+
+  /**
+   * Кто что поставил — по порядку, в каком ставили, без снятых. Для «N реакций» в меню
+   * сообщения в группе: на этот вопрос пилюля с числом не отвечает.
+   */
+  reactors(message: Message): Reactor[] {
+    const room = this.room;
+    if (!room || !message.eventId) return [];
+    const relations = room.relations.getChildEventsForEvent(message.eventId, RelationType.Annotation, EventType.Reaction);
+    const events = [...(relations?.getRelations() ?? [])]
+      .filter((e) => !e.isRedacted() && e.status !== EventStatus.CANCELLED)
+      .sort((a, b) => a.getTs() - b.getTs());
+    return events.flatMap((e) => {
+      const userId = e.getSender();
+      const key = e.getRelation()?.key;
+      if (!userId || !key) return [];
+      const member = room.getMember(userId);
+      const avatarUrl = member?.getMxcAvatarUrl();
+      return [{ userId, name: member?.name ?? userId, ...(avatarUrl ? { avatarUrl } : {}), key }];
+    });
+  }
+
+  /**
+   * Пожаловаться модераторам сервера — не нам: приложение жалобу не разбирает. Причина
+   * необязательна: жалоба без слов — тоже жалоба.
+   */
+  report(message: Message, reason: string): void {
+    const id = message.eventId;
+    if (!id || message.own) return;
+    this.act('reportFailed', () => this.client.reportEvent(this.roomId, id, -100, reason));
   }
 
   pin(message: Message): void {

@@ -1,5 +1,6 @@
 /** Слова ленты: служебные строки, подписи вложений. */
 import type { MessageKind, ServiceEvent } from '../../core/timeline/message';
+import type { RoomActionFailure } from '../../core/rooms/roomDetails.svelte.ts';
 import { plural, t, type TextKey } from '../../i18n/index.svelte.ts';
 
 export function serviceText(event: ServiceEvent): string {
@@ -53,4 +54,9 @@ export function attachmentLabel(kind: MessageKind): string {
     default:
       return '';
   }
+}
+
+/** Что не вышло с чатом — словами нативной. «Адрес занят» у неё без `Failed`: это не сбой, а ответ. */
+export function roomFailureText(failure: RoomActionFailure): string {
+  return failure === 'addressTaken' ? t('roomAction.addressTaken') : t(`roomAction.${failure}Failed`);
 }

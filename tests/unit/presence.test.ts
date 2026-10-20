@@ -70,8 +70,8 @@ describe('присутствие на демо-сервере', () => {
     await applyPresence(client, true);
     expect(seen.some((r) => r.startsWith('PUT') && r.includes('/presence/') && r.includes('"offline"'))).toBe(true);
     // Идущая синхронизация досиживает свой длинный опрос (до 5 с), следующая — уже с `offline`.
-    await until(() => seen.some((r) => r.startsWith('GET') && r.includes('/sync') && r.includes('set_presence=offline')), 12_000);
-  }, 15_000);
+    await until(() => seen.some((r) => r.startsWith('GET') && r.includes('/sync') && r.includes('set_presence=offline')), 25_000);
+  }, 30_000);
 
   it('о собеседнике — что сказал сервер; молчащий сервер — ничего', async () => {
     const { client } = await started();

@@ -383,9 +383,14 @@
         {#if recovery.protection === 'on'}
           <p class="state"><span class="ok" aria-hidden="true">✓</span>{t('encryption.on')}</p>
           <p class="secondary">{t('encryption.onHelp')}</p>
-        {:else}
+        {:else if recovery.protection === 'keyNeeded'}
+          <!-- Копия есть, а это устройство её не откроет: код или подтверждение с другого. -->
+          <p class="state"><span class="warn" aria-hidden="true">!</span>{t('encryption.keyNeeded')}</p>
+          <PrimaryButton onclick={() => app.openRecovery()}>{t('encryption.restore')}</PrimaryButton>
+          <p class="secondary">{t('encryption.keyNeededHelp')}</p>
+        {:else if recovery.protection === 'off'}
           <p class="state"><span class="warn" aria-hidden="true">!</span>{t('encryption.off')}</p>
-          <PrimaryButton onclick={() => app.openRecovery()}>{t('recovery.choose.title')}</PrimaryButton>
+          <PrimaryButton onclick={() => app.openRecovery()}>{t('encryption.protect')}</PrimaryButton>
           <p class="secondary">{t('encryption.offHelp')}</p>
         {/if}
         {#if recovery.failure}

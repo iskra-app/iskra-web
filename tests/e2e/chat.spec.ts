@@ -24,7 +24,8 @@ test('меню сообщения: реакция ставится из меню
   await signInToDemo(page);
   await openRoom(page, /^Выходные/);
   const menu = await menuOf(page, 'Я — пирог');
-  await expect(menu).toContainText(/Отправлено \d{1,2}:\d{2}/);
+  // Точно: с датой и секундами — время у пузыря даёт только часы.
+  await expect(menu).toContainText(/Отправлено .*\d{4}.*\d{1,2}:\d{2}:\d{2}/);
   // Чужое: ответить и скопировать — да; изменить и удалить — нет.
   await expect(menu.getByRole('menuitem', { name: 'Ответить' })).toBeVisible();
   await expect(menu.getByRole('menuitem', { name: 'Изменить' })).toHaveCount(0);
@@ -495,5 +496,35 @@ test('полоса «новые ключи»: собеседник сменил 
   await expect(page.getByRole('log').getByRole('article').filter({ hasText: 'Возьми плед' })).toBeVisible({ timeout: 20_000 });
   await page.waitForTimeout(1_000);
   await expect(banner).toHaveCount(0);
+  expect(problems).toEqual([]);
+});
+
+test('меню сообщения: «N реакций» — кто что поставил; «Пожаловаться» — модераторам, с причиной по желанию', async ({ page }) => {
+  const problems = watchForProblems(page);
+  await signInToDemo(page);
+  await openRoom(page, /^Выходные/);
+  const lake = page.getByRole('log').getByRole('article').filter({ hasText: 'Озеро прошлым летом' });
+  await lake.click({ button: 'right' });
+  const menu = page.getByRole('menu', { name: 'Ещё' });
+  await menu.getByRole('menuitem', { name: '1 реакция' }).click();
+  const reactors = page.getByRole('dialog', { name: '1 реакция' });
+  await expect(reactors.getByRole('radio', { name: 'Все · 1' })).toBeChecked();
+  await expect(reactors.getByRole('listitem')).toHaveText([/Борис.*🔥/]);
+  await page.keyboard.press('Escape');
+  await expect(reactors).toBeHidden();
+
+  // Своё — не жалуются; чужое — да.
+  const menuOf = async (text: string) => {
+    await page.getByRole('log').getByRole('article').filter({ hasText: text }).click({ button: 'right' });
+    await expect(menu).toBeVisible();
+  };
+  await menuOf('Я — пирог');
+  await menu.getByRole('menuitem', { name: 'Пожаловаться' }).click();
+  const report = page.getByRole('dialog', { name: 'Пожаловаться на сообщение' });
+  await report.getByRole('textbox').fill('Спам');
+  await report.getByRole('button', { name: 'Отправить' }).click();
+  await expect(report).toBeHidden();
+  await page.waitForTimeout(300);
+  await expect(page.getByRole('alert')).toHaveCount(0);
   expect(problems).toEqual([]);
 });

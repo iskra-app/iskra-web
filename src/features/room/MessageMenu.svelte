@@ -7,9 +7,8 @@
   import { ICON_VIEWBOX, icons } from '../../design/icons.ts';
   import { tick } from 'svelte';
   import Menu from '../../design/Menu.svelte';
-  import { clock } from '../../design/time';
   import type { Message } from '../../core/timeline/message';
-  import { i18n, t } from '../../i18n/index.svelte.ts';
+  import { i18n, plural, t } from '../../i18n/index.svelte.ts';
   import type { MessageActions } from './actions';
   import { quickReactions } from './reactions';
   import EmojiPanel from './EmojiPanel.svelte';
@@ -46,6 +45,7 @@
     if (!current) picking = false;
   });
   const mine = $derived(new Set(message?.reactions.filter((r) => r.mine).map((r) => r.key) ?? []));
+  const reactionCount = $derived(message?.reactions.reduce((sum, r) => sum + r.count, 0) ?? 0);
 
   /** Реакция — и в недавние, откуда бы её ни поставили, как в нативной. */
   function react(emoji: string) {
@@ -93,6 +93,10 @@
         <svg viewBox={ICON_VIEWBOX} aria-hidden="true"><path d={icons.plus} /></svg>
       </button>
     </div>
+    {#if actions.showsReactors && reactionCount > 0}
+      <!-- Первым: кто что поставил — единственный вопрос, на который пилюля с числом не отвечает. -->
+      <button type="button" role="menuitem" onclick={() => run(actions.reactors)}>{plural('message.menu.reactors', reactionCount)}</button>
+    {/if}
     {#if actions.canReply}
       <button type="button" role="menuitem" onclick={() => run(actions.reply)}>{t('message.menu.reply')}</button>
     {/if}
@@ -129,10 +133,15 @@
     {#if message.canDelete}
       <button type="button" role="menuitem" class="danger" onclick={() => run(actions.remove)}>{t('message.menu.delete')}</button>
     {/if}
+    {#if !message.own && message.eventId && message.kind.type !== 'deleted'}
+      <!-- Чужое, ушедшее, не удалённое: жалоба указывает на событие на сервере. -->
+      <button type="button" role="menuitem" class="danger" onclick={() => run(actions.report)}>{t('message.menu.report')}</button>
+    {/if}
     {#if !message.own}
       <button type="button" role="menuitem" class="danger" onclick={() => run(actions.block)}>{t('message.menu.block')}</button>
     {/if}
-    <p class="sent">{t('message.menu.sentAt', { time: clock(message.ts, i18n.locale) })}</p>
+    <!-- Точно, с датой и секундами: время у пузыря — только часы, а здесь — всё остальное. -->
+    <p class="sent">{t('message.menu.sentAt', { time: new Intl.DateTimeFormat(i18n.locale, { dateStyle: 'medium', timeStyle: 'medium' }).format(message.ts) })}</p>
   {/if}
 </Menu>
 
