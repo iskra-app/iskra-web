@@ -160,9 +160,6 @@
         <button type="button" role="menuitem" class="danger" onclick={() => run(actions.report)}>{t('message.menu.report')}</button>
       {/if}
     {/if}
-    {#if !message.own}
-      <button type="button" role="menuitem" class="danger" onclick={() => run(actions.block)}>{t('message.menu.block')}</button>
-    {/if}
     <!-- Точно, с датой и секундами: время у пузыря — только часы, а здесь — всё остальное. -->
     <div class="rule" role="separator"></div>
     <p class="fact">{t('message.menu.sentAt', { time: exactly(message.ts) })}</p>

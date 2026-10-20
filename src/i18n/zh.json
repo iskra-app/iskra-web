@@ -398,6 +398,7 @@
   "profile.blockUser": "屏蔽用户",
   "profile.blockedNotice": "您已屏蔽此用户，其新消息不会送达您。",
   "profile.matrixID": "Matrix ID",
+  "profile.message": "发消息",
   "profile.mute": "静音",
   "profile.search": "搜索",
   "profile.share": "分享",

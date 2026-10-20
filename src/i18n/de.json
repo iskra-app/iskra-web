@@ -402,6 +402,7 @@
   "profile.blockUser": "Nutzer blockieren",
   "profile.blockedNotice": "Sie haben diesen Nutzer blockiert. Seine neuen Nachrichten erreichen Sie nicht.",
   "profile.matrixID": "Matrix ID",
+  "profile.message": "Schreiben",
   "profile.mute": "Stumm",
   "profile.search": "Suchen",
   "profile.share": "Teilen",

@@ -4,6 +4,7 @@
 -->
 <script lang="ts">
   import { untrack } from 'svelte';
+  import { profileRequest } from '../room/profileRequest.svelte.ts';
   import Columns from '../../design/Columns.svelte';
   import Bar from '../../design/Bar.svelte';
   import SparkGlyph from '../../design/SparkGlyph.svelte';
@@ -48,6 +49,13 @@
   let roomTimeline: TimelineStore | undefined = $state();
 
   let panelOpen = $state(false);
+  // Страница человека из ленты — в панели «О чате»: открыть её (и закрыть тред, если он на её месте).
+  $effect(() => {
+    const pending = profileRequest.pending;
+    if (!pending || pending.roomId !== roomId) return;
+    if (untrack(() => threadId)) closeThread();
+    panelOpen = true;
+  });
   const roomId = $derived(router.route.name === 'room' ? router.route.roomId : null);
   /** Открытый тред — на месте «О чате»: справа на широком экране, листом поверх чата на узком. */
   const threadId = $derived(router.route.name === 'room' ? router.route.thread : undefined);

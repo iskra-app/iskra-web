@@ -403,6 +403,7 @@
   "profile.blockUser": "Bloquear usuario",
   "profile.blockedNotice": "Ha bloqueado a este usuario. Sus mensajes nuevos no le llegan.",
   "profile.matrixID": "Matrix ID",
+  "profile.message": "Escribir",
   "profile.mute": "Silenciar",
   "profile.search": "Buscar",
   "profile.share": "Compartir",

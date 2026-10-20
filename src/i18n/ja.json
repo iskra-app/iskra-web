@@ -398,6 +398,7 @@
   "profile.blockUser": "ユーザーをブロック",
   "profile.blockedNotice": "このユーザーをブロックしています。新しいメッセージは届きません。",
   "profile.matrixID": "Matrix ID",
+  "profile.message": "メッセージ",
   "profile.mute": "ミュート",
   "profile.search": "検索",
   "profile.share": "共有",

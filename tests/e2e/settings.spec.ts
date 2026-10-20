@@ -20,9 +20,9 @@ async function openSettings(page: Page, row?: string) {
 
 async function openPanel(page: Page) {
   await page.getByRole('button', { name: 'О чате' }).click();
-  const panel = page.getByRole('radiogroup', { name: 'Уведомления' }).locator('xpath=ancestor::div[contains(@class,"panel")][1]');
-  await expect(panel).toBeVisible();
-  return panel;
+  // Вся колонка «О чате»: в ней и сама панель, и страница человека, открытая из неё.
+  await expect(page.getByRole('radiogroup', { name: 'Уведомления' })).toBeVisible();
+  return page.locator('aside.panel');
 }
 
 test('«О чате» в личном чате: ID собеседника, «Поделиться», «Заблокировать», «Удалить чат»', async ({ page }, info) => {
@@ -31,8 +31,8 @@ test('«О чате» в личном чате: ID собеседника, «П�
   await signInToDemo(page);
   await openRoom(page, /^Аня/);
   const panel = await openPanel(page);
-  await expect(panel.locator('header')).toContainText('@anya:demo.iskra.invalid');
-  await expect(panel.locator('header')).toContainText('Переписка зашифрована');
+  await expect(panel.locator('header').last()).toContainText('@anya:demo.iskra.invalid');
+  await expect(panel.locator('header').last()).toContainText('Переписка зашифрована');
   if (!isPhone(info.project.name) && info.project.name.startsWith('chromium')) {
     await panel.getByRole('button', { name: 'Поделиться' }).click();
     await expect(panel.getByRole('status')).toHaveText('Ссылка скопирована');
@@ -59,8 +59,8 @@ test('«О чате» там, где прав нет: шапка, кнопки, 
   await expect(panel).toContainText('3 участника');
 
   // Шапка — как в нативной: сколько участников и что с шифрованием; под ней — кнопки.
-  await expect(panel.locator('header')).toContainText('3 участника');
-  await expect(panel.locator('header')).toContainText('Переписка не зашифрована');
+  await expect(panel.locator('header').last()).toContainText('3 участника');
+  await expect(panel.locator('header').last()).toContainText('Переписка не зашифрована');
   await expect(panel.getByRole('button', { name: 'Пригласить' })).toBeVisible();
 
   const alerts = panel.getByRole('radiogroup', { name: 'Уведомления' });
@@ -88,10 +88,12 @@ test('своя комната: изменить название, дать ро�
   await expect(edit).toBeHidden();
   await expect(panel.getByRole('heading', { name: 'Очень длинная история' })).toBeVisible({ timeout: 10_000 });
 
+  // Страница человека: роль выбором — и назад, к списку.
   await panel.getByRole('button', { name: /^Борис/ }).click();
-  await page.getByRole('menuitem', { name: 'Роль' }).click();
-  const role = page.getByRole('dialog', { name: 'Что может Борис?' });
-  await role.getByRole('radio', { name: 'Модератор' }).click();
+  await expect(panel.getByRole('heading', { name: 'Борис' })).toBeVisible();
+  await panel.getByRole('radio', { name: 'Модератор' }).click();
+  await expect(panel.getByRole('radio', { name: 'Модератор' })).toHaveAttribute('aria-checked', 'true', { timeout: 10_000 });
+  await panel.getByRole('button', { name: 'Назад' }).click();
   await expect(panel.getByRole('button', { name: /Борис.*Модератор/ })).toBeVisible({ timeout: 10_000 });
 
   await panel.getByRole('button', { name: 'Пригласить' }).click();
@@ -201,21 +203,28 @@ test('настройки по разделам: имя, язык, тема, шр
   }
 });
 
-test('заблокировать из меню сообщения — сообщений не видно; разблокировать — в настройках', async ({ page }) => {
+test('заблокировать со страницы человека (имя у сообщения) — сообщений не видно; разблокировать — в настройках', async ({ page }) => {
   const problems = watchForProblems(page);
   await signInToDemo(page);
   await openRoom(page, /^Дом 14/);
   const bubble = page.getByRole('log').getByRole('article').filter({ hasText: 'Лифт опять не работает' });
+  await expect(bubble).toBeVisible();
+  // Меню сообщения блокировки не предлагает — как в нативной: она на странице человека.
   await bubble.click({ button: 'right' });
-  await page.getByRole('menu', { name: 'Ещё' }).getByRole('menuitem', { name: 'Заблокировать' }).click();
+  await expect(page.getByRole('menu', { name: 'Ещё' }).getByRole('menuitem', { name: 'Заблокировать' })).toHaveCount(0);
+  await page.keyboard.press('Escape');
+  await page.getByRole('log').getByText('Вера', { exact: true }).last().click();
+  await page.getByRole('button', { name: 'Заблокировать пользователя' }).click();
   const dialog = page.getByRole('dialog', { name: 'Заблокировать Вера?' });
   await expect(dialog).toContainText('Разблокировать можно в настройках');
   await dialog.getByRole('button', { name: 'Заблокировать' }).click();
+  await expect(page.getByRole('button', { name: 'Разблокировать пользователя' })).toBeVisible({ timeout: 10_000 });
+  await page.getByRole('button', { name: 'Закрыть', exact: true }).click();
   await expect(bubble).toHaveCount(0, { timeout: 10_000 });
   // Служебная строка о ней остаётся: блокировка прячет слова, а не факт, что человек в чате.
   await expect(page.getByRole('log')).toContainText('Повестка');
 
-  const back = page.getByRole('button', { name: 'Назад' });
+  const back = page.getByRole('button', { name: 'Назад' }).first();
   if (await back.isVisible()) await back.click();
   // И в списке чатов её слова не превью.
   await expect(page.getByRole('link', { name: /^Дом 14/ })).not.toContainText('Лифт опять');
@@ -598,7 +607,7 @@ test('своя комната: история для новых, адрес (з�
 
   // Заблокировать Веру — и пустить обратно из настроек.
   await panel.getByRole('button', { name: /^Вера/ }).click();
-  await page.getByRole('menuitem', { name: 'Заблокировать в чате' }).click();
+  await panel.getByRole('button', { name: 'Заблокировать в чате' }).click();
   await page.getByRole('dialog').getByRole('button', { name: 'Заблокировать в чате' }).click();
   await expect(panel.getByRole('button', { name: /^Вера/ })).toHaveCount(0, { timeout: 10_000 });
   edit = await openEdit();

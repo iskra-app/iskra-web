@@ -21,8 +21,6 @@ export interface MessageActions {
   unpin(message: Message): void;
   /** Спросить «удалить у всех?» — и удалить. */
   remove(message: Message): void;
-  /** Спросить «заблокировать?» — и заблокировать отправителя. */
-  block(message: Message): void;
   retry(key: string): void;
   /** «Отправить всё равно» — только для `identityChanged` и `insecureDevices`. */
   sendAnyway(key: string): void;
@@ -45,6 +43,8 @@ export interface MessageActions {
    * здесь не бывает: личный чат, настройки, или это уже лента треда.
    */
   openThread?: (message: Message) => void;
+  /** Страница человека — по лицу или имени у сообщения. Нет — лицо не нажимается (подглядывание). */
+  openProfile?: (userId: string) => void;
   /** Меню: у точки — для мыши, листом — для пальца. */
   openMenu(message: Message, at: { x: number; y: number }, sheet: boolean): void;
 }

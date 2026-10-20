@@ -103,16 +103,30 @@
 {:else}
   <div class="row" class:own={message.own && !compact} class:compact class:first={firstInRun} class:grouped={withFace} class:interactive>
     {#if withFace}
+      <!-- Лицо и имя ведут на страницу человека. Мышью и пальцем; скринридеру и Tab — через
+           список участников в «О чате»: сотня одинаковых остановок в ленте ему не нужна. -->
       <span class="face">
         {#if faceHere}
-          <Avatar name={message.senderName} seed={message.senderId} photo={senderPhoto} mode={preferences.faces} />
+          {#if actions.openProfile}
+            {@const open = actions.openProfile}
+            <button type="button" class="to-profile" tabindex="-1" aria-hidden="true" onclick={() => open(message.senderId)}>
+              <Avatar name={message.senderName} seed={message.senderId} photo={senderPhoto} mode={preferences.faces} />
+            </button>
+          {:else}
+            <Avatar name={message.senderName} seed={message.senderId} photo={senderPhoto} mode={preferences.faces} />
+          {/if}
         {/if}
       </span>
     {/if}
     <div class="stack">
       {#if nameHere}
         <!-- Видимое имя — для глаз; скринридеру его говорит само сообщение, у каждого. -->
-        <span class="sender" aria-hidden="true">{message.senderName}</span>
+        {#if actions.openProfile}
+          {@const open = actions.openProfile}
+          <button type="button" class="sender to-profile" tabindex="-1" aria-hidden="true" onclick={() => open(message.senderId)}>{message.senderName}</button>
+        {:else}
+          <span class="sender" aria-hidden="true">{message.senderName}</span>
+        {/if}
       {/if}
       <div class="bubble-wrap">
       <!-- Пузырь — `article`: запись в `role="log"` ленты и её остановка с клавиатуры
@@ -294,6 +308,15 @@
   }
   .own .stack {
     align-items: flex-end;
+  }
+  .to-profile {
+    display: block;
+    padding: 0;
+    border: none;
+    background: none;
+    font: inherit;
+    text-align: start;
+    cursor: pointer;
   }
   .sender {
     padding-inline: var(--bubble-pad-x);

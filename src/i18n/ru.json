@@ -410,6 +410,7 @@
   "profile.blockUser": "Заблокировать пользователя",
   "profile.blockedNotice": "Вы заблокировали этого пользователя. Его новые сообщения сюда не приходят.",
   "profile.matrixID": "Matrix ID",
+  "profile.message": "Написать",
   "profile.mute": "Без звука",
   "profile.search": "Поиск",
   "profile.share": "Поделиться",

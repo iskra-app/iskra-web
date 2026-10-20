@@ -50,6 +50,7 @@
   import type { Place } from '../../core/timeline/location';
   import { preferences } from '../app/preferences.svelte.ts';
   import { revealRequest } from '../app/revealRequest.svelte.ts';
+  import { profileRequest } from './profileRequest.svelte.ts';
   import { unlinkMentions, type ComposerMention } from '../../core/timeline/composerMentions';
   import { Photo, pixelsFor } from '../rooms/faces.svelte.ts';
   import type { MentionRow } from './MentionPicker.svelte';
@@ -123,7 +124,6 @@
     if (transcript) void navigator.clipboard?.writeText(transcript).catch(() => {});
     selection = null;
   }
-  let blocking = $state<Message | null>(null);
   let attachments = $state<OutgoingFile[]>([]);
   let dropping = $state(false);
   /** Строка над полем: не влезло в лимит, не нашли место — сказать и дать закрыть. */
@@ -444,6 +444,7 @@
     get showsReactors() {
       return room?.kind !== 'direct';
     },
+    openProfile: (userId: string) => profileRequest.open(roomId, userId),
     get openThread() {
       return usesThreads ? (message: Message) => message.eventId && router.go({ name: 'room', roomId, thread: message.eventId }) : undefined;
     },
@@ -465,7 +466,6 @@
     pin: (message) => store?.pin(message),
     unpin: (message) => store?.unpin(message),
     remove: (message) => (deleting = message),
-    block: (message) => (blocking = message),
     retry: (key) => store?.retry(key),
     sendAnyway: (key) => store?.sendAnyway(key),
     discard: (key) => store?.discard(key),
@@ -714,19 +714,6 @@
   }}
 />
 
-<ConfirmDialog
-  open={!!blocking}
-  title={t('message.menu.blockConfirm', { name: blocking?.senderName ?? '' })}
-  message={t('message.menu.blockConfirmMessage')}
-  confirmLabel={t('message.menu.block')}
-  cancelLabel={t('common.cancel')}
-  destructive
-  onclose={() => (blocking = null)}
-  onconfirm={() => {
-    if (blocking) void session.blocked.block(blocking.senderId);
-    blocking = null;
-  }}
-/>
 
 <style>
   .room {

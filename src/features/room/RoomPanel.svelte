@@ -9,7 +9,6 @@
 <script lang="ts">
   import { untrack } from 'svelte';
   import ConfirmDialog from '../../design/ConfirmDialog.svelte';
-  import Menu from '../../design/Menu.svelte';
   import ProblemPanel from '../../design/ProblemPanel.svelte';
   import { router } from '../../core/navigation/router.svelte.ts';
   import { shareLink } from '../../core/navigation/links';
@@ -25,7 +24,8 @@
   import { Photo, pixelsFor } from '../rooms/faces.svelte.ts';
   import RoomEditDialog from './RoomEditDialog.svelte';
   import InviteDialog from './InviteDialog.svelte';
-  import RoleDialog from './RoleDialog.svelte';
+  import MemberProfile from './MemberProfile.svelte';
+  import { profileRequest } from './profileRequest.svelte.ts';
   import RoomSearchDialog from './RoomSearchDialog.svelte';
   import MatrixIdField from './MatrixIdField.svelte';
   import type { TimelineStore } from '../../core/timeline/timelineStore.svelte.ts';
@@ -70,9 +70,15 @@
   let searching = $state(false);
   let inviting = $state(false);
   let leaving = $state(false);
-  let blocking = $state<MemberSummary | null>(null);
-  let roleFor = $state<MemberSummary | null>(null);
-  let memberMenu = $state<{ member: MemberSummary; at: { x: number; y: number } } | null>(null);
+  /** Открытая страница человека — по ID: роль поменялась — страница видит новую. */
+  let profileId = $state<string | null>(null);
+  const profile = $derived(profileId ? details?.members.find((m) => m.id === profileId) : undefined);
+  // Из ленты — по лицу или имени у сообщения.
+  $effect(() => {
+    if (profileRequest.pending?.roomId !== roomId) return;
+    const userId = profileRequest.take(roomId);
+    if (userId) profileId = userId;
+  });
 
   // В личном чате изменить можно всегда — одно: как вы зовёте собеседника на этом устройстве.
   const canEdit = $derived(
@@ -94,32 +100,6 @@
 
   const roleLabel = (role: RoomRole): string =>
     role === 'administrator' ? t('room.administrator') : role === 'moderator' ? t('room.moderator') : '';
-
-  /** Что можно сделать с участником — если ничего, строка не нажимается. */
-  function actionsFor(member: MemberSummary) {
-    if (!details) return { write: false, role: false, remove: false, ban: false };
-    return {
-      write: member.id !== session.userId && !member.invited,
-      role: details.rolesFor(member).length > 0,
-      remove: details.mayRemove(member),
-      ban: details.mayBan(member),
-    };
-  }
-
-  function openMember(member: MemberSummary, event: MouseEvent) {
-    const rect = (event.currentTarget as HTMLElement).getBoundingClientRect();
-    memberMenu = { member, at: { x: rect.left + 16, y: rect.bottom } };
-  }
-
-  /**
-   * Пункт меню участника: взять участника *до* того, как меню закрыто. `{@const}` внутри
-   * меню читает `memberMenu`, и после закрытия читать его уже нечего.
-   */
-  function onMember(action: (member: MemberSummary) => void) {
-    const member = memberMenu?.member;
-    memberMenu = null;
-    if (member) action(member);
-  }
 
   async function write(member: MemberSummary) {
     try {
@@ -243,7 +223,11 @@
   }
 </script>
 
-{#if details}
+{#if details && profile}
+  <div class="panel">
+    <MemberProfile {session} {details} member={profile} photo={photoOf(profile)} onback={() => (profileId = null)} onwrite={(m) => void write(m)} />
+  </div>
+{:else if details}
   <div class="panel">
     <header>
       <span class="face">
@@ -403,15 +387,9 @@
           {#if tab === 'members'}
             <ul class="list">
               {#each details.members as member (member.id)}
-                {@const can = actionsFor(member)}
                 <li>
-                  <button
-                    type="button"
-                    class="row"
-                    disabled={!(can.write || can.role || can.remove || can.ban)}
-                    aria-haspopup="menu"
-                    onclick={(event) => openMember(member, event)}
-                  >
+                  <!-- Страница человека — как в нативной: что с ним можно сделать, там и видно. -->
+                  <button type="button" class="row" onclick={() => (profileId = member.id)}>
                     <span class="avatar"><Avatar name={member.name} seed={member.id} photo={photoOf(member)} mode={preferences.faces} /></span>
                     <span class="what">
                       <span class="name">{member.name}</span>
@@ -478,29 +456,6 @@
 
   </div>
 
-  <Menu
-    open={!!memberMenu}
-    x={memberMenu?.at.x ?? 0}
-    y={memberMenu?.at.y ?? 0}
-    label={t('room.manage.memberActions', { name: memberMenu?.member.name ?? '' })}
-    onclose={() => (memberMenu = null)}
-  >
-    {#if memberMenu}
-      {@const can = actionsFor(memberMenu.member)}
-      {#if can.write}
-        <button type="button" role="menuitem" onclick={() => onMember(write)}>{t('room.manage.write')}</button>
-      {/if}
-      {#if can.role}
-        <button type="button" role="menuitem" onclick={() => onMember((m) => (roleFor = m))}>{t('room.manage.role')}</button>
-      {/if}
-      {#if can.remove}
-        <button type="button" role="menuitem" class="danger" onclick={() => onMember((m) => void details?.remove(m))}>{t('room.manage.remove')}</button>
-      {/if}
-      {#if can.ban}
-        <button type="button" role="menuitem" class="danger" onclick={() => onMember((m) => (blocking = m))}>{t('room.manage.block')}</button>
-      {/if}
-    {/if}
-  </Menu>
 
   {#if viewing}
     <Viewer items={viewing.items} start={viewing.start} media={session.media} onclose={() => (viewing = null)} />
@@ -508,7 +463,6 @@
 
   <RoomEditDialog open={editing} {details} {session} onclose={() => (editing = false)} />
   <InviteDialog open={inviting} {details} onclose={() => (inviting = false)} />
-  <RoleDialog member={roleFor} {details} onclose={() => (roleFor = null)} />
 
   <ConfirmDialog
     open={leaving}
@@ -519,19 +473,6 @@
     destructive
     onclose={() => (leaving = false)}
     onconfirm={() => void leave()}
-  />
-  <ConfirmDialog
-    open={!!blocking}
-    title={t('room.manage.blockQuestion', { name: blocking?.name ?? '' })}
-    message={t('room.manage.blockHelp')}
-    confirmLabel={t('room.manage.block')}
-    cancelLabel={t('room.manage.cancel')}
-    destructive
-    onclose={() => (blocking = null)}
-    onconfirm={() => {
-      if (blocking) void details?.ban(blocking);
-      blocking = null;
-    }}
   />
 {/if}
 

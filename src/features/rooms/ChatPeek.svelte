@@ -67,7 +67,6 @@
     pin: noop,
     unpin: noop,
     remove: noop,
-    block: noop,
     retry: noop,
     sendAnyway: noop,
     discard: noop,
