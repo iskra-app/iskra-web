@@ -72,6 +72,17 @@ export function databaseNames(userId: string) {
   };
 }
 
+export interface AccountDevice {
+  id: string;
+  name: string;
+  lastSeen?: number;
+  ip?: string;
+  current: boolean;
+}
+
+/** Чем кончилось «Завершить»: спросить пароль, пароль не тот, это на сайте сервера, не вышло. */
+export type EndSessions = 'done' | 'needsPassword' | 'wrongPassword' | 'managed' | 'failed';
+
 export class UserSession {
   connection = $state<Connection>('connecting');
   /** Как меня зовут и как я выгляжу — живое: меняется, когда поменяли в настройках или где-то ещё. */
@@ -310,8 +321,8 @@ export class UserSession {
     await this.readProfile();
   }
 
-  /** Мои устройства — список с сервера; это отмечено. */
-  async devices(): Promise<Array<{ id: string; name: string; lastSeen?: number; current: boolean }>> {
+  /** Мои устройства — список с сервера; это первым, остальные — по последней активности. */
+  async devices(): Promise<AccountDevice[]> {
     const { devices } = await this.client.getDevices();
     const mine = this.client.getDeviceId();
     return devices
@@ -319,9 +330,76 @@ export class UserSession {
         id: d.device_id,
         name: d.display_name || d.device_id,
         ...(d.last_seen_ts ? { lastSeen: d.last_seen_ts } : {}),
+        ...(d.last_seen_ip ? { ip: d.last_seen_ip } : {}),
         current: d.device_id === mine,
       }))
       .sort((a, b) => +b.current - +a.current || (b.lastSeen ?? 0) - (a.lastSeen ?? 0));
+  }
+
+  /** Сеансы аккаунта завершаются на странице сервера (вход через MAS), а не здесь. */
+  get sessionsManagedByServer(): boolean {
+    return !!this.account.oauth;
+  }
+
+  /**
+   * Страница сервера, где завершают сеанс (MSC4191): один — сразу на нём, несколько — список.
+   * Нет страницы — `undefined`.
+   */
+  sessionEndPage(deviceId?: string): string | undefined {
+    const page = this.accountPage();
+    if (!page) return undefined;
+    // Разовый расчёт адреса, не состояние.
+    // eslint-disable-next-line svelte/prefer-svelte-reactivity
+    const url = new URL(page);
+    if (deviceId) {
+      url.searchParams.set('action', 'org.matrix.session_end');
+      url.searchParams.set('device_id', deviceId);
+    } else {
+      url.searchParams.set('action', 'org.matrix.sessions_list');
+    }
+    return url.href;
+  }
+
+  /**
+   * Завершить сеансы — выйти из аккаунта на тех устройствах (`AccountDevices.end` нативной).
+   * Сначала без пароля: некоторым серверам он не нужен, а ответ скажет, нужен ли. Это
+   * устройство не завершается никогда: выход — другая кнопка.
+   */
+  async endSessions(deviceIds: string[], password?: string): Promise<EndSessions> {
+    const others = deviceIds.filter((id) => id !== this.client.getDeviceId());
+    if (!others.length) return 'done';
+    if (this.sessionsManagedByServer) return 'managed';
+    const refused = (error: unknown): EndSessions => {
+      const e = error as { httpStatus?: number; errcode?: string; data?: { errcode?: string } };
+      const errcode = e.errcode ?? e.data?.errcode;
+      if (e.httpStatus === 404 || errcode === 'M_UNRECOGNIZED') return 'managed';
+      if (e.httpStatus === 401) return password ? 'wrongPassword' : 'needsPassword';
+      return 'failed';
+    };
+    try {
+      if (!password) {
+        await this.client.deleteMultipleDevices(others);
+        return 'done';
+      }
+      // Пароль — в сессию UIA, которую сервер выдаёт на первый запрос без него.
+      let session: string | undefined;
+      try {
+        await this.client.deleteMultipleDevices(others);
+        return 'done';
+      } catch (error) {
+        session = (error as { data?: { session?: string } }).data?.session;
+        if ((error as { httpStatus?: number }).httpStatus !== 401) return refused(error);
+      }
+      await this.client.deleteMultipleDevices(others, {
+        type: 'm.login.password',
+        identifier: { type: 'm.id.user', user: this.userId },
+        password,
+        ...(session ? { session } : {}),
+      } as never);
+      return 'done';
+    } catch (error) {
+      return refused(error);
+    }
   }
 
   /**

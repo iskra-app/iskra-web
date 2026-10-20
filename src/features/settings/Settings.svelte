@@ -33,6 +33,7 @@
   import QuickReactionPicker from './QuickReactionPicker.svelte';
   import { builtOn, describeDevice, iskraLicence, type Licence } from './licences';
   import FoldersSettings from './FoldersSettings.svelte';
+  import DevicesSection from './DevicesSection.svelte';
   import { languageChoices } from '../app/languages';
   import QrCodeDialog from '../app/QrCodeDialog.svelte';
   import { isMac } from '../../design/hotkeys';
@@ -152,18 +153,6 @@
     newCode = (await recovery?.makeNewKey()) ?? null;
   }
 
-  // ————— Устройства —————
-
-  let devices = $state<Awaited<ReturnType<UserSession['devices']>> | null>(null);
-  let devicesFailed = $state(false);
-  $effect(() => {
-    if (section !== 'security') return;
-    session.devices().then(
-      (list) => ((devices = list), (devicesFailed = false)),
-      () => (devicesFailed = !devices),
-    );
-  });
-  const accountPage = $derived(session.accountPage());
   /** Ссылки — как `AboutView` нативной Искры: адрес показывается как есть, не переводится. */
   const source = { href: 'https://github.com/iskra-app/iskra-web', label: 'github.com/iskra-app/iskra-web' };
   const links: Array<{ title: TextKey; href: string; label: string }> = [
@@ -399,25 +388,7 @@
       </section>
     {/if}
 
-    <section aria-labelledby="devices-title">
-      <h3 id="devices-title">{t('settings.devices')}</h3>
-      {#if devices}
-        <ul class="list">
-          {#each devices as device (device.id)}
-            <li>
-              <strong>{device.name}</strong>
-              <span class="secondary">{device.current ? t('settings.thisDevice') : device.id}</span>
-            </li>
-          {/each}
-        </ul>
-      {:else if devicesFailed}
-        <p class="problem" role="alert">{t('settings.devicesFailed')}</p>
-      {/if}
-      <p class="secondary">{t('settings.devicesHelp')}</p>
-      {#if accountPage}
-        <a class="link" href={accountPage} target="_blank" rel="noopener noreferrer">{t('settings.openAccountPage')}</a>
-      {/if}
-    </section>
+    <DevicesSection {session} />
 
     <section aria-labelledby="blocked-title">
       <h3 id="blocked-title">{t('settings.blocked')}</h3>
@@ -993,8 +964,5 @@
   dd {
     margin: 0;
     overflow-wrap: anywhere;
-  }
-  .link {
-    color: var(--accent);
   }
 </style>

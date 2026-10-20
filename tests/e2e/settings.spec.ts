@@ -607,3 +607,30 @@ test('своя комната: история для новых, адрес (з�
   await question.getByRole('button', { name: 'Разблокировать' }).click();
   await expect(edit.getByRole('button', { name: 'Разблокировать' })).toHaveCount(0, { timeout: 10_000 });
 });
+
+test('устройства: «Активные сеансы» — завершить один (сервер просит пароль), потом все другие', async ({ page }) => {
+  await signInToDemo(page);
+  await openSettings(page, 'Безопасность');
+  const sessions = page.getByRole('region', { name: 'Активные сеансы' });
+  await expect(sessions.getByRole('listitem')).toHaveCount(2);
+  await expect(sessions.getByRole('listitem').first()).toContainText('Iskra (iPhone)');
+  await expect(sessions).toContainText('203.0.113.7');
+
+  await sessions.getByRole('listitem').filter({ hasText: 'Iskra (iPhone)' }).getByRole('button', { name: 'Завершить' }).click();
+  await page.getByRole('dialog', { name: 'Завершить этот сеанс?' }).getByRole('button', { name: 'Завершить' }).click();
+  const password = page.getByRole('dialog', { name: 'Нужен пароль' });
+  await password.getByLabel('Пароль').fill('не тот');
+  await password.getByRole('button', { name: 'Завершить' }).click();
+  await expect(password.getByRole('alert')).toHaveText('Пароль не подошёл.');
+  await password.getByLabel('Пароль').fill('password');
+  await password.getByRole('button', { name: 'Завершить' }).click();
+  await expect(password).toBeHidden();
+  await expect(sessions.getByRole('listitem')).toHaveCount(1, { timeout: 10_000 });
+
+  await page.getByRole('button', { name: 'Завершить все другие сеансы' }).click();
+  await page.getByRole('dialog', { name: 'Завершить все другие сеансы?' }).getByRole('button', { name: 'Завершить все другие сеансы' }).click();
+  await password.getByLabel('Пароль').fill('password');
+  await password.getByRole('button', { name: 'Завершить' }).click();
+  await expect(sessions).toContainText('Других сеансов нет', { timeout: 10_000 });
+  await expect(page.getByRole('button', { name: 'Завершить все другие сеансы' })).toHaveCount(0);
+});

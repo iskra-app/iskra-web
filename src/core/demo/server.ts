@@ -86,6 +86,14 @@ export class DemoHomeserver {
   private readonly storage: DemoStorage | undefined;
   /** Данные аккаунта, изменённые с прошлой синхронизации. */
   private pendingAccountData: Array<{ type: string; content: unknown }> = [];
+  /**
+   * Другие сеансы Алисы — только в списке устройств, без ключей (шифрование их не видит):
+   * чтобы в демо было что завершать. Завершённые уходят до перезагрузки страницы.
+   */
+  private readonly otherSessions = [
+    { device_id: 'IPHONEDEMO', display_name: 'Iskra (iPhone)', last_seen_ip: '203.0.113.7', last_seen_ts: Date.now() - 2 * 3600_000 },
+    { device_id: 'FIREFOXDEMO', display_name: 'Firefox на Linux', last_seen_ip: '198.51.100.23', last_seen_ts: Date.now() - 3 * 24 * 3600_000 },
+  ];
   /** Адреса, занятые в демо: адрес → комната. Каталожные (`demoDirectory`) заняты тоже. */
   private readonly aliases = new Map<string, string>();
   /** Комнаты Алисы, выставленные в каталог сервера. */
@@ -146,6 +154,7 @@ export class DemoHomeserver {
       ['PUT', re(`${c}/v3/directory/list/room/([^/]+)`), (r) => this.setListed(r)],
       ['PUT', re(`${c}/v3/profile/([^/]+)/(displayname|avatar_url)`), (r) => this.putProfile(r)],
       ['GET', re(`${c}/v3/devices`), () => this.devices()],
+      ['POST', re(`${c}/v3/delete_devices`), (r) => this.deleteDevices(r)],
       ['POST', re(`${c}/v3/user/([^/]+)/filter`), (r) => this.createFilter(r)],
       ['GET', re(`${c}/v3/user/([^/]+)/filter/([^/]+)`), (r) => this.getFilter(r)],
       ['GET', re(`${c}/v3/sync`), (r) => this.sync(r)],
@@ -1117,7 +1126,26 @@ export class DemoHomeserver {
 
   private devices(): Response {
     const devices = Object.keys(this.account.devices).map((id) => ({ device_id: id, display_name: 'Iskra Web', last_seen_ts: Date.now() }));
-    return json(200, { devices });
+    return json(200, { devices: [...devices, ...this.otherSessions] });
+  }
+
+  /** Завершить сеансы — только с паролем, как у настоящего сервера (UIA). */
+  private deleteDevices({ body }: DemoRequest): Response {
+    const { devices = [], auth } = (body ?? {}) as { devices?: string[]; auth?: { type?: string; password?: string } };
+    const ok = auth?.type === 'm.login.password' && auth.password === demoCredentials.password;
+    if (!ok) {
+      return json(401, {
+        flows: [{ stages: ['m.login.password'] }],
+        params: {},
+        session: 'demo-uia-devices',
+        ...(auth ? { errcode: 'M_FORBIDDEN', error: 'Invalid password' } : {}),
+      });
+    }
+    for (const id of devices) {
+      const i = this.otherSessions.findIndex((s) => s.device_id === id);
+      if (i >= 0) this.otherSessions.splice(i, 1);
+    }
+    return json(200, {});
   }
 
   /** Одно событие по ID — закреплённое, которого нет среди загруженного. */
