@@ -42,6 +42,7 @@
   import { SvelteSet } from 'svelte/reactivity';
   import MessageMenu from './MessageMenu.svelte';
   import PinnedStrip from './PinnedStrip.svelte';
+  import PinnedDialog from './PinnedDialog.svelte';
   import IdentityBanner from './IdentityBanner.svelte';
   import type { IdentityChangesStore } from '../../core/encryption/identityChanges.svelte.ts';
   import Timeline from './Timeline.svelte';
@@ -70,6 +71,8 @@
   const DRAFT_SAVE_MS = 400;
 
   let composer: Composer | undefined = $state();
+  /** Открыт список «Закреплённые». */
+  let pinnedList = $state(false);
   let timeline: Timeline | undefined = $state();
 
   // Открыли из поиска — лента открывается на найденном. Чат уже был открыт — к нему же.
@@ -544,9 +547,22 @@
   {#if store && store.pinnedIds.length && !thread}
     <PinnedStrip
       message={store.pinnedMessage}
-      canUnpin={store.canPin}
+      count={store.pinnedIds.length}
       onjump={() => store?.pinnedMessage?.eventId && void timeline?.reveal(store.pinnedMessage.eventId)}
-      onunpin={() => store?.pinnedMessage && store.unpin(store.pinnedMessage)}
+      onlist={() => (pinnedList = true)}
+    />
+    <PinnedDialog
+      open={pinnedList}
+      {session}
+      {roomId}
+      direct={room?.kind === 'direct'}
+      canUnpin={store.canPin}
+      onjump={(eventId) => {
+        pinnedList = false;
+        void timeline?.reveal(eventId);
+      }}
+      onunpin={(eventId) => store?.unpinEvent(eventId)}
+      onclose={() => (pinnedList = false)}
     />
   {/if}
   {#if store}

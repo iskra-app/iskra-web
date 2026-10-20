@@ -49,7 +49,7 @@ test('«О чате» в личном чате: ID собеседника, «П�
   expect(problems).toEqual([]);
 });
 
-test('«О чате» там, где прав нет: шапка, кнопки, уведомления, закреплённые, участники', async ({ page }) => {
+test('«О чате» там, где прав нет: шапка, кнопки, уведомления, участники', async ({ page }) => {
   const problems = watchForProblems(page);
   await signInToDemo(page);
   await openRoom(page, /^Выходные/);
@@ -70,9 +70,8 @@ test('«О чате» там, где прав нет: шапка, кнопки, 
   await expect(alerts.getByRole('radio', { name: 'Выключены' })).toHaveAttribute('aria-checked', 'true');
   await expect(panel.getByRole('button', { name: 'Со звуком' })).toBeVisible();
 
-  // Закреплённое из панели ведёт к сообщению.
-  await panel.getByRole('button', { name: /Кто что берёт на пикник/ }).click();
-  await expect(page.getByRole('log').getByRole('article').filter({ hasText: 'Кто что берёт на пикник?' })).toBeInViewport();
+  // Закреплённых в панели нет, как в нативной: они — по шеврону на полосе над лентой.
+  await expect(panel).not.toContainText('Кто что берёт на пикник?');
   expect(problems).toEqual([]);
 });
 

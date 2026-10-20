@@ -151,7 +151,7 @@ test('в личном чате опроса в скрепке нет', async ({ 
   await expect(page.getByRole('menuitem', { name: 'Опрос' })).toHaveCount(0);
 });
 
-test('закреплённое: полоса над лентой, нажатие ведёт к сообщению', async ({ page }) => {
+test('закреплённое: полоса над лентой ведёт к сообщению, шеврон — к списку «Закреплённые»', async ({ page }) => {
   await signInToDemo(page);
   await openRoom(page, /^Выходные/);
   const strip = page.getByRole('button', { name: 'Перейти к закреплённому' });
@@ -163,6 +163,17 @@ test('закреплённое: полоса над лентой, нажатие
   await expect(page.getByRole('button', { name: 'Открепить' })).toHaveCount(0);
   const menu = await menuOf(page, 'Кто что берёт на пикник?');
   await expect(menu.getByRole('menuitem', { name: /Закрепить|Открепить/ })).toHaveCount(0);
+  await page.keyboard.press('Escape');
+
+  // Список — из шеврона; оттуда тоже к сообщению.
+  await page.getByRole('log').evaluate((log) => log.parentElement!.scrollTo({ top: 0 }));
+  await page.getByRole('button', { name: 'Закреплённые' }).click();
+  const list = page.getByRole('dialog', { name: 'Закреплённые' });
+  await expect(list).toContainText('Борис');
+  await expect(list.getByRole('button', { name: 'Открепить' })).toHaveCount(0);
+  await list.getByRole('button', { name: /Кто что берёт на пикник/ }).click();
+  await expect(list).toBeHidden();
+  await expect(bubble(page, 'Кто что берёт на пикник?')).toBeInViewport();
 });
 
 test('шапка чата, как в нативной: под именем — «печатает…», потом число участников; в личном — когда был собеседник', async ({ page }) => {

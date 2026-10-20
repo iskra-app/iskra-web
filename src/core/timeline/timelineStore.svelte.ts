@@ -830,15 +830,19 @@ export class TimelineStore {
   }
 
   pin(message: Message): void {
-    this.setPinned(message, true);
+    this.setPinned(message.eventId, true);
   }
 
   unpin(message: Message): void {
-    this.setPinned(message, false);
+    this.setPinned(message.eventId, false);
   }
 
-  private setPinned(message: Message, pinned: boolean): void {
-    const id = message.eventId;
+  /** Открепить из списка «Закреплённые»: там не сообщения ленты, а только ID. */
+  unpinEvent(eventId: string): void {
+    this.setPinned(eventId, false);
+  }
+
+  private setPinned(id: string | undefined, pinned: boolean): void {
     if (!id || !this.canPin) return;
     const rest = this.pinnedIds.filter((p) => p !== id);
     const next = pinned ? [...rest, id] : rest;

@@ -11,7 +11,8 @@
  * могут, а создатель комнаты версии 12 выше любого числа (`Infinity`).
  */
 import { Direction, EventType, MatrixEvent, Visibility, RoomEvent, RoomMemberEvent, RoomStateEvent, type MatrixClient, type Room } from 'matrix-js-sdk';
-import { firstLineOf } from '../timeline/words';
+import { previewOf } from './preview';
+import type { Preview } from './types';
 import type { LocalNameSource } from './localNames.svelte.ts';
 import { alertsRules, roomAlerts, type RoomAlerts } from './pushRules';
 
@@ -30,12 +31,14 @@ export interface MemberSummary {
   invited: boolean;
 }
 
-/** Закреплённое — для списка в панели: кто и что, одной строкой. */
+/** Закреплённое — для списка «Закреплённые»: кто, когда и что. */
 export interface PinnedSummary {
   eventId: string;
+  senderId?: string;
   senderName?: string;
-  /** Первая строка текста; пусто — не текст или не загрузилось. */
-  text: string;
+  ts?: number;
+  /** Что в нём — словами, как в строке списка чатов; нет — ещё не загрузилось. */
+  preview?: Preview;
   /** Достать не вышло: удалено или недоступно. */
   unavailable: boolean;
 }
@@ -324,15 +327,14 @@ export class RoomDetailsStore {
     this.pinned = ids.map((eventId): PinnedSummary => {
       const event = room.findEventById(eventId) ?? this.fetched.get(eventId) ?? undefined;
       if (event === undefined && !this.fetched.has(eventId)) void this.fetchPinned(eventId);
-      if (!event) return { eventId, text: '', unavailable: this.fetched.get(eventId) === null };
+      if (!event) return { eventId, unavailable: this.fetched.get(eventId) === null };
       const sender = event.getSender();
-      const content = event.isRedacted() ? {} : event.getContent();
-      const body = content['body'];
-      const html = content['format'] === 'org.matrix.custom.html' && typeof content['formatted_body'] === 'string' ? content['formatted_body'] : undefined;
+      const preview = event.isRedacted() ? undefined : previewOf(event);
       return {
         eventId,
-        ...(sender ? { senderName: room.getMember(sender)?.name || sender } : {}),
-        text: typeof body === 'string' ? firstLineOf(body, html) : '',
+        ...(sender ? { senderId: sender, senderName: room.getMember(sender)?.name || sender } : {}),
+        ts: event.getTs(),
+        ...(preview ? { preview } : {}),
         unavailable: event.isRedacted(),
       };
     });

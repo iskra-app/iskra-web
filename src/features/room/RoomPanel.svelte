@@ -345,23 +345,6 @@
       >
     </section>
 
-    {#if details.pinned.length}
-      <section aria-labelledby="pinned-title">
-        <h3 id="pinned-title">{t('room.pinnedTitle')}</h3>
-        <ul class="list">
-          {#each details.pinned as pin (pin.eventId)}
-            <li>
-              <button type="button" class="row" disabled={pin.unavailable} onclick={() => onjump(pin.eventId)}>
-                <span class="what">
-                  {#if pin.senderName}<strong>{pin.senderName}</strong>{/if}
-                  <span class="line">{pin.unavailable ? t('reply.unavailable') : pin.text || '…'}</span>
-                </span>
-              </button>
-            </li>
-          {/each}
-        </ul>
-      </section>
-    {/if}
 
     {#if tab}
       <section class="contents" aria-labelledby="contents-title">
