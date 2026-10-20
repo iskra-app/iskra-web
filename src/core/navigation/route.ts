@@ -75,14 +75,17 @@ export function isEventId(value: string): boolean {
   return /^\$[^\s/]+$/.test(value);
 }
 
-/** `!opaque:server` — и больше ничего: ни пробелов, ни управляющих символов. */
+/**
+ * `!opaque:server` — или `!opaque` без сервера: так выглядят комнаты версии 12. Больше ничего:
+ * ни пробелов, ни управляющих символов.
+ */
 export function isRoomId(value: string): boolean {
-  return /^![^\s:/]+:[^\s/]+$/.test(value);
+  return /^![^\s:/]+(?::[^\s/]+)?$/.test(value);
 }
 
 /** Кого или что открывает ссылка: `@local:server`, `#alias:server` или `!id:server`. */
 export function isOpenTarget(value: string): boolean {
-  return /^[@#!][^\s:/]+:[^\s/]+$/.test(value);
+  return /^[@#][^\s:/]+:[^\s/]+$/.test(value) || isRoomId(value);
 }
 
 /** Имя сервера в `via` — хост с портом, без пути и пробелов. */

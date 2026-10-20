@@ -28,7 +28,13 @@ describe('адрес', () => {
     expect(isRoomId('!abc:localhost:8448')).toBe(true);
     expect(isRoomId('#alias:matrix.org')).toBe(false);
     expect(isRoomId('!abc matrix.org')).toBe(false);
-    expect(isRoomId('!abc')).toBe(false);
+    // Комнаты версии 12: ID без сервера.
+    expect(isRoomId('!iBOt13TiOwCach-G_-DyVEFp_QxcZmTkVoGhiv-WvP0')).toBe(true);
+    expect(parseRoute('#/room/!iBOt13TiOwCach-G_-DyVEFp_QxcZmTkVoGhiv-WvP0')).toEqual({
+      name: 'room',
+      roomId: '!iBOt13TiOwCach-G_-DyVEFp_QxcZmTkVoGhiv-WvP0',
+    });
+    expect(isRoomId('!')).toBe(false);
   });
 
   it('чужая ссылка — человек, адрес или комната', () => {
