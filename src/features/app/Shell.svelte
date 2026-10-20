@@ -3,6 +3,8 @@
   уровня приложения и число непрочитанных в заголовке вкладки. Лента — этап 4.
 -->
 <script lang="ts">
+  import { untrack } from 'svelte';
+  import { profileRequest } from '../room/profileRequest.svelte.ts';
   import Columns from '../../design/Columns.svelte';
   import Bar from '../../design/Bar.svelte';
   import SparkGlyph from '../../design/SparkGlyph.svelte';
@@ -14,8 +16,10 @@
   import { parseRoute } from '../../core/navigation/route';
   import { app } from '../../core/session/app.svelte.ts';
   import type { UserSession } from '../../core/session/userSession.svelte.ts';
-  import { plural, t } from '../../i18n/index.svelte.ts';
+  import { i18n, plural, t } from '../../i18n/index.svelte.ts';
   import { typingText } from '../room/text';
+  import { presenceLabel } from '../room/presenceLabel';
+  import type { PresenceWatch } from '../../core/session/presence.svelte.ts';
   import { describeHotkey, match } from '../../design/hotkeys';
   import { hasUnread } from '../../core/rooms/types';
   import { preferences } from './preferences.svelte.ts';
@@ -29,6 +33,7 @@
   import RoomView from '../room/RoomView.svelte';
   import HotkeyHelp from './HotkeyHelp.svelte';
   import NewChatDialog from '../rooms/NewChatDialog.svelte';
+  import OpenLinkDialog from './OpenLinkDialog.svelte';
   import Settings from '../settings/Settings.svelte';
   import { settingsParent, settingsTitles } from '../settings/sections';
   import RoomPanel from '../room/RoomPanel.svelte';
@@ -44,7 +49,19 @@
   let roomTimeline: TimelineStore | undefined = $state();
 
   let panelOpen = $state(false);
+  // Страница человека из ленты — в панели «О чате»: открыть её (и закрыть тред, если он на её месте).
+  $effect(() => {
+    const pending = profileRequest.pending;
+    if (!pending || pending.roomId !== roomId) return;
+    if (untrack(() => threadId)) closeThread();
+    panelOpen = true;
+  });
   const roomId = $derived(router.route.name === 'room' ? router.route.roomId : null);
+  /** Открытый тред — на месте «О чате»: справа на широком экране, листом поверх чата на узком. */
+  const threadId = $derived(router.route.name === 'room' ? router.route.thread : undefined);
+  function closeThread() {
+    if (roomId) router.go({ name: 'room', roomId });
+  }
   const room = $derived(roomId ? session.rooms.get(roomId) : undefined);
   // Чат, которого нет в списке (чужая ссылка, ещё не синхронизирован), — показываем ID.
   const title = $derived(room ? roomName(room) : (roomId ?? ''));
@@ -57,6 +74,26 @@
     session.connection === 'offline' ? t('roomList.waitingForNetwork') : session.connection === 'connecting' ? t('roomList.updating') : undefined,
   );
   /**
+   * Где собеседник личного чата — пока чат открыт. Скрыл своё время захода — не спрашиваем и о
+   * чужом: подглядывать, прячась, — то сочетание, которое переключатель исключает.
+   */
+  let presence = $state<PresenceWatch | null>(null);
+  const counterpart = $derived(room?.kind === 'direct' && !preferences.hidePresence ? room.counterpartId : undefined);
+  $effect(() => {
+    if (!counterpart) return;
+    const watch = session.presence(counterpart);
+    presence = watch;
+    return () => {
+      watch.destroy();
+      if (presence === watch) presence = null;
+    };
+  });
+  // Сказать серверу при входе и при каждом щелчке переключателя.
+  $effect(() => {
+    void session.applyPresence(preferences.hidePresence);
+  });
+
+  /**
    * Строка под именем чата — `headerSubtitle` нативной: связь, потом кто печатает, потом кто
    * это — ID собеседника в личном чате, число участников в группе.
    */
@@ -65,9 +102,38 @@
     const typing = roomTimeline?.typing ?? [];
     if (typing.length) return room?.kind === 'direct' ? t('room.typing') : typingText(typing);
     if (!room) return undefined;
-    if (room.kind === 'direct') return room.counterpartId;
+    if (room.kind === 'direct') return (presence?.presence && presenceLabel(presence.presence, Date.now(), i18n.locale)) || room.counterpartId;
     return room.memberCount > 0 ? plural('room.members', room.memberCount) : undefined;
   });
+
+  /**
+   * Чужая ссылка (`#/open/…`) — когда сессия готова: раньше список чатов ещё не знает, где мы
+   * уже состоим. Свой чат с человеком и своя комната открываются сразу; остальное — вопросом.
+   */
+  let link = $state<{ target: string; via?: string[] | undefined } | null>(null);
+  let askingLink = $state(false);
+  $effect(() => {
+    const route = router.route;
+    // Ушли со ссылки сами («назад», другой чат) — и вопрос уходит.
+    if (route.name !== 'open') askingLink = false;
+    if (route.name !== 'open' || !session.ready) return;
+    untrack(() => {
+      const existing = session.existingRoomFor(route.target);
+      if (route.target === session.userId) router.replace({ name: 'home' });
+      else if (existing) router.replace({ name: 'room', roomId: existing });
+      else {
+        link = { target: route.target, via: route.via };
+        askingLink = true;
+      }
+    });
+  });
+
+  /** Открыли чат или отказались. Окно закрывается и событием `close` — второй раз ничего не делаем. */
+  function closeLink(roomId?: string) {
+    if (!askingLink) return;
+    askingLink = false;
+    router.replace(roomId ? { name: 'room', roomId } : { name: 'home' });
+  }
 
   $effect(() => {
     showBadge(session.rooms.badge, t('app.name'));
@@ -120,7 +186,8 @@
       case 'escape':
         // Открытое окно или меню закрывается само (`<dialog>`); это — когда закрывать нечего.
         if (document.querySelector('dialog[open]')) return;
-        if (panelOpen) panelOpen = false;
+        if (threadId) closeThread();
+        else if (panelOpen) panelOpen = false;
         else if (roomId) {
           if (!roomView?.escape()) closeRoom();
         } else if (router.route.name === 'settings') settingsBack();
@@ -177,8 +244,8 @@
 <Columns
   bind:listWidth={preferences.listWidth}
   showMain={roomId !== null || router.route.name === 'settings'}
-  panelOpen={panelOpen && roomId !== null}
-  onClosePanel={() => (panelOpen = false)}
+  panelOpen={(panelOpen || !!threadId) && roomId !== null}
+  onClosePanel={() => (threadId ? closeThread() : (panelOpen = false))}
   resizeLabel={t('layout.resizeList')}
 >
   {#snippet list()}
@@ -214,7 +281,14 @@
           {@render face()}
         {/snippet}
         {#snippet trailing()}
-          <IconButton label={t('room.info')} pressed={panelOpen} onclick={() => (panelOpen = !panelOpen)}>
+          <IconButton
+            label={t('room.info')}
+            pressed={panelOpen && !threadId}
+            onclick={() => {
+              if (threadId) closeThread();
+              panelOpen = threadId ? true : !panelOpen;
+            }}
+          >
             <Icon name="info" />
           </IconButton>
         {/snippet}
@@ -254,6 +328,18 @@
   {/snippet}
 
   {#snippet panel()}
+    {#if roomId && threadId}
+      <div class="panel-column">
+        <Bar title={t('thread.title')} subtitle={title}>
+          {#snippet trailing()}
+            <IconButton label={t('thread.close')} onclick={closeThread}><Icon name="close" /></IconButton>
+          {/snippet}
+        </Bar>
+        {#key `${roomId} ${threadId}`}
+          <RoomView {session} {roomId} thread={threadId} />
+        {/key}
+      </div>
+    {:else}
     <div class="panel-column">
       <Bar title={t('room.info')}>
         {#snippet trailing()}
@@ -275,6 +361,7 @@
         {/key}
       {/if}
     </div>
+    {/if}
   {/snippet}
 </Columns>
 
@@ -283,6 +370,9 @@
 <QuickSwitcher {session} open={switching} onclose={() => (switching = false)} />
 <HotkeyHelp open={helping} onclose={() => (helping = false)} />
 <NewChatDialog open={creating} {session} onclose={() => (creating = false)} />
+{#if link}
+  <OpenLinkDialog open={askingLink} {session} target={link.target} via={link.via} onopen={closeLink} onclose={() => closeLink()} />
+{/if}
 
 <ConfirmDialog
   open={confirmingSignOut}

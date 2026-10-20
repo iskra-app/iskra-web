@@ -14,8 +14,10 @@
     items: Message[];
     media: MediaLoader;
     onopen: (message: Message) => void;
+    /** Под альбомом подпись. */
+    captioned?: boolean;
   }
-  let { items, media, onopen }: Props = $props();
+  let { items, media, onopen, captioned = false }: Props = $props();
 
   /*
    * Мозаика считает в долях ширины. Ширина альбома — `--size-media-max-width` (320), потолок
@@ -50,7 +52,7 @@
   }
 </script>
 
-<span class="album" use:shape={height}>
+<span class="album" class:captioned use:shape={height}>
   {#each items as item, i (item.key)}
     {#if frames[i] && (item.kind.type === 'image' || item.kind.type === 'video')}
       <span class="tile" use:place={{ f: frames[i], h: height }}>
@@ -69,6 +71,11 @@
     aspect-ratio: 1 / var(--album-height, 1);
     border-radius: var(--radius-picture);
     overflow: hidden;
+  }
+  /* Под альбомом подпись: нижние углы — меньше, они уже не край пузыря, а граница с текстом. */
+  .album.captioned {
+    border-end-start-radius: var(--radius-control);
+    border-end-end-radius: var(--radius-control);
   }
   .tile {
     position: absolute;

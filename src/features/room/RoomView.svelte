@@ -8,30 +8,41 @@
   между чатами на десктопе его не теряло.
 -->
 <script lang="ts">
+  import { untrack } from 'svelte';
   import ConfirmDialog from '../../design/ConfirmDialog.svelte';
   import type { OutgoingFile } from '../../core/media/upload';
   import { fileSize } from '../media/files';
-  import { prepareFile } from '../media/prepare';
+  import { prepareFile, stickerFile } from '../media/prepare';
+  import Menu from '../../design/Menu.svelte';
+  import { viewport } from '../../design/viewport.svelte.ts';
+  import { stickerOf, type Sticker } from '../../core/stickers/imagePack';
+  import StickerPanel from './StickerPanel.svelte';
+  import { showsStickers } from './stickers';
   import type { Recording } from '../media/voiceRecorder.svelte.ts';
   import { VideoNoteRecorder } from '../media/videoNoteRecorder.svelte.ts';
   import { VIDEO_NOTE_SIDE } from '../media/videoNote';
   import VideoNoteCapture from './VideoNoteCapture.svelte';
   import Viewer, { type ViewerItem } from '../media/Viewer.svelte';
   import type { Message } from '../../core/timeline/message';
+  import { router } from '../../core/navigation/router.svelte.ts';
+  import { threadsShownIn } from './threads';
   import type { UserSession } from '../../core/session/userSession.svelte.ts';
-  import type { TimelineStore } from '../../core/timeline/timelineStore.svelte.ts';
+  import type { Reactor, TimelineStore } from '../../core/timeline/timelineStore.svelte.ts';
   import { i18n, t } from '../../i18n/index.svelte.ts';
   import type { ComposerContext, MessageActions } from './actions';
   import Composer from './Composer.svelte';
   import PollComposer from './PollComposer.svelte';
   import SelectionBar from './SelectionBar.svelte';
   import ForwardDialog from './ForwardDialog.svelte';
+  import ReactorsDialog from './ReactorsDialog.svelte';
+  import ReportDialog from './ReportDialog.svelte';
   import { canForward } from '../../core/timeline/forward';
   import { membersOf } from '../../core/timeline/album';
   import { inTimelineOrder, selectionTranscript } from '../../core/timeline/selection';
   import { SvelteSet } from 'svelte/reactivity';
   import MessageMenu from './MessageMenu.svelte';
   import PinnedStrip from './PinnedStrip.svelte';
+  import PinnedDialog from './PinnedDialog.svelte';
   import IdentityBanner from './IdentityBanner.svelte';
   import type { IdentityChangesStore } from '../../core/encryption/identityChanges.svelte.ts';
   import Timeline from './Timeline.svelte';
@@ -39,6 +50,8 @@
   import { distance } from './distance';
   import type { Place } from '../../core/timeline/location';
   import { preferences } from '../app/preferences.svelte.ts';
+  import { revealRequest } from '../app/revealRequest.svelte.ts';
+  import { profileRequest } from './profileRequest.svelte.ts';
   import { unlinkMentions, type ComposerMention } from '../../core/timeline/composerMentions';
   import { Photo, pixelsFor } from '../rooms/faces.svelte.ts';
   import type { MentionRow } from './MentionPicker.svelte';
@@ -48,13 +61,27 @@
     roomId: string;
     /** Лента чата — наружу, для вкладок «О чате»: они читают то, что она загрузила. */
     store?: TimelineStore;
+    /** Это тред под сообщением (ID корня), а не сам чат: та же лента, только его ответы. */
+    thread?: string;
   }
-  let { session, roomId, store = $bindable() }: Props = $props();
+  let { session, roomId, store = $bindable(), thread }: Props = $props();
+  /** Черновик треда — свой, рядом с черновиком чата. */
+  const draftKey = $derived(thread ? `${roomId}#${thread}` : roomId);
 
   const DRAFT_SAVE_MS = 400;
 
   let composer: Composer | undefined = $state();
+  /** Открыт список «Закреплённые». */
+  let pinnedList = $state(false);
   let timeline: Timeline | undefined = $state();
+
+  // Открыли из поиска — лента открывается на найденном. Чат уже был открыт — к нему же.
+  const openAt = untrack(() => (thread ? undefined : revealRequest.take(roomId)));
+  $effect(() => {
+    if (!timeline || thread || revealRequest.pending?.roomId !== roomId) return;
+    const eventId = revealRequest.take(roomId);
+    if (eventId) void timeline.reveal(eventId);
+  });
 
   let text = $state('');
   let context = $state<ComposerContext>(null);
@@ -65,6 +92,10 @@
   let stashedMentions: ComposerMention[] = [];
   let menu = $state<{ message: Message; at: { x: number; y: number }; sheet: boolean } | null>(null);
   let deleting = $state<Message | null>(null);
+  /** Кто отреагировал — открытое окно; `null` — закрыто. */
+  let reactorsOf = $state<Reactor[] | null>(null);
+  /** На что жалуются; `null` — окно закрыто. */
+  let reporting = $state<Message | null>(null);
   let endingPoll = $state<Message | null>(null);
   let creatingPoll = $state(false);
   /** Выбранные сообщения — ключи, пока выбирают; `null` почти всегда. См. `selection.ts`. */
@@ -96,7 +127,6 @@
     if (transcript) void navigator.clipboard?.writeText(transcript).catch(() => {});
     selection = null;
   }
-  let blocking = $state<Message | null>(null);
   let attachments = $state<OutgoingFile[]>([]);
   let dropping = $state(false);
   /** Строка над полем: не влезло в лимит, не нашли место — сказать и дать закрыть. */
@@ -136,8 +166,8 @@
   });
 
   $effect(() => {
-    const id = roomId;
-    const created = session.timeline(id);
+    const id = draftKey;
+    const created = session.timeline(roomId, thread);
     store = created;
     text = '';
     context = null;
@@ -170,6 +200,8 @@
   /** Кто здесь сменил ключи — живёт, пока открыт чат, как и лента. */
   let identities = $state<IdentityChangesStore | null>(null);
   $effect(() => {
+    // В треде о сменивших ключи не говорим: это сказано над самим чатом.
+    if (thread) return;
     const created = session.identityChanges(roomId);
     identities = created;
     return () => {
@@ -190,6 +222,12 @@
   }
 
   const room = $derived(session.rooms.get(roomId));
+  /** Треды в этом чате — `ThreadSettings` нативной: не в личном, и по настройке «Чаты». */
+  const usesThreads = $derived(!thread && !!room && room.kind !== 'direct' && threadsShownIn(room.memberCount));
+  $effect(() => {
+    store?.setThreads({ enabled: usesThreads, hidesReplies: preferences.threadsHideReplies });
+  });
+
   /** Собеседник личного чата, если вы его заблокировали: в группе один заблокированный писать не мешает. */
   const blockedId = $derived(room?.kind === 'direct' && room.counterpartId && session.blocked.has(room.counterpartId) ? room.counterpartId : undefined);
   const canSend = $derived(room?.membership === 'join' || (!room && session.canSend(roomId)));
@@ -201,11 +239,13 @@
 
   function oninput(value: string) {
     if (context?.kind !== 'edit') {
+      // Скрыл «печатает…» — о наборе никому не говорим; остановку — тоже незачем.
+      if (preferences.hideTyping) return;
       if (value.trim()) store?.typingActive();
       else store?.typingStopped();
     }
     clearTimeout(saveTimer);
-    const id = roomId;
+    const id = draftKey;
     saveTimer = setTimeout(() => void session.saveDraft(id, draftText()), DRAFT_SAVE_MS);
   }
 
@@ -230,7 +270,7 @@
     }
     context = null;
     clearTimeout(saveTimer);
-    void session.saveDraft(roomId, text);
+    void session.saveDraft(draftKey, text);
   }
 
   /**
@@ -289,6 +329,20 @@
       replyTo,
     );
     if (replyTo) context = null;
+  }
+
+  /** Панель стикеров — у кнопки в поле, где её нажали. */
+  let stickerPanel = $state<{ x: number; y: number } | null>(null);
+
+  /** Стикер выбран: панель закрывается сразу, стикер уходит следом — с ответом, если отвечали. */
+  async function sendSticker(sticker: Sticker) {
+    stickerPanel = null;
+    const target = store;
+    if (!target) return;
+    const replyTo = context?.kind === 'reply' ? context.message : undefined;
+    if (replyTo) context = null;
+    const sent = await target.sendSticker(sticker, replyTo, async () => stickerFile(await session.media.blob({ mxc: sticker.url }, sticker.mimetype ?? 'image/png'), sticker.body));
+    if (sent) session.stickers.used(sticker);
   }
 
   function cancelVideoNote() {
@@ -390,6 +444,15 @@
     get canReply() {
       return canSend;
     },
+    get showsReactors() {
+      return room?.kind !== 'direct';
+    },
+    openProfile: (userId: string) => profileRequest.open(roomId, userId),
+    get openThread() {
+      return usesThreads ? (message: Message) => message.eventId && router.go({ name: 'room', roomId, thread: message.eventId }) : undefined;
+    },
+    reactors: (message) => (reactorsOf = store?.reactors(message) ?? []),
+    report: (message) => (reporting = message),
     get canPin() {
       return !!store?.canPin;
     },
@@ -406,10 +469,19 @@
     pin: (message) => store?.pin(message),
     unpin: (message) => store?.unpin(message),
     remove: (message) => (deleting = message),
-    block: (message) => (blocking = message),
     retry: (key) => store?.retry(key),
+    sendAnyway: (key) => store?.sendAnyway(key),
     discard: (key) => store?.discard(key),
     openMenu: (message, at, sheet) => (menu = { message, at, sheet }),
+    stickerIsMine: (message) => {
+      const sticker = message.kind.type === 'sticker' ? stickerOf(message.kind.attachment) : undefined;
+      return sticker ? session.stickers.isMine(sticker.url) : undefined;
+    },
+    toggleSticker: (message) => {
+      const sticker = message.kind.type === 'sticker' ? stickerOf(message.kind.attachment) : undefined;
+      if (!sticker) return;
+      void (session.stickers.isMine(sticker.url) ? session.stickers.remove(sticker) : session.stickers.add(sticker));
+    },
     openMedia: (message) => {
       // Листается всё, что в комнате загружено: фото, видео, «кружочки» — по порядку ленты.
       const items: ViewerItem[] = (store?.messages ?? []).flatMap((m) =>
@@ -441,7 +513,7 @@
     return true;
   }
 
-  /** Из панели «О чате»: к закреплённому сообщению. */
+  /** Из панели «О чате»: к закреплённому сообщению или найденному в поиске по чату. */
   export function reveal(eventId: string): void {
     void timeline?.reveal(eventId);
   }
@@ -472,17 +544,30 @@
       <IdentityBanner change={identityChange} onacknowledge={() => void acknowledgeIdentity()} />
     {/key}
   {/if}
-  {#if store && store.pinnedIds.length}
+  {#if store && store.pinnedIds.length && !thread}
     <PinnedStrip
       message={store.pinnedMessage}
-      canUnpin={store.canPin}
+      count={store.pinnedIds.length}
       onjump={() => store?.pinnedMessage?.eventId && void timeline?.reveal(store.pinnedMessage.eventId)}
-      onunpin={() => store?.pinnedMessage && store.unpin(store.pinnedMessage)}
+      onlist={() => (pinnedList = true)}
+    />
+    <PinnedDialog
+      open={pinnedList}
+      {session}
+      {roomId}
+      direct={room?.kind === 'direct'}
+      canUnpin={store.canPin}
+      onjump={(eventId) => {
+        pinnedList = false;
+        void timeline?.reveal(eventId);
+      }}
+      onunpin={(eventId) => store?.unpinEvent(eventId)}
+      onclose={() => (pinnedList = false)}
     />
   {/if}
   {#if store}
     {#key store}
-      <Timeline bind:this={timeline} {store} {session} showSenders={room?.kind !== 'direct'} {actions} {selection} ontoggle={toggleSelected} />
+      <Timeline bind:this={timeline} {store} {session} {openAt} showSenders={room?.kind !== 'direct'} {actions} {selection} ontoggle={toggleSelected} />
     {/key}
   {/if}
   {#if videoNote.open}
@@ -497,8 +582,14 @@
     {/if}
     {#if store?.failure}
       <div class="failure" role="alert">
-        <span>{t(`timeline.${store.failure}`)}</span>
+        <span>{store.failure === 'sendAnywayFailed' ? t('message.delivery.sendAnywayFailed') : t(`timeline.${store.failure}`)}</span>
         <button type="button" onclick={() => store?.dismissFailure()}>{t('timeline.dismiss')}</button>
+      </div>
+    {/if}
+    {#if session.stickers.failure}
+      <div class="failure" role="alert">
+        <span>{t(`stickers.${session.stickers.failure}Failed`)}</span>
+        <button type="button" onclick={() => session.stickers.dismissFailure()}>{t('timeline.dismiss')}</button>
       </div>
     {/if}
     {#if session.blocked.failure === 'blockFailed'}
@@ -544,8 +635,9 @@
     {attachments}
     onfiles={(files) => void addFiles(files)}
     onremoveattachment={(index) => (attachments = attachments.filter((_, i) => i !== index))}
-    onlocation={locate}
-    onpoll={room?.kind === 'direct' ? undefined : () => (creatingPoll = true)}
+    onlocation={thread ? undefined : locate}
+    onpoll={room?.kind === 'direct' || thread ? undefined : () => (creatingPoll = true)}
+    onstickers={showsStickers() ? (at) => (stickerPanel = at) : undefined}
     {onvoice}
     {videoNote}
     bind:videoHolding
@@ -554,6 +646,12 @@
   />
   {/if}
 </div>
+
+<Menu open={!!stickerPanel} x={stickerPanel?.x ?? 0} y={stickerPanel?.y ?? 0} sheet={!viewport.finePointer} label={t('stickers.title')} onclose={() => (stickerPanel = null)}>
+  {#if stickerPanel}
+    <StickerPanel library={session.stickers} media={session.media} {roomId} onpick={(sticker) => void sendSticker(sticker)} />
+  {/if}
+</Menu>
 
 {#if viewing}
   <Viewer items={viewing.items} start={viewing.start} media={session.media} onclose={() => (viewing = null)} />
@@ -589,6 +687,10 @@
     selection = null;
   }}
 />
+
+<ReactorsDialog reactors={reactorsOf} {session} onclose={() => (reactorsOf = null)} />
+
+<ReportDialog message={reporting} onreport={(message, reason) => store?.report(message, reason)} onclose={() => (reporting = null)} />
 
 <ForwardDialog open={!!forwarding} {session} onsend={(ids, comment) => void forwardTo(ids, comment)} onclose={() => (forwarding = null)} />
 
@@ -628,19 +730,6 @@
   }}
 />
 
-<ConfirmDialog
-  open={!!blocking}
-  title={t('message.menu.blockConfirm', { name: blocking?.senderName ?? '' })}
-  message={t('message.menu.blockConfirmMessage')}
-  confirmLabel={t('message.menu.block')}
-  cancelLabel={t('common.cancel')}
-  destructive
-  onclose={() => (blocking = null)}
-  onconfirm={() => {
-    if (blocking) void session.blocked.block(blocking.senderId);
-    blocking = null;
-  }}
-/>
 
 <style>
   .room {

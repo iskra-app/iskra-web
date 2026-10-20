@@ -19,6 +19,7 @@ import {
   DEMO_SERVER,
   buildDemoWorld,
   demoCredentials,
+  demoAccountData,
   demoDirect,
   demoDirectory,
   demoMutedRooms,
@@ -86,6 +87,18 @@ export class DemoHomeserver {
   private readonly storage: DemoStorage | undefined;
   /** Данные аккаунта, изменённые с прошлой синхронизации. */
   private pendingAccountData: Array<{ type: string; content: unknown }> = [];
+  /**
+   * Другие сеансы Алисы — только в списке устройств, без ключей (шифрование их не видит):
+   * чтобы в демо было что завершать. Завершённые уходят до перезагрузки страницы.
+   */
+  private readonly otherSessions = [
+    { device_id: 'IPHONEDEMO', display_name: 'Iskra (iPhone)', last_seen_ip: '203.0.113.7', last_seen_ts: Date.now() - 2 * 3600_000 },
+    { device_id: 'FIREFOXDEMO', display_name: 'Firefox на Linux', last_seen_ip: '198.51.100.23', last_seen_ts: Date.now() - 3 * 24 * 3600_000 },
+  ];
+  /** Адреса, занятые в демо: адрес → комната. Каталожные (`demoDirectory`) заняты тоже. */
+  private readonly aliases = new Map<string, string>();
+  /** Комнаты Алисы, выставленные в каталог сервера. */
+  private readonly listed = new Set<string>();
   /** Чьи ключи сменились с прошлой синхронизации — `device_lists.changed`. */
   private pendingKeyChanges: string[] = [];
   /** Что отдать следующей синхронизацией: вход по приглашению, выход, отметки о прочтении. */
@@ -108,6 +121,11 @@ export class DemoHomeserver {
     this.slowDelayMs = options.slowDelayMs ?? 1_500;
     this.storage = options.storage;
     this.account = this.storage?.load() ?? emptyAccount();
+    // Вкладку перезагрузили после того, как список устройств уже видели, — в нём новый вход:
+    // так в демо видно «Новый вход в аккаунт — это вы?».
+    if (this.account.sawDevices) {
+      this.otherSessions.unshift({ device_id: 'CHROMEDEMO', display_name: 'Chrome на Windows', last_seen_ip: '192.0.2.44', last_seen_ts: Date.now() - 5 * 60_000 });
+    }
     const world = buildDemoWorld(options.now ?? Date.now());
     this.rooms = new Map(world.rooms.map((room) => [room.roomId, room]));
     this.invites = world.invites;
@@ -134,8 +152,15 @@ export class DemoHomeserver {
       ['POST', re(`${c}/v3/rooms/([^/]+)/invite`), (r) => this.membership(r, 'invite')],
       ['POST', re(`${c}/v3/rooms/([^/]+)/kick`), (r) => this.membership(r, 'leave')],
       ['POST', re(`${c}/v3/rooms/([^/]+)/ban`), (r) => this.membership(r, 'ban')],
+      // Разблокировать — запрет снят, а сам человек не вернулся: `leave`.
+      ['POST', re(`${c}/v3/rooms/([^/]+)/unban`), (r) => this.membership(r, 'leave')],
+      ['PUT', re(`${c}/v3/directory/room/([^/]+)`), (r) => this.claimAlias(r)],
+      ['DELETE', re(`${c}/v3/directory/room/([^/]+)`), (r) => this.releaseAlias(r)],
+      ['GET', re(`${c}/v3/directory/list/room/([^/]+)`), (r) => json(200, { visibility: this.listed.has(decodeURIComponent(r.params[0]!)) ? 'public' : 'private' })],
+      ['PUT', re(`${c}/v3/directory/list/room/([^/]+)`), (r) => this.setListed(r)],
       ['PUT', re(`${c}/v3/profile/([^/]+)/(displayname|avatar_url)`), (r) => this.putProfile(r)],
       ['GET', re(`${c}/v3/devices`), () => this.devices()],
+      ['POST', re(`${c}/v3/delete_devices`), (r) => this.deleteDevices(r)],
       ['POST', re(`${c}/v3/user/([^/]+)/filter`), (r) => this.createFilter(r)],
       ['GET', re(`${c}/v3/user/([^/]+)/filter/([^/]+)`), (r) => this.getFilter(r)],
       ['GET', re(`${c}/v3/sync`), (r) => this.sync(r)],
@@ -153,6 +178,7 @@ export class DemoHomeserver {
       ['PUT', re(`${c}/v3/rooms/([^/]+)/redact/([^/]+)/([^/]+)`), (r) => this.redact(r)],
       ['PUT', re(`${c}/v3/rooms/([^/]+)/state/([^/]+)/?([^/]*)`), (r) => this.putState(r)],
       ['GET', re(`${c}/v3/rooms/([^/]+)/event/([^/]+)`), (r) => this.event(r)],
+      ['GET', re(`${c}/v1/rooms/([^/]+)/relations/([^/]+)/([^/]+)(?:/[^/]+)?`), (r) => this.relations(r)],
       ['GET', re(`${c}/v3/rooms/([^/]+)/members`), (r) => this.members(r.params[0]!)],
       ['GET', re(`${c}/v3/rooms/([^/]+)/joined_members`), (r) => this.joinedMembers(r.params[0]!)],
       ['PUT', re(`${c}/v3/rooms/([^/]+)/typing/([^/]+)`), () => json(200, {})],
@@ -163,6 +189,9 @@ export class DemoHomeserver {
       ['GET', re(`${c}/v1/media/thumbnail/([^/]+)/([^/]+)`), (r) => this.downloadMedia(r)],
       ['GET', re(`${c}/v3/voip/turnServer`), () => json(200, {})],
       ['PUT', re(`${c}/v3/presence/([^/]+)/status`), () => json(200, {})],
+      ['GET', re(`${c}/v3/presence/([^/]+)/status`), (r) => this.presenceOf(r)],
+      // Жалоба уходит модераторам сервера — у демо их нет, но принять её он должен.
+      ['POST', re(`${c}/v3/rooms/([^/]+)/report/([^/]+)`), () => json(200, {})],
       // Звонков (MatrixRTC) в демо нет — и SDK это спрашивает на старте.
       ['GET', re(`${c}/unstable/org.matrix.msc4143/rtc/transports`), () => unrecognized()],
       ['GET', re(`${c}/v1/rtc/transports`), () => unrecognized()],
@@ -320,11 +349,20 @@ export class DemoHomeserver {
     const anya = asked.includes(demoUsers.anya) ? anyaIdentities[this.account.anyaNewKeys ? 1 : 0]! : undefined;
     return json(200, {
       device_keys,
-      master_keys: { ...byUser('master_key'), ...(anya ? { [demoUsers.anya]: anya.master_key } : {}) },
+      master_keys: { ...byUser('master_key'), ...(anya ? { [demoUsers.anya]: this.signedByAlice(anya.master_key) } : {}) },
       self_signing_keys: { ...byUser('self_signing_key'), ...(anya ? { [demoUsers.anya]: anya.self_signing_key } : {}) },
       user_signing_keys: byUser('user_signing_key'),
       failures: {},
     });
+  }
+
+  /** Главный ключ Ани — с подписью Алисы, если она его проверила. */
+  private signedByAlice(key: Record<string, unknown>): Record<string, unknown> {
+    const id = Object.keys(key['keys'] as Record<string, string>)[0]!.slice('ed25519:'.length);
+    const mine = this.account.anyaSignatures?.[id];
+    if (!mine) return key;
+    const signatures = key['signatures'] as Record<string, Record<string, string>> | undefined;
+    return { ...key, signatures: { ...signatures, [demoUsers.alice]: mine } };
   }
 
   /**
@@ -355,7 +393,15 @@ export class DemoHomeserver {
 
   private uploadSignatures({ body }: DemoRequest): Response {
     const uploads = (body ?? {}) as Record<string, Record<string, { signatures?: Record<string, Record<string, string>> }>>;
-    for (const [userId, signed] of Object.entries(uploads)) mergeSignatures(this.account, userId, signed);
+    for (const [userId, signed] of Object.entries(uploads)) {
+      if (userId !== demoUsers.anya) {
+        mergeSignatures(this.account, userId, signed);
+        continue;
+      }
+      // Алиса проверила Аню: подпись её ключом пользователей под главным ключом Ани.
+      const anya = (this.account.anyaSignatures ??= {});
+      for (const [id, key] of Object.entries(signed)) anya[id] = { ...anya[id], ...key.signatures?.[demoUsers.alice] };
+    }
     this.save();
     return json(200, { failures: {} });
   }
@@ -363,7 +409,7 @@ export class DemoHomeserver {
   // ————— Данные аккаунта —————
 
   private getAccountData(type: string): Response {
-    const content = this.account.accountData[type];
+    const content = this.account.accountData[type] ?? demoAccountData[type];
     return content === undefined ? json(404, { errcode: 'M_NOT_FOUND', error: 'Account data not found' }) : json(200, content);
   }
 
@@ -615,9 +661,8 @@ export class DemoHomeserver {
           highlight_count: room.unread?.highlights ?? 0,
         },
         summary: {
-          'm.joined_member_count': room.state.filter(
-            (e) => e.type === 'm.room.member' && e.content['membership'] === 'join',
-          ).length,
+          'm.joined_member_count':
+            room.joinedCount ?? room.state.filter((e) => e.type === 'm.room.member' && e.content['membership'] === 'join').length,
           'm.invited_member_count': 0,
         },
       };
@@ -632,7 +677,7 @@ export class DemoHomeserver {
       account_data: {
         events: [
           { type: 'm.direct', content: demoDirect },
-          ...Object.entries(this.account.accountData).map(([type, content]) => ({ type, content })),
+          ...Object.entries({ ...demoAccountData, ...this.account.accountData }).map(([type, content]) => ({ type, content })),
         ],
       },
       presence: { events: [] },
@@ -722,6 +767,16 @@ export class DemoHomeserver {
   }
 
   /**
+   * Присутствие: Аня была пять минут назад, остальные — как на сервере с выключенным
+   * присутствием: `offline` без времени, и показывать нечего.
+   */
+  private presenceOf({ params }: DemoRequest): Response {
+    const userId = decodeURIComponent((params as [string])[0]);
+    if (userId === demoUsers.anya) return json(200, { presence: 'offline', last_active_ago: 5 * 60_000, currently_active: false });
+    return json(200, { presence: 'offline' });
+  }
+
+  /**
    * Отправка. Событие ложится в историю и приходит обратно следующей синхронизацией с
    * `transaction_id` — так SDK узнаёт в нём свой local echo.
    *
@@ -770,6 +825,12 @@ export class DemoHomeserver {
   /** Событие Алисы — в историю и в следующую синхронизацию, с её `transaction_id`. */
   private append(roomId: string, event: DemoEvent, txnId?: string): void {
     const room = this.rooms.get(roomId)!;
+    if (event.state_key !== undefined) {
+      // Как у настоящего сервера: прежнее состояние — в `unsigned.prev_content`. По нему клиент
+      // знает, как звали заблокированного, — в самом событии блокировки имени нет.
+      const prev = room.state.find((e) => e.type === event.type && e.state_key === event.state_key);
+      if (prev) event = { ...event, unsigned: { ...event.unsigned, prev_content: prev.content } };
+    }
     room.timeline.push(event);
     if (event.state_key !== undefined) {
       room.state = [...room.state.filter((e) => !(e.type === event.type && e.state_key === event.state_key)), event];
@@ -843,8 +904,18 @@ export class DemoHomeserver {
     return json(200, { content_uri: demoMxc(id) });
   }
 
-  private downloadMedia({ params }: DemoRequest): Response {
-    const media = this.media.get(params[1] ?? '');
+  private async downloadMedia({ params }: DemoRequest): Promise<Response> {
+    const id = params[1] ?? '';
+    // «Искорки» — те же файлы, что у приложения: берутся из его же `public/stickers` при первом спросе.
+    if (!this.media.has(id) && /^sticker-[a-z]+$/.test(id)) {
+      try {
+        const response = await globalThis.fetch(`${import.meta.env.BASE_URL}stickers/${id}.png`);
+        if (response.ok) this.media.set(id, { bytes: new Uint8Array(await response.arrayBuffer()), type: 'image/png' });
+      } catch {
+        // Не браузер (юнит-тесты) — картинки нет, как нет её у сервера без файла.
+      }
+    }
+    const media = this.media.get(id);
     if (!media) return json(404, { errcode: 'M_NOT_FOUND', error: 'Not found' });
     return new Response(media.bytes.slice(), {
       status: 200,
@@ -1017,6 +1088,30 @@ export class DemoHomeserver {
   }
 
   /** Пригласить, исключить, заблокировать — событие участия от имени Алисы. */
+  /** Занять адрес: уже чей-то — 409, как у настоящего сервера. */
+  private claimAlias({ params, body }: DemoRequest): Response {
+    const alias = decodeURIComponent(params[0]!);
+    const roomId = (body as { room_id?: string } | undefined)?.room_id;
+    if (!roomId) return json(400, { errcode: 'M_BAD_JSON', error: 'No room_id' });
+    if (this.aliases.has(alias) || demoDirectory.some((room) => room.alias === alias)) {
+      return json(409, { errcode: 'M_UNKNOWN', error: 'Room alias already exists' });
+    }
+    this.aliases.set(alias, roomId);
+    return json(200, {});
+  }
+
+  private releaseAlias({ params }: DemoRequest): Response {
+    this.aliases.delete(decodeURIComponent(params[0]!));
+    return json(200, {});
+  }
+
+  private setListed({ params, body }: DemoRequest): Response {
+    const roomId = decodeURIComponent(params[0]!);
+    if ((body as { visibility?: string } | undefined)?.visibility === 'public') this.listed.add(roomId);
+    else this.listed.delete(roomId);
+    return json(200, {});
+  }
+
   private membership({ params, body }: DemoRequest, membership: 'invite' | 'leave' | 'ban'): Response {
     const room = this.rooms.get(params[0] ?? '');
     if (!room) return json(403, { errcode: 'M_FORBIDDEN', error: 'Not in room' });
@@ -1063,8 +1158,31 @@ export class DemoHomeserver {
   }
 
   private devices(): Response {
+    if (!this.account.sawDevices) {
+      this.account.sawDevices = true;
+      this.save();
+    }
     const devices = Object.keys(this.account.devices).map((id) => ({ device_id: id, display_name: 'Iskra Web', last_seen_ts: Date.now() }));
-    return json(200, { devices });
+    return json(200, { devices: [...devices, ...this.otherSessions] });
+  }
+
+  /** Завершить сеансы — только с паролем, как у настоящего сервера (UIA). */
+  private deleteDevices({ body }: DemoRequest): Response {
+    const { devices = [], auth } = (body ?? {}) as { devices?: string[]; auth?: { type?: string; password?: string } };
+    const ok = auth?.type === 'm.login.password' && auth.password === demoCredentials.password;
+    if (!ok) {
+      return json(401, {
+        flows: [{ stages: ['m.login.password'] }],
+        params: {},
+        session: 'demo-uia-devices',
+        ...(auth ? { errcode: 'M_FORBIDDEN', error: 'Invalid password' } : {}),
+      });
+    }
+    for (const id of devices) {
+      const i = this.otherSessions.findIndex((s) => s.device_id === id);
+      if (i >= 0) this.otherSessions.splice(i, 1);
+    }
+    return json(200, {});
   }
 
   /** Одно событие по ID — закреплённое, которого нет среди загруженного. */
@@ -1129,6 +1247,22 @@ export class DemoHomeserver {
   }
 
   /** `/messages` назад по истории: токен `t<n>` — «всё, что раньше n-го события». */
+  /** Связанные с событием — тред (`m.thread`) и прочее; новые первыми, одной страницей. */
+  private relations({ params }: DemoRequest): Response {
+    const room = this.rooms.get(decodeURIComponent(params[0] ?? ''));
+    if (!room) return json(403, { errcode: 'M_FORBIDDEN', error: 'Not in room' });
+    const target = decodeURIComponent(params[1] ?? '');
+    const relType = decodeURIComponent(params[2] ?? '');
+    const chunk = room.timeline
+      .filter((e) => {
+        const relation = e.content['m.relates_to'] as { rel_type?: unknown; event_id?: unknown } | undefined;
+        return relation?.rel_type === relType && relation.event_id === target;
+      })
+      .reverse()
+      .map((e) => ({ ...withDefaults(e), room_id: room.roomId }));
+    return json(200, { chunk });
+  }
+
   private messages({ params, url }: DemoRequest): Response {
     const room = this.rooms.get(params[0] ?? '');
     if (!room) return json(403, { errcode: 'M_FORBIDDEN', error: 'Not in room' });
@@ -1140,14 +1274,15 @@ export class DemoHomeserver {
     if (dir === 'f') {
       const end = Math.min(room.timeline.length, position + limit);
       return json(200, {
-        chunk: room.timeline.slice(position, end).map((e) => withDefaults(e)),
+        chunk: room.timeline.slice(position, end).map((e) => ({ ...withDefaults(e), room_id: room.roomId })),
         start: `t${position}`,
         ...(end < room.timeline.length ? { end: `t${end}` } : {}),
       });
     }
 
     const start = Math.max(0, position - limit);
-    const chunk = room.timeline.slice(start, position).reverse().map((e) => withDefaults(e));
+    // С `room_id`, как у настоящего сервера: в `/messages` события — ClientEvent, не урезанные, как в `/sync`.
+    const chunk = room.timeline.slice(start, position).reverse().map((e) => ({ ...withDefaults(e), room_id: room.roomId }));
     return json(200, {
       chunk,
       start: `t${position}`,

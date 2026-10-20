@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { MatrixEvent, type IEvent } from 'matrix-js-sdk';
-import { mapEvent, stripReplyFallback, type MapperContext } from '../../src/core/timeline/mapper';
+import { EventStatus, MatrixEvent, type IEvent } from 'matrix-js-sdk';
+import { failureOf, mapEvent, stripReplyFallback, type MapperContext } from '../../src/core/timeline/mapper';
 import { layout, RUN_WINDOW_MS } from '../../src/core/timeline/layout';
 import type { Message } from '../../src/core/timeline/message';
 
@@ -104,6 +104,8 @@ describe('TimelineMapper', () => {
 
   it('удалённое сообщение — «удалено», удалённое служебное — ничего', () => {
     expect(map({ type: 'm.room.message', content: {}, unsigned: { redacted_because: { type: 'm.room.redaction' } as never } })?.kind).toEqual({ type: 'deleted' });
+    // Когда удалили — для меню удалённого: «Удалено …».
+    expect(map({ type: 'm.room.message', content: {}, unsigned: { redacted_because: { type: 'm.room.redaction', origin_server_ts: 1234 } as never } })?.kind).toEqual({ type: 'deleted', at: 1234 });
     expect(map({ type: 'm.room.topic', state_key: '', content: {}, unsigned: { redacted_because: { type: 'm.room.redaction' } as never } })).toBeUndefined();
   });
 
@@ -198,6 +200,30 @@ describe('TimelineMapper', () => {
 
   it('ещё не расшифрованное — не строка; не расшифровавшееся — «не открыть»', () => {
     expect(map({ type: 'm.room.encrypted', content: { algorithm: 'm.megolm.v1.aes-sha2', ciphertext: 'x' } })).toBeUndefined();
+  });
+});
+
+describe('почему не ушло', () => {
+  // Дословно — как их отдаёт matrix-sdk-crypto-wasm 18 в строгом режиме изоляции.
+  const rust = (reason: string) => new Error(`encryption failed due to an error collecting the recipient devices: ${reason}`);
+
+  it('проверенный сменил личность, у проверенного неподписанное устройство — по тексту Rust-крипто', () => {
+    expect(failureOf(rust('one or more users that were verified have changed their identity'))).toBe('identityChanged');
+    expect(failureOf(rust('one or more verified users have unsigned devices'))).toBe('insecureDevices');
+  });
+
+  it('всё прочее — сервер', () => {
+    expect(failureOf(new Error('Network request failed'))).toBe('server');
+    expect(failureOf(rust('Encryption failed because your device is not verified'))).toBe('server');
+    expect(failureOf(undefined)).toBe('server');
+    expect(failureOf({ message: 42 })).toBe('server');
+  });
+
+  it('у не ушедшего — причина в доставке', () => {
+    const event = ev({ type: 'm.room.message', sender: ME, content: { msgtype: 'm.text', body: 'я' } });
+    event.error = rust('one or more users that were verified have changed their identity') as never;
+    event.setStatus(EventStatus.NOT_SENT);
+    expect(mapEvent(event, context)?.delivery).toEqual({ state: 'failed', reason: 'identityChanged' });
   });
 });
 

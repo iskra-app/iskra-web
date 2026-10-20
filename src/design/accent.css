@@ -44,3 +44,20 @@
   --bubble-own: color-mix(in srgb, var(--color-text) 16%, transparent);
   --on-bubble-own: var(--color-text);
 }
+
+/*
+ * «Тонировать интерфейс» — `Theme.Tint` нативной: один прозрачный лист акцента поверх всего, что
+ * нарисовано, — фон, пузыри и слова берут цвет разом. Восемь процентов — больше слова начнут
+ * сереть; у ч/б — половина: тьма не цвет, она только гасит. Сквозь лист всё нажимается.
+ */
+:root[data-tint] body::after {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: var(--z-tint);
+  background: color-mix(in srgb, var(--accent) var(--tint-interface), transparent);
+  pointer-events: none;
+}
+:root[data-tint][data-accent='mono'] body::after {
+  background: color-mix(in srgb, var(--accent) var(--tint-mono), transparent);
+}

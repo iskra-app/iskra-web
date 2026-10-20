@@ -30,15 +30,18 @@ import {
   type Room,
 } from 'matrix-js-sdk';
 import { sendAttachment, uploadClientFor, type OutgoingFile, type UploadClient } from '../media/upload';
+import { stickerContent, type Sticker } from '../stickers/imagePack';
 import { geoUri, type Place } from './location';
 import { markdownContent } from './composerMarkdown';
 import { currentMarker, rememberMovedMarker } from './readMarker';
 import { canSendPoll, pollEndContent, pollStartContent, type PollDraft } from './poll';
 import { mentionsMarkdown, rankCandidates, unlinkMentions, type ComposerMention, type RankedCandidate } from './composerMentions';
-import { mapEvent, type MapperContext } from './mapper';
+import { failureOf, mapEvent, threadRootOf, type MapperContext } from './mapper';
+import { previewOf } from '../rooms/preview';
+import { trustUnsignedDevices, withdrawChangedVerifications } from '../encryption/sendAnyway';
 import { isMarkedUnread, MARKED_UNREAD } from '../rooms/summarize';
 import { layout, SHOW_ALL_SERVICE, type ServiceHiding, type TimelineItem } from './layout';
-import type { Message, Reaction } from './message';
+import type { Message, Reaction, ThreadSummary } from './message';
 
 /**
  * Вложение в пути: загружается или не загрузилось. В ленте стоит своим пузырём с
@@ -49,13 +52,23 @@ export interface Upload {
   file: OutgoingFile;
   caption?: string;
   replyTo?: { eventId: string; senderId: string; own: boolean };
+  /** Связь события целиком — у ответа в треде: `m.thread` и подпорка `m.in_reply_to`. */
+  relatesTo?: Record<string, unknown>;
   /** 0…1 */
   progress: number;
   state: 'uploading' | 'failed';
 }
 
-/** Что не получилось — ключи текстов нативной Искры (`timeline.*Failed`). */
-export type TimelineFailure = 'reactionFailed' | 'deleteFailed' | 'editFailed' | 'pinFailed' | 'pollFailed';
+/** Что не получилось — ключи текстов нативной Искры (`timeline.*Failed`; `sendAnywayFailed` — из `message.delivery.*`). */
+export type TimelineFailure = 'reactionFailed' | 'deleteFailed' | 'editFailed' | 'pinFailed' | 'pollFailed' | 'reportFailed' | 'sendAnywayFailed' | 'stickerFailed';
+
+/** Кто поставил реакцию и какую — `Reactor` нативной. */
+export interface Reactor {
+  userId: string;
+  name: string;
+  avatarUrl?: string;
+  key: string;
+}
 
 const PINNED_EVENTS = 'm.room.pinned_events';
 /** Как долго «печатает» держится без нового нажатия — и как часто его повторять. */
@@ -65,6 +78,17 @@ const TYPING_REPEAT_MS = 20_000;
 const JUMP_MAX_PAGES = 10;
 
 const PAGE_SIZE = 30;
+/** Тред просится у сервера страницами по стольку, пока не кончится. */
+const THREAD_PAGE_SIZE = 50;
+const THREAD_MAX_PAGES = 20;
+
+/** Как лента комнаты обходится с тредами — решают настройки и сама комната, наверху. */
+export interface ThreadMode {
+  /** Строка «N ответов» под сообщением и «Ответить в треде». */
+  enabled: boolean;
+  /** Ответы в тредах — только в треде, не в общей ленте. */
+  hidesReplies: boolean;
+}
 /** Сколько страниц за один `fill`. Больше — это уже не «наполнить экран». */
 const MAX_PAGES = 20;
 const PAGE_TIMEOUT_MS = 20_000;
@@ -98,6 +122,17 @@ export class TimelineStore {
   failure = $state<TimelineFailure | null>(null);
 
   readonly roomId: string;
+  /** Это лента треда — ID его корня; в ленте — корень и ответы, и только они. */
+  readonly threadRootId: string | undefined;
+  private threads: ThreadMode = { enabled: false, hidesReplies: false };
+  /** Ответы треда, которые дал сервер (`/relations`): старые в общей ленте могут быть не загружены. */
+  private threadFetched: MatrixEvent[] = [];
+  private threadRoot: MatrixEvent | undefined;
+  private threadLoaded = false;
+  /** Последний ответ из сводки сервера — событием, один раз на ID. */
+  // Кэш, а не состояние.
+  // eslint-disable-next-line svelte/prefer-svelte-reactivity
+  private readonly threadLatest = new Map<string, MatrixEvent>();
   private readonly client: MatrixClient;
   private readonly ownUserId: string;
   private generation = 0;
@@ -121,9 +156,10 @@ export class TimelineStore {
   private uploadQueue: Promise<void> = Promise.resolve();
   private nextUpload = 0;
 
-  constructor(client: MatrixClient, roomId: string, uploader?: UploadClient) {
+  constructor(client: MatrixClient, roomId: string, uploader?: UploadClient, threadRootId?: string) {
     this.client = client;
     this.roomId = roomId;
+    this.threadRootId = threadRootId;
     this.uploader = uploader ?? uploadClientFor(client);
     this.ownUserId = client.getSafeUserId();
     this.listen();
@@ -213,6 +249,13 @@ export class TimelineStore {
     this.items = layout(this.messages, this.unreadFrom, this.hiding);
   }
 
+  /** Треды в этой комнате — по настройкам и её размеру (см. `ThreadSettings` нативной). */
+  setThreads(mode: ThreadMode): void {
+    if (mode.enabled === this.threads.enabled && mode.hidesReplies === this.threads.hidesReplies) return;
+    this.threads = { ...mode };
+    this.schedule();
+  }
+
   /** Пересобирает ленту сейчас. Тестам — чтобы не ждать кадра. */
   rebuild(): void {
     const room = this.room;
@@ -222,14 +265,16 @@ export class TimelineStore {
       return;
     }
     this.readPinned(room);
-    const context = this.context(room);
+    const live = room.getLiveTimeline().getEvents();
+    const pending = pendingOf(room);
+    const context = this.context(room, live, pending);
     const messages: Message[] = [];
     // Первое сообщение после маркера прочитанного — над ним полоса. Маркер не среди
-    // загруженного — полосы нет.
-    const marker = this.markerOf(room);
+    // загруженного — полосы нет. В треде полосы нет вовсе: маркер — комнаты.
+    const marker = this.threadRootId ? null : this.markerOf(room);
     let passedMarker = false;
     let unreadFrom: string | undefined;
-    for (const event of room.getLiveTimeline().getEvents()) {
+    for (const event of this.threadRootId ? this.threadEvents(room, live) : this.roomEvents(live)) {
       const message = mapEvent(event, context);
       if (message) {
         messages.push(message);
@@ -239,7 +284,8 @@ export class TimelineStore {
     }
     // Не ушедшие — SDK держит их отдельно от ленты (`pendingEventOrdering: detached`, так
     // создаёт клиент `UserSession`), и они стоят в конце, пока не уйдут или их не уберут.
-    for (const event of pendingOf(room)) {
+    for (const event of pending) {
+      if (!this.belongs(event)) continue;
       if (messages.some((m) => m.key === this.keys.get(event))) continue;
       const message = mapEvent(event, context);
       if (message) messages.push(message);
@@ -249,9 +295,71 @@ export class TimelineStore {
     this.unreadFrom = unreadFrom;
     this.items = layout(messages, unreadFrom, this.hiding);
     this.readPinnedMessage(room, context);
-    if (this.atStart === false && room.getLiveTimeline().getPaginationToken(Direction.Backward) === null) {
+    if (!this.threadRootId && this.atStart === false && room.getLiveTimeline().getPaginationToken(Direction.Backward) === null) {
       this.atStart = true;
     }
+  }
+
+  /** Общая лента: ответы в тредах — тоже, пока их не велели оставить только в треде. */
+  private roomEvents(live: MatrixEvent[]): MatrixEvent[] {
+    return this.threads.enabled && this.threads.hidesReplies ? live.filter((e) => !threadRootOf(e)) : live;
+  }
+
+  /** Лента треда: корень, потом ответы по времени — и полученные от сервера, и пришедшие синхронизацией. */
+  private threadEvents(room: Room, live: MatrixEvent[]): MatrixEvent[] {
+    const rootId = this.threadRootId!;
+    const byId: Record<string, MatrixEvent> = {};
+    for (const event of this.threadFetched) byId[event.getId() ?? ''] = event;
+    for (const event of live) if (threadRootOf(event) === rootId) byId[event.getId() ?? ''] = event;
+    const replies = Object.values(byId).sort((a, b) => a.getTs() - b.getTs());
+    const root = room.findEventById(rootId) ?? this.threadRoot;
+    return root ? [root, ...replies] : replies;
+  }
+
+  /** Не ушедшее — в эту ли ленту: в треде — только его ответы; в общей — по тем же правилам, что ушедшее. */
+  private belongs(event: MatrixEvent): boolean {
+    const root = threadRootOf(event);
+    if (this.threadRootId) return root === this.threadRootId;
+    return !(root && this.threads.enabled && this.threads.hidesReplies);
+  }
+
+  /**
+   * «N ответов» под сообщением: загруженные ответы и сводка сервера (`unsigned.m.relations`),
+   * что больше. Старый тред, ответы которого в ленту не попали, сервер всё равно посчитает.
+   */
+  private threadSummaries(room: Room, live: MatrixEvent[], pending: MatrixEvent[]): (eventId: string) => ThreadSummary | undefined {
+    const groups: Record<string, MatrixEvent[]> = {};
+    for (const event of [...live, ...pending]) {
+      const root = threadRootOf(event);
+      if (root && !event.isRedacted() && event.status !== EventStatus.CANCELLED) (groups[root] ??= []).push(event);
+    }
+    const nameOf = (userId: string) => room.getMember(userId)?.rawDisplayName?.trim() || userId;
+    return (eventId) => {
+      const loaded = groups[eventId] ?? [];
+      const server = room.findEventById(eventId)?.getUnsigned()['m.relations']?.['m.thread'] as
+        | { count?: unknown; latest_event?: { event_id?: unknown; origin_server_ts?: unknown } }
+        | undefined;
+      const replies = Math.max(loaded.length, typeof server?.count === 'number' ? server.count : 0);
+      if (!replies) return undefined;
+      let latest = loaded.at(-1);
+      const raw = server?.latest_event;
+      if (raw && typeof raw.event_id === 'string' && (!latest || (typeof raw.origin_server_ts === 'number' ? raw.origin_server_ts : 0) > latest.getTs())) {
+        latest = room.findEventById(raw.event_id) ?? this.latestFromServer(raw as never);
+      }
+      const sender = latest?.getSender();
+      const preview = latest ? previewOf(latest) : undefined;
+      return { replies, ...(sender ? { latestSender: nameOf(sender) } : {}), ...(preview ? { latest: preview } : {}) };
+    };
+  }
+
+  private latestFromServer(raw: { event_id: string }): MatrixEvent {
+    let event = this.threadLatest.get(raw.event_id);
+    if (!event) {
+      event = new MatrixEvent({ ...(raw as object), room_id: this.roomId });
+      this.threadLatest.set(raw.event_id, event);
+      if (event.isEncrypted()) void this.client.decryptEventIfNeeded(event).then(() => this.schedule());
+    }
+    return event;
   }
 
   private readPinned(room: Room): void {
@@ -300,7 +408,7 @@ export class TimelineStore {
     }
   }
 
-  private context(room: Room): MapperContext {
+  private context(room: Room, live: MatrixEvent[] = [], pending: MatrixEvent[] = []): MapperContext {
     const state = room.getLiveTimeline().getState(Direction.Forward);
     // Снимок на одну пересборку, не состояние.
     // eslint-disable-next-line svelte/prefer-svelte-reactivity
@@ -318,6 +426,8 @@ export class TimelineStore {
       isPinned: (eventId) => pinned.has(eventId),
       canRedactOthers: (event) => !!state?.maySendRedactionForEvent(event, this.ownUserId),
       isBlocked: (userId) => blocked.has(userId),
+      ...(this.threads.enabled && !this.threadRootId ? { threadOf: this.threadSummaries(room, live, pending) } : {}),
+      threaded: this.threads.enabled || !!this.threadRootId,
       keyOf: (event) => {
         let key = this.keys.get(event);
         if (!key) {
@@ -345,6 +455,7 @@ export class TimelineStore {
    * чата и «окно стало выше» (развернули на весь экран) — один и тот же вызов.
    */
   async fill(needsMore: () => boolean): Promise<void> {
+    if (this.threadRootId) return this.loadThread();
     let fetched = 0;
     let waited = 0;
     while (!this.destroyed && !this.atStart && needsMore() && fetched < MAX_PAGES && waited < MAX_PAGES) {
@@ -364,7 +475,45 @@ export class TimelineStore {
 
   /** Следующая страница — прокрутка дошла до верха. */
   async loadMore(): Promise<void> {
+    if (this.threadRootId) return this.loadThread();
     await this.page(true);
+  }
+
+  /**
+   * Тред целиком — у сервера (`/relations/…/m.thread`), страница за страницей: ответов в треде
+   * немного, а в общей ленте старых может не быть вовсе. Один раз за жизнь ленты; новое приходит
+   * синхронизацией.
+   */
+  private threadLoading: Promise<void> | null = null;
+  private loadThread(): Promise<void> {
+    if (this.threadLoaded) return Promise.resolve();
+    this.threadLoading ??= (async () => {
+      const rootId = this.threadRootId!;
+      const events: MatrixEvent[] = [];
+      let from: string | undefined;
+      try {
+        for (let page = 0; page < THREAD_MAX_PAGES; page++) {
+          const result = await withTimeout(
+            this.client.relations(this.roomId, rootId, 'm.thread', null, { dir: Direction.Backward, limit: THREAD_PAGE_SIZE, ...(from ? { from } : {}) }),
+            PAGE_TIMEOUT_MS,
+          );
+          if (result.originalEvent) this.threadRoot ??= result.originalEvent;
+          events.push(...result.events);
+          if (!result.nextBatch) break;
+          from = result.nextBatch;
+        }
+        await Promise.all([...events, ...(this.threadRoot ? [this.threadRoot] : [])].map((e) => this.client.decryptEventIfNeeded(e).catch(() => {})));
+        this.threadFetched = events;
+        this.threadLoaded = true;
+        this.atStart = true;
+      } catch {
+        if (!this.room?.findEventById(rootId) && !this.threadRoot) this.loadFailed = true;
+      } finally {
+        this.threadLoading = null;
+        this.rebuild();
+      }
+    })();
+    return this.threadLoading;
   }
 
   /** «Попробовать снова» после неудачного открытия. */
@@ -423,8 +572,9 @@ export class TimelineStore {
     this.typingStopped();
     const { content: words, userIds } = textContent(trimmed, mentions);
     const content: Record<string, unknown> = { msgtype: 'm.text', ...words };
+    const relation = this.relationFor(replyTo);
+    if (relation) content['m.relates_to'] = relation;
     if (replyTo?.eventId) {
-      content['m.relates_to'] = { 'm.in_reply_to': { event_id: replyTo.eventId } };
       if (!replyTo.own && !userIds.includes(replyTo.senderId)) userIds.push(replyTo.senderId);
       content['m.mentions'] = {};
     }
@@ -456,6 +606,52 @@ export class TimelineStore {
     this.schedule();
   }
 
+  /**
+   * Стикер из набора. Два пути — по комнате, как в нативной:
+   * - **открытая** — `m.sticker` со ссылкой на картинку набора; любой клиент нарисует стикер;
+   * - **зашифрованная** — а это почти любой настоящий разговор: картинку скачивают и отправляют
+   *   зашифрованным `m.image` по имени `sticker.<ext>` (`sealed` готовит экран — он же чистит
+   *   метаданные). `m.sticker` здесь отдал бы картинку серверу открытой.
+   */
+  async sendSticker(sticker: Sticker, replyTo: Message | undefined, sealed: () => Promise<OutgoingFile | null>): Promise<boolean> {
+    this.typingStopped();
+    this.failure = null;
+    try {
+      if (await this.uploader.isEncrypted(this.roomId)) {
+        const file = await sealed();
+        if (!file) throw new Error('sticker not prepared');
+        this.sendFiles([file], undefined, replyTo);
+        return true;
+      }
+      const content = stickerContent(sticker);
+      const relation = this.relationFor(replyTo);
+      if (relation) content['m.relates_to'] = relation;
+      if (replyTo?.eventId) content['m.mentions'] = replyTo.own ? {} : { user_ids: [replyTo.senderId] };
+      this.client.sendEvent(this.roomId, EventType.Sticker, content as never).catch(() => this.schedule());
+      this.schedule();
+      return true;
+    } catch {
+      this.failure = 'stickerFailed';
+      return false;
+    }
+  }
+
+  /**
+   * Связь нового события. В треде — `m.thread` к корню и `m.in_reply_to` к последнему ответу как
+   * подпорка (`is_falling_back`) для клиентов без тредов; на ответ внутри треда — настоящая цитата.
+   * Вне треда — просто ответ, если отвечают.
+   */
+  private relationFor(replyTo?: Message): Record<string, unknown> | undefined {
+    if (!this.threadRootId) return replyTo?.eventId ? { 'm.in_reply_to': { event_id: replyTo.eventId } } : undefined;
+    const latest = [...this.messages].reverse().find((m) => m.eventId && m.delivery.state === 'sent')?.eventId ?? this.threadRootId;
+    return {
+      rel_type: 'm.thread',
+      event_id: this.threadRootId,
+      is_falling_back: !replyTo?.eventId,
+      'm.in_reply_to': { event_id: replyTo?.eventId ?? latest },
+    };
+  }
+
   // ————— Вложения —————
 
   /**
@@ -473,6 +669,7 @@ export class TimelineStore {
         state: 'uploading',
         ...(index === 0 && caption?.trim() ? { caption: caption.trim() } : {}),
         ...(index === 0 && reply ? { replyTo: reply } : {}),
+        ...(this.threadRootId ? { relatesTo: this.relationFor(index === 0 ? replyTo : undefined)! } : {}),
       };
       this.uploads = [...this.uploads, upload];
       this.enqueue(upload.id);
@@ -505,6 +702,7 @@ export class TimelineStore {
       await sendAttachment(this.uploader, this.roomId, upload.file, {
         ...(upload.caption ? { caption: upload.caption } : {}),
         ...(upload.replyTo ? { replyTo: upload.replyTo } : {}),
+        ...(upload.relatesTo ? { relatesTo: upload.relatesTo } : {}),
         signal: abort.signal,
         onProgress: (progress) => this.patchUpload(id, { progress }),
       });
@@ -600,16 +798,51 @@ export class TimelineStore {
     this.act('deleteFailed', () => this.client.redactEvent(this.roomId, id));
   }
 
+  /**
+   * Кто что поставил — по порядку, в каком ставили, без снятых. Для «N реакций» в меню
+   * сообщения в группе: на этот вопрос пилюля с числом не отвечает.
+   */
+  reactors(message: Message): Reactor[] {
+    const room = this.room;
+    if (!room || !message.eventId) return [];
+    const relations = room.relations.getChildEventsForEvent(message.eventId, RelationType.Annotation, EventType.Reaction);
+    const events = [...(relations?.getRelations() ?? [])]
+      .filter((e) => !e.isRedacted() && e.status !== EventStatus.CANCELLED)
+      .sort((a, b) => a.getTs() - b.getTs());
+    return events.flatMap((e) => {
+      const userId = e.getSender();
+      const key = e.getRelation()?.key;
+      if (!userId || !key) return [];
+      const member = room.getMember(userId);
+      const avatarUrl = member?.getMxcAvatarUrl();
+      return [{ userId, name: member?.name ?? userId, ...(avatarUrl ? { avatarUrl } : {}), key }];
+    });
+  }
+
+  /**
+   * Пожаловаться модераторам сервера — не нам: приложение жалобу не разбирает. Причина
+   * необязательна: жалоба без слов — тоже жалоба.
+   */
+  report(message: Message, reason: string): void {
+    const id = message.eventId;
+    if (!id || message.own) return;
+    this.act('reportFailed', () => this.client.reportEvent(this.roomId, id, -100, reason));
+  }
+
   pin(message: Message): void {
-    this.setPinned(message, true);
+    this.setPinned(message.eventId, true);
   }
 
   unpin(message: Message): void {
-    this.setPinned(message, false);
+    this.setPinned(message.eventId, false);
   }
 
-  private setPinned(message: Message, pinned: boolean): void {
-    const id = message.eventId;
+  /** Открепить из списка «Закреплённые»: там не сообщения ленты, а только ID. */
+  unpinEvent(eventId: string): void {
+    this.setPinned(eventId, false);
+  }
+
+  private setPinned(id: string | undefined, pinned: boolean): void {
     if (!id || !this.canPin) return;
     const rest = this.pinnedIds.filter((p) => p !== id);
     const next = pinned ? [...rest, id] : rest;
@@ -720,6 +953,25 @@ export class TimelineStore {
     this.schedule();
   }
 
+  /**
+   * «Отправить всё равно» — на не ушедшее из-за проверенного, который больше не сходится
+   * (`identityChanged`, `insecureDevices`). Сначала решение о доверии (`sendAnyway.ts`),
+   * потом то же, что «Отправить заново». Не вышло — строка остаётся «не отправлено», а над
+   * лентой — «всё ещё не ушло», как в нативной.
+   */
+  sendAnyway(key: string): void {
+    const event = this.pendingByKey(key);
+    const room = this.room;
+    if (!event || !room || event.status !== EventStatus.NOT_SENT) return;
+    const reason = failureOf(event.error);
+    if (reason !== 'identityChanged' && reason !== 'insecureDevices') return;
+    this.act('sendAnywayFailed', async () => {
+      if (reason === 'identityChanged') await withdrawChangedVerifications(this.client, room);
+      else if (!(await trustUnsignedDevices(this.client, room))) throw new Error('no olm machine');
+      if (event.status === EventStatus.NOT_SENT) await this.client.resendEvent(event, room);
+    });
+  }
+
   /** «Удалить» не ушедшее — оно и не уходило, удалять нечего, кроме строки. */
   discard(key: string): void {
     const event = this.pendingByKey(key);
@@ -736,7 +988,8 @@ export class TimelineStore {
   /** Отметить прочитанным последнее чужое — зовёт экран, когда чат виден и внизу. */
   markRead(): void {
     const room = this.room;
-    if (!room) return;
+    // Квитанция без треда отметила бы прочитанным и общую ленту до этого места — а её не читали.
+    if (!room || this.threadRootId) return;
     // Метку «непрочитано», поставленную из меню строки, снимает прочтение, как в нативной.
     if (isMarkedUnread(room) && !this.clearingFlag) {
       this.clearingFlag = true;

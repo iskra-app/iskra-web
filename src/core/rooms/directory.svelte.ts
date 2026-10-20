@@ -45,11 +45,32 @@ export async function searchPeople(client: MatrixClient, term: string): Promise<
     }));
 }
 
-/** Войти по адресу или ID. Возвращает ID комнаты — когда она уже пришла синхронизацией. */
-export async function joinByAddress(client: MatrixClient, address: string): Promise<string> {
-  const room = await client.joinRoom(address.trim());
+/**
+ * Войти по адресу или ID. Возвращает ID комнаты — когда она уже пришла синхронизацией.
+ * `via` — через какие серверы искать комнату по ID: свой сервер о ней может не знать.
+ */
+export async function joinByAddress(client: MatrixClient, address: string, via: string[] = []): Promise<string> {
+  const room = await client.joinRoom(address.trim(), via.length ? { viaServers: via } : {});
   await arrived(client, room.roomId);
   return room.roomId;
+}
+
+/** Комната, где уже состоим, — по ID или по адресу, основному или запасному. */
+export function joinedRoom(client: MatrixClient, address: string): string | undefined {
+  const room = address.startsWith('!')
+    ? client.getRoom(address)
+    : client.getRooms().find((candidate) => candidate.getCanonicalAlias() === address || candidate.getAltAliases().includes(address));
+  return room?.getMyMembership() === 'join' ? room.roomId : undefined;
+}
+
+/** Имя и фото человека по Matrix ID. Сервер не знает — только ID. */
+export async function profileOf(client: MatrixClient, userId: string): Promise<Person> {
+  try {
+    const info = await client.getProfileInfo(userId);
+    return { id: userId, name: info.displayname || userId, ...(info.avatar_url ? { avatarUrl: info.avatar_url } : {}) };
+  } catch {
+    return { id: userId, name: userId };
+  }
 }
 
 function toPublicRoom(room: IPublicRoomsChunkRoom): PublicRoom {

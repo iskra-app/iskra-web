@@ -6,6 +6,7 @@ import { TimelineStore } from '../../src/core/timeline/timelineStore.svelte.ts';
 import { uploadClientFor } from '../../src/core/media/upload';
 import { MediaLoader } from '../../src/core/media/media';
 import { quietLogger } from '../../src/core/support/logger';
+import { AllDevicesIsolationMode } from 'matrix-js-sdk/lib/crypto-api';
 
 let client: MatrixClient | undefined;
 let store: TimelineStore | undefined;
@@ -124,6 +125,77 @@ describe('TimelineStore на демо-сервере', () => {
     await until(() => store!.messages.at(-1)!.delivery.state === 'sent' && !!store!.messages.at(-1)!.eventId, 15_000);
     expect(server.unknown).toEqual([]);
   }, 20_000);
+
+  it('проверенная Аня сменила ключи — не ушло; «Отправить всё равно» снимает проверку — ушло', async () => {
+    const { client, server } = await started(undefined, true);
+    const crypto = client.getCrypto()!;
+    await verifyAnya(client, server);
+
+    store = new TimelineStore(client, demoRooms.anya);
+    // Первое уходит — и на него Аня «входит с нового телефона» (`anyaChangesKeys`).
+    store.send('Первое');
+    await until(() => store!.messages.at(-1)!.delivery.state === 'sent' && !!store!.messages.at(-1)!.eventId, 15_000);
+    let changed = false;
+    await until(() => {
+      void crypto.getUserVerificationStatus(demoUsers.anya).then((s) => (changed = s.needsUserApproval));
+      return changed;
+    }, 15_000);
+
+    store.send('Второе');
+    await until(() => store!.messages.at(-1)!.delivery.state === 'failed', 15_000);
+    const failed = store.messages.at(-1)!;
+    expect(failed.delivery).toEqual({ state: 'failed', reason: 'identityChanged' });
+    // «Отправить заново» упирается в то же самое.
+    store.retry(failed.key);
+    store.rebuild();
+    expect(store.messages.at(-1)!.delivery.state).toBe('sending');
+    await until(() => store!.messages.at(-1)!.delivery.state === 'failed', 15_000);
+
+    store.sendAnyway(failed.key);
+    await until(() => store!.messages.at(-1)!.delivery.state === 'sent' && !!store!.messages.at(-1)!.eventId, 15_000);
+    expect(store.failure).toBeNull();
+    const status = await crypto.getUserVerificationStatus(demoUsers.anya);
+    expect(status.needsUserApproval).toBe(false);
+    expect(status.isCrossSigningVerified()).toBe(false);
+    expect(server.unknown).toEqual([]);
+  }, 60_000);
+
+  it('у проверенной Ани устройство, которое она не подписала, — не ушло; «Отправить всё равно» — ушло', async () => {
+    const { client, server } = await started(undefined, true);
+    // Аня вошла с телефона и не подписала его своей кросс-подписью: настоящие ключи
+    // устройства — от второй olm-машины, в ответ `keys/query` о ней.
+    const Machine = olmMachineOf(client).constructor as unknown as {
+      initialize(userId: unknown, deviceId: unknown): Promise<OlmMachineForTest>;
+    };
+    const UserId = olmMachineOf(client).userId.constructor as new (id: string) => unknown;
+    const DeviceId = olmMachineOf(client).deviceId.constructor as new (id: string) => unknown;
+    const phone = await Machine.initialize(new UserId(demoUsers.anya), new DeviceId('ANYAPHONE'));
+    const upload = (await phone.outgoingRequests()).find((r) => JSON.parse(r.body).device_keys)!;
+    const phoneKeys = JSON.parse(upload.body).device_keys as Record<string, unknown>;
+    const original = server.fetch;
+    const withPhone: typeof fetch = async (input, init) => {
+      const response = await original(input, init);
+      if (!String(input instanceof Request ? input.url : input).includes('/keys/query')) return response;
+      const body = (await response.json()) as { device_keys: Record<string, Record<string, unknown>> };
+      if (body.device_keys[demoUsers.anya]) body.device_keys[demoUsers.anya]!['ANYAPHONE'] = phoneKeys;
+      return new Response(JSON.stringify(body), { status: 200, headers: { 'Content-Type': 'application/json' } });
+    };
+    (client as unknown as { http: { opts: { fetchFn: typeof fetch } } }).http.opts.fetchFn = withPhone;
+    await verifyAnya(client, server);
+
+    store = new TimelineStore(client, demoRooms.anya);
+    store.send('Привет');
+    await until(() => store!.messages.at(-1)!.delivery.state === 'failed', 15_000);
+    const failed = store.messages.at(-1)!;
+    expect(failed.delivery).toEqual({ state: 'failed', reason: 'insecureDevices' });
+
+    store.sendAnyway(failed.key);
+    await until(() => store!.messages.at(-1)!.delivery.state === 'sent' && !!store!.messages.at(-1)!.eventId, 15_000);
+    expect(store.failure).toBeNull();
+    // Это не проверка телефона — доверие как есть: подписанным владельцем он не стал.
+    expect((await client.getCrypto()!.getDeviceVerificationStatus(demoUsers.anya, 'ANYAPHONE'))?.signedByOwner).toBe(false);
+    expect(server.unknown).toEqual([]);
+  }, 60_000);
 
   it('прочитано — отметка уходит, значок гаснет', async () => {
     const { client } = await started();
@@ -289,3 +361,41 @@ describe('TimelineStore на демо-сервере', () => {
     expect(server.unknown).toEqual([]);
   }, 30_000);
 });
+
+/**
+ * Строгий режим, как в приложении, свой кросс-подпись — и Аня проверена: её главный ключ
+ * подписан ключом пользователей Алисы. В приложении проверять другого человека негде —
+ * поэтому прямо через olm-машину.
+ */
+async function verifyAnya(client: MatrixClient, server: DemoHomeserver): Promise<void> {
+  const crypto = client.getCrypto()!;
+  crypto.setDeviceIsolationMode(new AllDevicesIsolationMode(true));
+  await crypto.bootstrapCrossSigning({ authUploadDeviceSigningKeys: (upload) => upload(null) });
+  await crypto.getUserDeviceInfo([demoUsers.anya], true);
+  const machine = olmMachineOf(client);
+  const UserId = machine.userId.constructor as new (id: string) => unknown;
+  const request = await (await machine.getIdentity(new UserId(demoUsers.anya)))!.verify();
+  await server.fetch(`${server.baseUrl}/_matrix/client/v3/keys/signatures/upload`, {
+    method: 'POST',
+    headers: { Authorization: 'Bearer demo-token-DEMODEVICE', 'Content-Type': 'application/json' },
+    body: request.body,
+  });
+  // Подпись — на сервере; крипто узнает о ней, как узнало бы от настоящего: из `device_lists`.
+  const demo = server as unknown as { pendingKeyChanges: string[]; wake?: () => void };
+  demo.pendingKeyChanges.push(demoUsers.anya);
+  demo.wake?.();
+  let verified = false;
+  await until(() => {
+    void crypto.getUserVerificationStatus(demoUsers.anya).then((s) => (verified = s.isCrossSigningVerified()));
+    return verified;
+  }, 15_000);
+}
+
+const olmMachineOf = (client: MatrixClient) => (client.getCrypto() as unknown as { olmMachine: OlmMachineForTest }).olmMachine;
+
+interface OlmMachineForTest {
+  readonly userId: object;
+  readonly deviceId: object;
+  getIdentity(userId: unknown): Promise<{ verify(): Promise<{ body: string }> } | undefined>;
+  outgoingRequests(): Promise<Array<{ type: number; body: string }>>;
+}

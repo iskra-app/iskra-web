@@ -54,6 +54,8 @@
     onlocation?: () => void;
     /** «Опрос» в меню скрепки. Нет — пункта нет: в личном чате опрос ни к чему. */
     onpoll?: () => void;
+    /** Кнопка стикеров в поле — где её нажали. Нет — кнопки нет (все наборы выключены). */
+    onstickers?: (at: { x: number; y: number }) => void;
     /**
      * Выбранные из списка «@» — рядом с черновиком: в поле простые слова, а это говорит, какой
      * `@Кай` какой. Держит `RoomView`, как и сам черновик.
@@ -86,6 +88,7 @@
     onremoveattachment,
     onlocation,
     onpoll,
+    onstickers,
     mentions = $bindable([]),
     mentionCandidates,
     mentionPhoto = () => undefined,
@@ -381,11 +384,20 @@
     return () => cancelAnimationFrame(frame);
   });
 
+  /** Кнопка стикеров — не при правке: правка меняет слова уже отправленного, а стикер — не слова. */
+  const offersStickers = $derived(!!onstickers && context?.kind !== 'edit');
+
   /** Поле растёт с текстом — до потолка, дальше прокручивается само. */
   function grow() {
     if (!field) return;
     field.style.height = 'auto';
-    field.style.height = `${field.scrollHeight}px`;
+    // `scrollHeight` — без рамки, а высота у `border-box` — с ней: без этих двух пикселей текст
+    // не помещался и поле прокручивалось на них. Прокрутка — только у потолка, иначе дробная
+    // высота строки давала бы ещё полпикселя хода.
+    const border = field.offsetHeight - field.clientHeight;
+    const wanted = field.scrollHeight + border;
+    field.style.height = `${wanted}px`;
+    field.style.overflowY = wanted > field.offsetHeight ? 'auto' : 'hidden';
   }
   $effect(() => {
     void text;
@@ -496,8 +508,10 @@
     </button>
     <input bind:this={picker} type="file" multiple hidden onchange={picked} />
   {/if}
+  <span class="field">
   <textarea
     bind:this={field}
+    class:with-stickers={offersStickers}
     bind:value={text}
     rows="1"
     placeholder={t('room.composerPlaceholder')}
@@ -519,6 +533,24 @@
     onselect={trackCursor}
     onblur={() => (cursor = null)}
   ></textarea>
+  {#if offersStickers}
+    <!-- В поле, у его конца, как в нативной: часть поля, а не кнопка рядом с ним. -->
+    <button
+      type="button"
+      class="stickers"
+      aria-label={t('stickers.open')}
+      title={t('stickers.open')}
+      aria-haspopup="menu"
+      {disabled}
+      onclick={(event) => {
+        const rect = event.currentTarget.getBoundingClientRect();
+        onstickers?.({ x: rect.left, y: rect.top });
+      }}
+    >
+      <svg viewBox={ICON_VIEWBOX} aria-hidden="true"><path d={icons.emojiSmileys} /></svg>
+    </button>
+  {/if}
+  </span>
   {/if}
   {#if recorder.state === 'recording' && !press}
     <button type="button" class="stop" aria-label={t('voice.stop')} title={t('voice.stop')} onclick={stopRecording}>
@@ -669,17 +701,46 @@
       backdrop-filter: saturate(180%) blur(var(--backdrop-blur));
     }
   }
+  .field {
+    position: relative;
+    display: flex;
+    flex: 1;
+    min-width: 0;
+  }
   textarea {
     flex: 1;
     min-height: var(--size-navigation-bar);
     max-height: 40vh;
-    padding: calc((var(--size-navigation-bar) - 1lh) / 2) var(--space-roomy);
+    padding: calc((var(--size-navigation-bar) - 1lh) / 2 - var(--border-hairline)) var(--space-roomy);
     border: var(--border-hairline) solid var(--color-separator);
     border-radius: var(--radius-bubble);
     background: var(--color-background);
     resize: none;
     line-height: var(--line-height-body);
-    overflow-y: auto;
+    overflow-y: hidden;
+  }
+  textarea.with-stickers {
+    padding-inline-end: var(--size-navigation-bar);
+  }
+  .stickers {
+    position: absolute;
+    inset-block-end: 0;
+    inset-inline-end: 0;
+    display: grid;
+    place-items: center;
+    width: var(--size-navigation-bar);
+    height: var(--size-navigation-bar);
+    padding: 0;
+    border: none;
+    border-radius: var(--radius-circle);
+    background: transparent;
+    color: var(--color-text-secondary);
+    cursor: pointer;
+  }
+  .stickers svg {
+    width: var(--size-icon);
+    height: var(--size-icon);
+    fill: currentColor;
   }
   textarea:focus-visible {
     outline: 2px solid var(--accent);

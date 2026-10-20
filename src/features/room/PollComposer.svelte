@@ -141,6 +141,7 @@
   .remove svg {
     width: var(--size-icon);
     height: var(--size-icon);
+    fill: currentColor;
   }
   .add {
     align-self: flex-start;

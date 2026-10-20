@@ -38,6 +38,8 @@
     kind === 'video' ? t('message.media.video') : kind === 'videoNote' ? t('message.media.videoNote') : t('message.media.photo'),
   );
   const video = $derived(kind === 'video' || kind === 'videoNote');
+  /** Стикер, ушедший зашифрованной картинкой, зовётся `sticker.png` — вслух это «Стикер». */
+  const alt = $derived(kind === 'sticker' && /^sticker\.\w+$/i.test(attachment.name) && !attachment.caption ? t('preview.sticker') : (attachment.caption ?? attachment.name));
 
   /**
    * Что показываем — по содержимому, а не по объекту: лента пересобирает сообщения на каждой
@@ -70,7 +72,7 @@
 
 {#snippet picture()}
   {#if url}
-    <img src={url} alt={attachment.caption ?? attachment.name} draggable="false" />
+    <img src={url} alt={alt} draggable="false" />
   {:else if failed}
     <span class="failed">{t('message.media.failed')}</span>
   {/if}

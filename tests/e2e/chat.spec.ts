@@ -24,7 +24,8 @@ test('меню сообщения: реакция ставится из меню
   await signInToDemo(page);
   await openRoom(page, /^Выходные/);
   const menu = await menuOf(page, 'Я — пирог');
-  await expect(menu).toContainText(/Отправлено \d{1,2}:\d{2}/);
+  // Точно: с датой и секундами — время у пузыря даёт только часы.
+  await expect(menu).toContainText(/Отправлено .*\d{4}.*\d{1,2}:\d{2}:\d{2}/);
   // Чужое: ответить и скопировать — да; изменить и удалить — нет.
   await expect(menu.getByRole('menuitem', { name: 'Ответить' })).toBeVisible();
   await expect(menu.getByRole('menuitem', { name: 'Изменить' })).toHaveCount(0);
@@ -32,7 +33,7 @@ test('меню сообщения: реакция ставится из меню
   await menu.getByRole('menuitemcheckbox', { name: 'Реакция 👍' }).click();
   await expect(menu).toBeHidden();
 
-  const chip = page.getByRole('list', { name: 'Реакции' }).getByRole('button', { name: '👍 1' });
+  const chip = page.getByRole('list', { name: 'Реакции' }).getByRole('button', { name: '👍, 1 человек' });
   await expect(chip).toHaveAttribute('aria-pressed', 'true', { timeout: 10_000 });
   // Снять — нажать на свою же. Дождаться, пока она уйдёт на сервер: снимают её, а не эхо.
   await expect(page.getByRole('img', { name: 'Отправляется' })).toHaveCount(0);
@@ -150,7 +151,7 @@ test('в личном чате опроса в скрепке нет', async ({ 
   await expect(page.getByRole('menuitem', { name: 'Опрос' })).toHaveCount(0);
 });
 
-test('закреплённое: полоса над лентой, нажатие ведёт к сообщению', async ({ page }) => {
+test('закреплённое: полоса над лентой ведёт к сообщению, шеврон — к списку «Закреплённые»', async ({ page }) => {
   await signInToDemo(page);
   await openRoom(page, /^Выходные/);
   const strip = page.getByRole('button', { name: 'Перейти к закреплённому' });
@@ -162,9 +163,20 @@ test('закреплённое: полоса над лентой, нажатие
   await expect(page.getByRole('button', { name: 'Открепить' })).toHaveCount(0);
   const menu = await menuOf(page, 'Кто что берёт на пикник?');
   await expect(menu.getByRole('menuitem', { name: /Закрепить|Открепить/ })).toHaveCount(0);
+  await page.keyboard.press('Escape');
+
+  // Список — из шеврона; оттуда тоже к сообщению.
+  await page.getByRole('log').evaluate((log) => log.parentElement!.scrollTo({ top: 0 }));
+  await page.getByRole('button', { name: 'Закреплённые' }).click();
+  const list = page.getByRole('dialog', { name: 'Закреплённые' });
+  await expect(list).toContainText('Борис');
+  await expect(list.getByRole('button', { name: 'Открепить' })).toHaveCount(0);
+  await list.getByRole('button', { name: /Кто что берёт на пикник/ }).click();
+  await expect(list).toBeHidden();
+  await expect(bubble(page, 'Кто что берёт на пикник?')).toBeInViewport();
 });
 
-test('шапка чата, как в нативной: под именем — «печатает…», потом число участников; в личном — ID собеседника', async ({ page }) => {
+test('шапка чата, как в нативной: под именем — «печатает…», потом число участников; в личном — когда был собеседник', async ({ page }) => {
   await signInToDemo(page);
   await openRoom(page, /^Выходные/);
   const subtitle = page.locator('.main-column header .subtitle');
@@ -174,8 +186,9 @@ test('шапка чата, как в нативной: под именем — �
   await expect(subtitle).toHaveText('Вера печатает…', { timeout: 10_000 });
   await expect(subtitle).toHaveText('3 участника', { timeout: 15_000 });
 
+  // Присутствие из демо: Аня была пять минут назад. Сервер, который молчит, — ID собеседника.
   await openRoom(page, /^Аня/);
-  await expect(subtitle).toHaveText('@anya:demo.iskra.invalid');
+  await expect(subtitle).toHaveText('был(а) 5 мин назад');
 });
 
 test('HTML сообщения: разметка на месте, скрипта нет, картинка — подписью; под CSP без ошибок', async ({ page }) => {
@@ -402,7 +415,7 @@ test('«Больше эмодзи»: панель с разделами, реа�
   await menu.getByRole('button', { name: 'Еда и напитки' }).click();
   await menu.getByRole('menuitemcheckbox', { name: 'Реакция 🍕' }).click();
   await expect(menu).toBeHidden();
-  await expect(page.getByRole('list', { name: 'Реакции' }).getByRole('button', { name: '🍕 1' })).toBeVisible({ timeout: 10_000 });
+  await expect(page.getByRole('list', { name: 'Реакции' }).getByRole('button', { name: '🍕, 1 человек' })).toBeVisible({ timeout: 10_000 });
 
   menu = await menuOf(page, 'Я — пирог');
   await menu.getByRole('menuitem', { name: 'Больше эмодзи' }).click();
@@ -432,6 +445,8 @@ test('лента с клавиатуры: одна остановка Tab, ст�
 
   await page.keyboard.press('Tab');
   expect(await focused()).toMatch(/^article:.*Алиса, ты с нами/);
+  // Выше — стикер Бориса, ещё выше — прогноз.
+  await page.keyboard.press('ArrowUp');
   await page.keyboard.press('ArrowUp');
   expect(await focused()).toMatch(/^article:.*Прогноз на субботу/);
   await page.keyboard.press('Enter');
@@ -494,5 +509,35 @@ test('полоса «новые ключи»: собеседник сменил 
   await expect(page.getByRole('log').getByRole('article').filter({ hasText: 'Возьми плед' })).toBeVisible({ timeout: 20_000 });
   await page.waitForTimeout(1_000);
   await expect(banner).toHaveCount(0);
+  expect(problems).toEqual([]);
+});
+
+test('меню сообщения: «N реакций» — кто что поставил; «Пожаловаться» — модераторам, с причиной по желанию', async ({ page }) => {
+  const problems = watchForProblems(page);
+  await signInToDemo(page);
+  await openRoom(page, /^Выходные/);
+  const lake = page.getByRole('log').getByRole('article').filter({ hasText: 'Озеро прошлым летом' });
+  await lake.click({ button: 'right' });
+  const menu = page.getByRole('menu', { name: 'Ещё' });
+  await menu.getByRole('menuitem', { name: '1 реакция' }).click();
+  const reactors = page.getByRole('dialog', { name: '1 реакция' });
+  await expect(reactors.getByRole('radio', { name: 'Все · 1' })).toBeChecked();
+  await expect(reactors.getByRole('listitem')).toHaveText([/Борис.*🔥/]);
+  await page.keyboard.press('Escape');
+  await expect(reactors).toBeHidden();
+
+  // Своё — не жалуются; чужое — да.
+  const menuOf = async (text: string) => {
+    await page.getByRole('log').getByRole('article').filter({ hasText: text }).click({ button: 'right' });
+    await expect(menu).toBeVisible();
+  };
+  await menuOf('Я — пирог');
+  await menu.getByRole('menuitem', { name: 'Пожаловаться' }).click();
+  const report = page.getByRole('dialog', { name: 'Пожаловаться на сообщение' });
+  await report.getByRole('textbox').fill('Спам');
+  await report.getByRole('button', { name: 'Отправить' }).click();
+  await expect(report).toBeHidden();
+  await page.waitForTimeout(300);
+  await expect(page.getByRole('alert')).toHaveCount(0);
   expect(problems).toEqual([]);
 });

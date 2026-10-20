@@ -117,8 +117,8 @@ test('действия строки: прочитано и непрочитан�
   // Папок нет — нет и «В папку».
   await expect(actions.items()).toHaveText(
     phone
-      ? ['Открыть чат', 'Отметить прочитанным', 'Закрепить', 'В архив', 'Закрыть предпросмотр']
-      : ['Подглядеть', 'Открыть чат', 'Отметить прочитанным', 'Закрепить', 'В архив'],
+      ? ['Открыть чат', 'Отметить прочитанным', 'Закрепить', 'В архив', 'Удалить', 'Закрыть предпросмотр']
+      : ['Подглядеть', 'Открыть чат', 'Отметить прочитанным', 'Закрепить', 'В архив', 'Удалить'],
   );
   await actions.item('Отметить прочитанным').click();
   await expect(weekend).not.toHaveAccessibleName(/непрочитанн/);
@@ -249,4 +249,51 @@ test('реакция на ваше — сердечко в строке, а не
   await expect(history.locator('.count, .dot')).toHaveCount(0);
   await openRoom(page, /^Длинная история/);
   await expect(page.getByRole('link', { name: /^Длинная история/ }).locator('.reacted')).toHaveCount(0, { timeout: 10_000 });
+});
+
+test('«Удалить» из меню строки — сначала вопрос, потом выход; пустой архив говорит, как туда попасть', async ({ page }) => {
+  await signInToDemo(page);
+  const rows = (name: RegExp) => page.getByRole('link', { name });
+  // Под мышью — меню, под пальцем — «Подглядеть» с теми же пунктами кнопками.
+  const choose = (name: string) => page.getByRole('menuitem', { name, exact: true }).or(page.getByRole('button', { name, exact: true })).click();
+  // В архиве один чат: вернуть его — и архив пуст.
+  await page.getByRole('button', { name: 'Архив' }).click();
+  await rows(/^Старый проект/).click({ button: 'right' });
+  await choose('Из архива');
+  await expect(page.getByText('В архиве пусто')).toBeVisible();
+  await page.getByRole('button', { name: 'Назад' }).first().click();
+
+  await rows(/^Дом 14/).click({ button: 'right' });
+  await choose('Удалить');
+  const question = page.getByRole('dialog', { name: 'Выйти из чата?' });
+  await expect(question).toContainText('Удалить чат целиком в Matrix нельзя');
+  await question.getByRole('button', { name: 'Выйти' }).click();
+  await expect(rows(/^Дом 14/)).toHaveCount(0, { timeout: 10_000 });
+});
+
+test('«Новый вход в аккаунт»: прежние сеансы — не новость; новый — вопрос; «Да, это я» — больше не спрашивать', async ({ page }) => {
+  await signInToDemo(page);
+  const banner = page.getByRole('region', { name: 'Новый вход в аккаунт' });
+  await expect(page.getByRole('link', { name: /^Выходные/ })).toBeVisible();
+  await page.waitForTimeout(500);
+  await expect(banner).toHaveCount(0);
+
+  // В демо после перезагрузки в аккаунте появляется новый сеанс.
+  await page.reload({ waitUntil: 'domcontentloaded' });
+  await expect(banner).toBeVisible({ timeout: 20_000 });
+  await expect(banner).toContainText('Chrome на Windows · 192.0.2.44');
+  await banner.getByRole('button', { name: 'Это не я' }).click();
+  await expect(page.getByRole('heading', { name: 'Устройства', level: 1 })).toBeVisible();
+  await expect(page.getByRole('region', { name: 'Активные сеансы' })).toContainText('Chrome на Windows');
+
+  await page.goto('/#/', { waitUntil: 'domcontentloaded' });
+  await expect(banner).toBeVisible({ timeout: 20_000 });
+  await banner.getByRole('button', { name: 'Да, это я' }).click();
+  await expect(banner).toHaveCount(0);
+  // Запись в IndexedDB — не мгновенно; перезагрузить в ту же миллисекунду человек не успеет.
+  await page.waitForTimeout(500);
+  await page.reload({ waitUntil: 'domcontentloaded' });
+  await expect(page.getByRole('link', { name: /^Выходные/ })).toBeVisible({ timeout: 20_000 });
+  await page.waitForTimeout(500);
+  await expect(banner).toHaveCount(0);
 });

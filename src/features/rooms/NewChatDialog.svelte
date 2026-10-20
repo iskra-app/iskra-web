@@ -24,7 +24,7 @@
   import type { UserSession } from '../../core/session/userSession.svelte.ts';
   import { plural, t, type TextKey } from '../../i18n/index.svelte.ts';
   import PersonRow from './PersonRow.svelte';
-  import { roomName } from './text';
+  import { byLetter, contactsOf, matching } from './contacts';
 
   let { open, session, onclose }: { open: boolean; session: UserSession; onclose: () => void } = $props();
 
@@ -68,50 +68,10 @@
     directory = null;
   });
 
-  interface Contact {
-    id: string;
-    name: string;
-    avatarUrl?: string;
-    roomId: string;
-  }
-
-  /**
-   * Все, с кем есть личный чат, по разу. Лицо личного чата растёт из Matrix ID собеседника; где ядро
-   * не знает, кто это, — его нет и в списке. Два чата с одним человеком — один, более свежий.
-   */
-  const contacts = $derived.by(() => {
-    // eslint-disable-next-line svelte/prefer-svelte-reactivity -- снимок внутри $derived
-    const seen = new Set<string>();
-    const result: Contact[] = [];
-    for (const room of [...session.rooms.organized.list, ...session.rooms.organized.archived]) {
-      if (room.kind !== 'direct' || room.membership !== 'join' || !room.avatarSeed.startsWith('@') || seen.has(room.avatarSeed)) continue;
-      seen.add(room.avatarSeed);
-      result.push({ id: room.avatarSeed, name: roomName(room), ...(room.avatarUrl ? { avatarUrl: room.avatarUrl } : {}), roomId: room.id });
-    }
-    return result;
-  });
-
-  const byName = (a: Contact, b: Contact) => a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: 'base' });
-
-  /** По первым буквам, как читают записную книжку. Что начинается не с буквы — под «#», в конце. */
-  const letters = $derived.by(() => {
-    // eslint-disable-next-line svelte/prefer-svelte-reactivity -- снимок внутри $derived
-    const groups = new Map<string, Contact[]>();
-    for (const contact of contacts) {
-      const first = [...contact.name][0] ?? '';
-      const letter = /\p{L}/u.test(first) ? first.toLocaleUpperCase() : '#';
-      groups.set(letter, [...(groups.get(letter) ?? []), contact]);
-    }
-    return [...groups.entries()]
-      .map(([letter, people]) => ({ letter, people: people.sort(byName) }))
-      .sort((a, b) => (a.letter === '#' ? 1 : b.letter === '#' ? -1 : a.letter.localeCompare(b.letter)));
-  });
-
+  const contacts = $derived(contactsOf([...session.rooms.organized.list, ...session.rooms.organized.archived]));
+  const letters = $derived(byLetter(contacts));
   const term = $derived(query.trim());
-  const known = $derived.by(() => {
-    const needle = term.toLocaleLowerCase();
-    return contacts.filter((c) => c.name.toLocaleLowerCase().includes(needle) || c.id.toLocaleLowerCase().includes(needle)).sort(byName);
-  });
+  const known = $derived(matching(contacts, term));
   const strangers = $derived(found.filter((person) => !known.some((c) => c.id === person.id)));
   const typedId = $derived(isMatrixId(term) && term !== session.userId ? term : null);
   const writeToTyped = $derived(typedId !== null && !known.some((c) => c.id === typedId) && !strangers.some((p) => p.id === typedId));

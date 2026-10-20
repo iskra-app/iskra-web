@@ -28,6 +28,10 @@ export interface DemoAccountState {
   nextDevice: number;
   /** Аня уже сменила ключи (`identities.ts`): вторая личность вместо первой. */
   anyaNewKeys?: boolean;
+  /** Подписи Алисы под главными ключами Ани (id ключа → подписи): Алиса её проверила. */
+  anyaSignatures?: Record<string, Record<string, string>>;
+  /** Список устройств уже показывали — в следующую загрузку вкладки в нём «новый вход». */
+  sawDevices?: boolean;
 }
 
 export interface DemoStorage {

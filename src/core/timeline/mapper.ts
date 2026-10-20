@@ -8,10 +8,11 @@
  */
 import { EventStatus, EventType, MsgType, type MatrixEvent } from 'matrix-js-sdk';
 import { isVideoNote } from '../rooms/preview';
+import { isStickerImage } from '../stickers/imagePack';
 import { parseGeoUri } from './location';
 import { firstLineOf } from './words';
 import { forwardOriginOf } from './forward';
-import type { Attachment, Delivery, EncryptedFileKey, MediaSource, Message, MessageKind, Poll, Reaction, ReplyPreview, SendFailure, ServiceEvent } from './message';
+import type { Attachment, Delivery, EncryptedFileKey, MediaSource, Message, MessageKind, Poll, Reaction, ReplyPreview, SendFailure, ServiceEvent, ThreadSummary } from './message';
 
 export interface MapperContext {
   ownUserId: string;
@@ -29,6 +30,20 @@ export interface MapperContext {
   canRedactOthers: (event: MatrixEvent) => boolean;
   /** Заблокирован ли отправитель: его сообщений не видно, служебные строки о нём — видно. */
   isBlocked: (userId: string) => boolean;
+  /** Тред под событием — строка «N ответов». Нет — тредов в этой ленте не показывают. */
+  threadOf?: (eventId: string) => ThreadSummary | undefined;
+  /**
+   * Треды в этой ленте видны — строкой под корнем или это лента самого треда. Тогда запасная
+   * цитата ответа в треде (`is_falling_back`) — не цитата. Не видны — она и есть связь с
+   * корнем, как в нативной: без неё ответ из треда висел бы в чате ни к чему.
+   */
+  threaded?: boolean;
+}
+
+/** Корень треда, если событие — ответ в нём (`m.thread`). Связь лежит открытой и у зашифрованного. */
+export function threadRootOf(event: MatrixEvent): string | undefined {
+  const relation = event.getWireContent()['m.relates_to'] as { rel_type?: unknown; event_id?: unknown } | undefined;
+  return relation?.rel_type === 'm.thread' && typeof relation.event_id === 'string' ? relation.event_id : undefined;
 }
 
 const POLL_START = new Set(['m.poll.start', 'org.matrix.msc3381.poll.start']);
@@ -51,6 +66,8 @@ export function mapEvent(event: MatrixEvent, context: MapperContext): Message | 
   const live = kind.type !== 'deleted' && kind.type !== 'service';
   // Пометка — в исходном содержимом: правка пересланного её не повторяет.
   const forwarded = live ? forwardOriginOf(event.getOriginalContent()) : undefined;
+  const threadRootId = threadRootOf(event);
+  const thread = eventId && live && !threadRootId ? context.threadOf?.(eventId) : undefined;
   return {
     key: context.keyOf(event),
     ...(eventId ? { eventId } : {}),
@@ -66,6 +83,8 @@ export function mapEvent(event: MatrixEvent, context: MapperContext): Message | 
     ...(forwarded ? { forwarded } : {}),
     reactions: eventId && live ? context.reactionsOf(eventId) : [],
     pinned: !!eventId && live && context.isPinned(eventId),
+    ...(thread ? { thread } : {}),
+    ...(threadRootId ? { threadRootId } : {}),
     canEdit: own && !!eventId && delivery.state === 'sent' && (kind.type === 'text' || kind.type === 'emote' || kind.type === 'notice'),
     canDelete: !!eventId && live && (own || context.canRedactOthers(event)),
   };
@@ -79,7 +98,9 @@ function kindOf(event: MatrixEvent, context: MapperContext): MessageKind | undef
   if (event.getRelation()?.rel_type === 'm.replace') return undefined;
 
   if (event.isRedacted()) {
-    return isMessageLike(type) ? { type: 'deleted' } : undefined;
+    if (!isMessageLike(type)) return undefined;
+    const at = (event.getUnsigned().redacted_because as { origin_server_ts?: unknown } | undefined)?.origin_server_ts;
+    return typeof at === 'number' ? { type: 'deleted', at } : { type: 'deleted' };
   }
   if (event.isDecryptionFailure()) return { type: 'unreadable' };
   // Ещё расшифровывается — покажем, когда расшифруется, а не мигнём «не прочитать».
@@ -114,8 +135,13 @@ function messageKind(event: MatrixEvent): MessageKind {
       return { type: 'emote', body: text, ...withHtml };
     case MsgType.Notice:
       return { type: 'notice', body: text, ...withHtml };
-    case MsgType.Image:
-      return { type: 'image', attachment: attachmentOf(content) };
+    case MsgType.Image: {
+      // WebP — стикер, как бы ни пришёл; и картинка, которую отправили как стикер (`sticker.png`):
+      // в зашифрованном чате стикер уходит зашифрованным `m.image` — см. `isStickerImage`.
+      const attachment = attachmentOf(content);
+      const filename = typeof content['filename'] === 'string' ? content['filename'] : body;
+      return { type: isStickerImage(attachment.mimetype, filename) ? 'sticker' : 'image', attachment };
+    }
     case MsgType.Video: {
       const attachment = attachmentOf(content);
       return { type: isVideoNote(content as { info?: unknown }) ? 'videoNote' : 'video', attachment };
@@ -308,6 +334,11 @@ function serviceEvent(event: MatrixEvent, context: MapperContext): ServiceEvent 
 }
 
 function replyOf(event: MatrixEvent, context: MapperContext): ReplyPreview | undefined {
+  // Ответ в треде несёт `m.in_reply_to` на предыдущий ответ — подпорку для клиентов без тредов
+  // (`is_falling_back`). Где треды видны, это не цитата: иначе каждый ответ в треде рисовался бы
+  // цитатой соседа.
+  const relation = event.getWireContent()['m.relates_to'] as { rel_type?: unknown; is_falling_back?: unknown } | undefined;
+  if (context.threaded && relation?.rel_type === 'm.thread' && relation.is_falling_back === true) return undefined;
   const eventId = event.getContent()['m.relates_to']?.['m.in_reply_to']?.event_id ?? event.replyEventId;
   if (typeof eventId !== 'string') return undefined;
   const original = context.eventById(eventId);
@@ -335,10 +366,17 @@ function deliveryOf(event: MatrixEvent): Delivery {
   }
 }
 
-function failureOf(error: unknown): SendFailure {
-  const name = (error as { name?: string } | null)?.name ?? '';
-  if (name === 'UnknownDeviceError') return 'insecureDevices';
-  if (/identity/i.test(name)) return 'identityChanged';
+/**
+ * Почему не ушло. Две причины — от Rust-крипто в строгом режиме изоляции устройств
+ * (`AllDevicesIsolationMode(true)`): у проверенного собеседника — устройство, которое он сам
+ * не подписал, или другая личность. Это обычный `Error`, отличить можно только по тексту —
+ * `SessionRecipientCollectionError` в matrix-sdk-crypto.
+ */
+export function failureOf(error: unknown): SendFailure {
+  const message = (error as { message?: unknown } | null)?.message;
+  if (typeof message !== 'string') return 'server';
+  if (message.includes('verified users have unsigned devices')) return 'insecureDevices';
+  if (message.includes('users that were verified have changed their identity')) return 'identityChanged';
   return 'server';
 }
 

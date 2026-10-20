@@ -101,16 +101,17 @@ export async function submitAddress(page: Page, address: string): Promise<void> 
 }
 
 /**
- * Открыть приложение с `/`. Firefox под Playwright изредка теряет сам переход — повторяем
- * его здесь, одним местом, а не в каждом тесте (подробности — ниже, у повтора).
+ * Открыть приложение — с `/` или с другого адреса (`/#/open/…`). Firefox под Playwright
+ * изредка теряет сам первый переход — повторяем его здесь, одним местом, а не в каждом тесте
+ * (подробности — ниже, у повтора). Первый переход теста — только через эту функцию.
  */
-export async function openApp(page: Page): Promise<void> {
+export async function openApp(page: Page, path = '/'): Promise<void> {
   await calmEntrance(page);
   const log = recordConsole(page);
   // Не ждём `load`: приложению он не нужен, а Firefox в CI изредка его так и не присылает.
   try {
     try {
-      await page.goto('/', { waitUntil: 'domcontentloaded', timeout: 10_000 });
+      await page.goto(path, { waitUntil: 'domcontentloaded', timeout: 10_000 });
     } catch (error) {
       // Firefox под Playwright изредка теряет сам переход: документ запрошен и получен, а
       // страница так и не переключилась на него — ни `framenavigated`, ни строки нашего
@@ -120,7 +121,7 @@ export async function openApp(page: Page): Promise<void> {
       // DOMContentLoaded не пришёл, — это уже наше, и повтора нет.
       if (log.some((line) => line.startsWith('[navigated] http'))) throw error;
       log.push(`[retry] переход не состоялся; запросы: ${(requests.get(page) ?? []).join(', ') || '—'}`);
-      await page.goto('/', { waitUntil: 'domcontentloaded', timeout: 20_000 });
+      await page.goto(path, { waitUntil: 'domcontentloaded', timeout: 20_000 });
     }
   } catch (error) {
     // Firefox в CI однажды не дождался и DOMContentLoaded. Он приходит после того, как
@@ -169,13 +170,13 @@ async function passRecoveryStep(page: Page): Promise<string | null> {
   return null;
 }
 
-/** Экран «Сохраните код»: забрать код, поставить галочку, «Я сохранил код». */
+/** Экран «Сохраните код»: забрать код, поставить галочку, «Код сохранён». */
 export async function saveRecoveryCode(page: Page): Promise<string> {
   const code = (await page.getByTestId('recovery-code').innerText()).trim();
-  const saved = page.getByRole('button', { name: 'Я сохранил код' });
+  const saved = page.getByRole('button', { name: 'Код сохранён' });
   // Без галочки кнопка не нажимается: сначала прочитать предупреждение.
   await expect(saved).toBeDisabled();
-  await page.getByRole('switch', { name: 'Я записал код в надёжное место' }).check();
+  await page.getByRole('switch', { name: 'Код записан, он в надёжном месте' }).check();
   await saved.click();
   return code;
 }

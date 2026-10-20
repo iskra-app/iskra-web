@@ -19,20 +19,24 @@
   import type { IconName } from '../../design/icons.ts';
   import { formatRoute, type SettingsSection } from '../../core/navigation/route';
   import { router } from '../../core/navigation/router.svelte.ts';
+  import { shareLink } from '../../core/navigation/links';
   import type { AccountSwitch, DefaultAlerts } from '../../core/rooms/pushRules';
   import { app } from '../../core/session/app.svelte.ts';
   import type { UserSession } from '../../core/session/userSession.svelte.ts';
   import { isPersisted, requestPersistence } from '../../core/storage/persistence';
   import { i18n, t, type TextKey } from '../../i18n/index.svelte.ts';
-  import { faceModes, fonts, preferences, type Appearance, type FaceMode, type Font } from '../app/preferences.svelte.ts';
+  import { faceModes, fonts, preferences, type Appearance, type FaceMode, type Font, threadPlaces, type ThreadPlace } from '../app/preferences.svelte.ts';
   import { fileSize } from '../media/files';
   import RecoveryCode from '../recovery/RecoveryCode.svelte';
   import AccentSwatches from './AccentSwatches.svelte';
   import WallpaperPicker from './WallpaperPicker.svelte';
+  import AppearancePreview from './AppearancePreview.svelte';
   import { settingsTitles } from './sections';
   import QuickReactionPicker from './QuickReactionPicker.svelte';
+  import StickerSettings from './StickerSettings.svelte';
   import { builtOn, describeDevice, iskraLicence, type Licence } from './licences';
   import FoldersSettings from './FoldersSettings.svelte';
+  import DevicesSection from './DevicesSection.svelte';
   import { languageChoices } from '../app/languages';
   import QrCodeDialog from '../app/QrCodeDialog.svelte';
   import { isMac } from '../../design/hotkeys';
@@ -152,18 +156,6 @@
     newCode = (await recovery?.makeNewKey()) ?? null;
   }
 
-  // ————— Устройства —————
-
-  let devices = $state<Awaited<ReturnType<UserSession['devices']>> | null>(null);
-  let devicesFailed = $state(false);
-  $effect(() => {
-    if (section !== 'security') return;
-    session.devices().then(
-      (list) => ((devices = list), (devicesFailed = false)),
-      () => (devicesFailed = !devices),
-    );
-  });
-  const accountPage = $derived(session.accountPage());
   /** Ссылки — как `AboutView` нативной Искры: адрес показывается как есть, не переводится. */
   const source = { href: 'https://github.com/iskra-app/iskra-web', label: 'github.com/iskra-app/iskra-web' };
   const links: Array<{ title: TextKey; href: string; label: string }> = [
@@ -190,8 +182,13 @@
   let clearing = $state(false);
   let confirmClear = $state(false);
   let clearFailed = $state(false);
+  /** Поисковый индекс: сколько занимает (`null` — считаем) и как идёт его очистка. */
+  let searchBytes = $state<number | null>(null);
+  let confirmSearchClear = $state(false);
+  let searchClearFailed = $state(false);
 
   async function readStorage() {
+    void session.searchIndexSize().then((bytes) => (searchBytes = bytes));
     persisted = await isPersisted().catch(() => null);
     try {
       const estimate = await navigator.storage?.estimate?.();
@@ -222,6 +219,20 @@
     }
   }
 
+  /** Как в нативной: после очистки — перезагрузка, индекс собирается заново. */
+  async function clearSearchIndex() {
+    confirmSearchClear = false;
+    clearing = true;
+    searchClearFailed = false;
+    try {
+      await session.clearSearchIndex();
+      location.reload();
+    } catch {
+      clearing = false;
+      searchClearFailed = true;
+    }
+  }
+
   // ————— Внешний вид —————
 
   const themes: Array<{ value: Appearance; label: TextKey }> = [
@@ -236,6 +247,7 @@
   };
   const fontLabel = (font: Font): TextKey => `appearance.font.${font}`;
   const languages = languageChoices;
+  const threadPlaceLabels: Record<ThreadPlace, TextKey> = { always: 'chats.threadsAlways', inLargeRooms: 'chats.threadsLargeRooms', never: 'chats.threadsNever' };
 
   // ————— Об Iskra —————
 
@@ -256,6 +268,20 @@
 
   let confirmingSignOut = $state(false);
   let showingCode = $state(false);
+  let linkCopied = $state(false);
+
+  /** Своя ссылка: на телефоне — системным «Поделиться», на десктопе — в буфер, как в «О чате». */
+  async function shareMe() {
+    const link = shareLink(me.id);
+    if (typeof navigator.share === 'function' && !viewport.finePointer) {
+      await navigator.share({ url: link }).catch(() => {});
+      return;
+    }
+    await navigator.clipboard
+      .writeText(link)
+      .then(() => (linkCopied = true))
+      .catch(() => {});
+  }
 </script>
 
 {#snippet licenceRow(licence: Licence)}
@@ -275,15 +301,22 @@
       <span class="avatar big"><Avatar name={me.name} seed={me.id} photo={photo.url} mode={preferences.faces} /></span>
       <strong class="profile-name">{me.name}</strong>
       <span class="secondary selectable">{me.id}</span>
-      <!-- Свой QR-код — `ProfileActionTile` нативной в шапке профиля. -->
-      <button type="button" class="tile" onclick={() => (showingCode = true)}>
-        <Icon name="qr" />
-        <span>{t('qr.title')}</span>
-      </button>
+      <!-- «Поделиться» и свой QR-код — `ProfileActionTile` нативной в шапке профиля. -->
+      <div class="tiles">
+        <button type="button" class="tile" onclick={() => void shareMe()}>
+          <Icon name="share" />
+          <span>{t('profile.share')}</span>
+        </button>
+        <button type="button" class="tile" onclick={() => (showingCode = true)}>
+          <Icon name="qr" />
+          <span>{t('qr.title')}</span>
+        </button>
+      </div>
+      {#if linkCopied}<p class="secondary" role="status">{t('room.linkCopiedWeb')}</p>{/if}
     </div>
     <QrCodeDialog
       open={showingCode}
-      link={`https://matrix.to/#/${encodeURIComponent(me.id)}`}
+      link={shareLink(me.id)}
       name={me.name}
       subtitle={me.id}
       seed={me.id}
@@ -383,9 +416,14 @@
         {#if recovery.protection === 'on'}
           <p class="state"><span class="ok" aria-hidden="true">✓</span>{t('encryption.on')}</p>
           <p class="secondary">{t('encryption.onHelp')}</p>
-        {:else}
+        {:else if recovery.protection === 'keyNeeded'}
+          <!-- Копия есть, а это устройство её не откроет: код или подтверждение с другого. -->
+          <p class="state"><span class="warn" aria-hidden="true">!</span>{t('encryption.keyNeeded')}</p>
+          <PrimaryButton onclick={() => app.openRecovery()}>{t('encryption.restore')}</PrimaryButton>
+          <p class="secondary">{t('encryption.keyNeededHelp')}</p>
+        {:else if recovery.protection === 'off'}
           <p class="state"><span class="warn" aria-hidden="true">!</span>{t('encryption.off')}</p>
-          <PrimaryButton onclick={() => app.openRecovery()}>{t('recovery.choose.title')}</PrimaryButton>
+          <PrimaryButton onclick={() => app.openRecovery()}>{t('encryption.protect')}</PrimaryButton>
           <p class="secondary">{t('encryption.offHelp')}</p>
         {/if}
         {#if recovery.failure}
@@ -394,44 +432,38 @@
       </section>
     {/if}
 
-    <section aria-labelledby="devices-title">
-      <h3 id="devices-title">{t('settings.devices')}</h3>
-      {#if devices}
-        <ul class="list">
-          {#each devices as device (device.id)}
-            <li>
-              <strong>{device.name}</strong>
-              <span class="secondary">{device.current ? t('settings.thisDevice') : device.id}</span>
-            </li>
-          {/each}
-        </ul>
-      {:else if devicesFailed}
-        <p class="problem" role="alert">{t('settings.devicesFailed')}</p>
-      {/if}
-      <p class="secondary">{t('settings.devicesHelp')}</p>
-      {#if accountPage}
-        <a class="link" href={accountPage} target="_blank" rel="noopener noreferrer">{t('settings.openAccountPage')}</a>
-      {/if}
-    </section>
+    <!-- Устройства и заблокированные — строками со своими страницами, как в нативной. -->
+    <ul class="rows">
+      <li>
+        <a href={hrefOf('devices')}>
+          <span class="row-icon"><Icon name="devices" /></span>
+          <span class="row-label">{t('devices.title')}</span>
+          <span class="chevron"><Icon name="forward" /></span>
+        </a>
+      </li>
+      <li>
+        <a href={hrefOf('blocked')}>
+          <span class="row-icon"><Icon name="block" /></span>
+          <span class="row-label">{t('settings.blocked')}</span>
+          <span class="chevron"><Icon name="forward" /></span>
+        </a>
+      </li>
+    </ul>
 
-    <section aria-labelledby="blocked-title">
-      <h3 id="blocked-title">{t('settings.blocked')}</h3>
-      {#if blocked.ids.length}
-        <ul class="list">
-          {#each blocked.ids as userId (userId)}
-            <li class="row">
-              <span class="id">{userId}</span>
-              <PlainButton busy={unblocking === userId} disabled={offline} onclick={() => void unblock(userId)}>{t('settings.unblock')}</PlainButton>
-            </li>
-          {/each}
-        </ul>
-      {:else}
-        <p>{t('settings.blockedEmptyTitle')}</p>
-        <p class="secondary">{t('settings.blockedEmptyMessage')}</p>
-      {/if}
-      {#if blocked.failure === 'unblockFailed'}
-        <p class="problem" role="alert">{t('account.unblockFailed')}</p>
-      {/if}
+    <!-- Что о вас узнают, пока вы ничего не пишете: что вы здесь и что набираете, — две вещи,
+         которые сервер Matrix действительно говорит другим. На этом устройстве. -->
+    <section aria-labelledby="privacy-title">
+      <h3 id="privacy-title">{t('privacy.title')}</h3>
+      <label class="switch">
+        <span>{t('privacy.hidePresence')}</span>
+        <input type="checkbox" role="switch" bind:checked={preferences.hidePresence} />
+      </label>
+      <p class="secondary">{t('privacy.hidePresenceHelp')}</p>
+      <label class="switch">
+        <span>{t('privacy.hideTyping')}</span>
+        <input type="checkbox" role="switch" bind:checked={preferences.hideTyping} />
+      </label>
+      <p class="secondary">{t('privacy.hideTypingHelp')}</p>
     </section>
 
     {#if recovery?.protection === 'on'}
@@ -444,7 +476,9 @@
 
   {:else if section === 'appearance'}
     <!-- Порядок `AppearanceView` нативной: вид ленты, тема, цвет, обои; дальше — то, что есть
-         только здесь: шрифт и язык (в iOS язык — в настройках системы). -->
+         только здесь: шрифт и язык (в iOS язык — в настройках системы). Первым — как это будет
+         выглядеть. -->
+    <AppearancePreview />
     <label class="switch">
       <span>{t('appearance.compact')}</span>
       <input
@@ -464,6 +498,10 @@
     </div>
     <h3 id="accent-title">{t('appearance.accent')}</h3>
     <AccentSwatches labelledby="accent-title" />
+    <label class="switch">
+      <span>{t('appearance.tintInterface')}</span>
+      <input type="checkbox" role="switch" bind:checked={preferences.tintsInterface} />
+    </label>
     <h3 id="wallpaper-title">{t('appearance.wallpaper')}</h3>
     <WallpaperPicker labelledby="wallpaper-title" />
     <h3 id="font-title">{t('appearance.font')}</h3>
@@ -487,9 +525,24 @@
     <h3 id="quick-reaction-title">{t('reactions.quick')}</h3>
     <QuickReactionPicker labelledby="quick-reaction-title" />
     <p class="secondary">{t('reactions.quickHelp')}</p>
+    <StickerSettings {session} />
   {:else if section === 'folders'}
     <FoldersSettings {session} />
   {:else if section === 'chats'}
+    <!-- Варианты строками с галочкой, а не меню: «В чатах больше 100 человек» рядом с подписью на телефоне не помещается. -->
+    <h3 id="threads-title">{t('chats.threads')}</h3>
+    <div class="options" role="radiogroup" aria-labelledby="threads-title">
+      {#each threadPlaces as place (place)}
+        <button type="button" role="radio" aria-checked={preferences.threadsShown === place} onclick={() => (preferences.threadsShown = place)}>
+          {t(threadPlaceLabels[place])}
+        </button>
+      {/each}
+    </div>
+    <label class="switch">
+      <span>{t('chats.threadsHideReplies')}</span>
+      <input type="checkbox" role="switch" bind:checked={preferences.threadsHideReplies} disabled={preferences.threadsShown === 'never'} />
+    </label>
+    <p class="secondary">{t('chats.threadsHelpWeb')}</p>
     <h3>{t('chats.serviceSection')}</h3>
     <label class="switch">
       <span>{t('chats.hideNameChanges')}</span>
@@ -509,6 +562,27 @@
       </label>
       <p class="secondary">{preferences.sendWithModEnter ? t('chats.modReturnOnHelpWeb', { mod }) : t('chats.enterSendsHelpWeb')}</p>
     {/if}
+  {:else if section === 'devices'}
+    <DevicesSection {session} />
+  {:else if section === 'blocked'}
+    <section aria-label={t('settings.blocked')}>
+      {#if blocked.ids.length}
+        <ul class="list">
+          {#each blocked.ids as userId (userId)}
+            <li class="row">
+              <span class="id">{userId}</span>
+              <PlainButton busy={unblocking === userId} disabled={offline} onclick={() => void unblock(userId)}>{t('settings.unblock')}</PlainButton>
+            </li>
+          {/each}
+        </ul>
+      {:else}
+        <p>{t('settings.blockedEmptyTitle')}</p>
+        <p class="secondary">{t('settings.blockedEmptyMessage')}</p>
+      {/if}
+      {#if blocked.failure === 'unblockFailed'}
+        <p class="problem" role="alert">{t('account.unblockFailed')}</p>
+      {/if}
+    </section>
   {:else if section === 'media'}
     <h3 id="auto-download-title">{t('media.autoDownload')}</h3>
     <div class="options" role="radiogroup" aria-labelledby="auto-download-title">
@@ -555,6 +629,16 @@
     <PlainButton danger busy={clearing} onclick={() => (confirmClear = true)}>{clearing ? t('storage.clearing') : t('storage.clear')}</PlainButton>
     <p class="secondary">{t('storage.cacheWeb')}</p>
     {#if clearFailed}<p class="problem" role="alert">{t('storage.failed')}</p>{/if}
+    <!-- Своей группой, как в нативной: это не про место, а про слова удалённого, которые индекс мог сохранить. -->
+    <h3>{t('storage.search')}</h3>
+    <PlainButton danger busy={clearing} disabled={!searchBytes} onclick={() => (confirmSearchClear = true)}>
+      {clearing ? t('storage.clearing') : t('storage.search.clear')}
+    </PlainButton>
+    <p class="secondary">
+      {t('storage.search.explained')}
+      {searchBytes === null ? t('storage.measuring') : fileSize(searchBytes, i18n.locale)}
+    </p>
+    {#if searchClearFailed}<p class="problem" role="alert">{t('storage.search.failed')}</p>{/if}
   {:else if section === 'about'}
     <!-- `AboutView` нативной, строка в строку: значок, имя и строка о себе; версия, сборка,
          устройство; сайт, исходный код и лицензии; внизу — чьё это и на каких условиях. -->
@@ -647,11 +731,22 @@
 <ConfirmDialog
   open={confirmClear}
   title={t('storage.confirm.title')}
-  message={t('storage.cacheWeb')}
+  message={t('storage.confirm.body')}
   confirmLabel={t('storage.confirm.action')}
   cancelLabel={t('storage.cancel')}
   onclose={() => (confirmClear = false)}
   onconfirm={() => void clearCache()}
+/>
+
+<ConfirmDialog
+  open={confirmSearchClear}
+  title={t('storage.search.confirm.title')}
+  message={t('storage.search.confirm.body')}
+  confirmLabel={t('storage.confirm.action')}
+  cancelLabel={t('storage.cancel')}
+  destructive
+  onclose={() => (confirmSearchClear = false)}
+  onconfirm={() => void clearSearchIndex()}
 />
 
 <ConfirmDialog
@@ -706,6 +801,10 @@
   .big {
     --avatar-size: var(--size-avatar-profile);
     margin-block-end: var(--space-close);
+  }
+  .tiles {
+    display: flex;
+    gap: var(--space-close);
   }
   .tile {
     display: flex;
@@ -972,8 +1071,5 @@
   dd {
     margin: 0;
     overflow-wrap: anywhere;
-  }
-  .link {
-    color: var(--accent);
   }
 </style>

@@ -7,6 +7,7 @@
  */
 import { EventType, MsgType, type MatrixEvent } from 'matrix-js-sdk';
 import { wordsOf } from '../timeline/words';
+import { isStickerImage } from '../stickers/imagePack';
 import type { Preview } from './types';
 
 const POLL_TYPES = new Set(['m.poll.start', 'org.matrix.msc3381.poll.start']);
@@ -53,6 +54,8 @@ export function previewOf(event: MatrixEvent): Preview | undefined {
       return body ? { kind: 'text', text: wordsOf(body, html) } : undefined;
     }
     case MsgType.Image: {
+      const mimetype = (content.info as { mimetype?: unknown } | undefined)?.mimetype;
+      if (isStickerImage(typeof mimetype === 'string' ? mimetype : undefined, typeof content.filename === 'string' ? content.filename : body)) return { kind: 'sticker' };
       // Подпись — если `body` не просто имя файла (MSC2530: `filename` рядом с `body`).
       const caption = typeof content.filename === 'string' && content.filename !== body ? body : undefined;
       return caption ? { kind: 'photo', text: caption } : { kind: 'photo' };

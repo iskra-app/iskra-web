@@ -1,3 +1,4 @@
+import type { Preview } from '../rooms/types';
 import type { Place } from './location';
 import type { ForwardOrigin } from './forward';
 
@@ -85,7 +86,8 @@ export type MessageKind =
   | { type: 'location'; body: string; uri: string; place: Place }
   | { type: 'poll'; poll: Poll }
   | { type: 'service'; event: ServiceEvent }
-  | { type: 'deleted' }
+  /** `at` — когда удалили, если сервер сказал (`redacted_because`). */
+  | { type: 'deleted'; at?: number }
   | { type: 'unreadable' }
   | { type: 'unsupported' };
 
@@ -107,6 +109,14 @@ export interface ReplyPreview {
   text?: string;
 }
 
+/** Строка под сообщением, на которое ответили в треде: «3 ответа» и последний из них. */
+export interface ThreadSummary {
+  replies: number;
+  latestSender?: string;
+  /** Последний ответ — как в превью списка: слова или вид вложения. */
+  latest?: Preview;
+}
+
 export interface Message {
   /** Стабильный ключ строки: не меняется, когда local echo получает настоящий ID. */
   key: string;
@@ -124,6 +134,10 @@ export interface Message {
   forwarded?: ForwardOrigin;
   reactions: Reaction[];
   pinned: boolean;
+  /** Тред под этим сообщением — когда в нём уже отвечали. */
+  thread?: ThreadSummary;
+  /** Это ответ в треде — ID корня. */
+  threadRootId?: string;
   /** Своё, ушедшее — и кто-то из собеседников уже прочитал (по квитанциям чтения). */
   read?: boolean;
   /**

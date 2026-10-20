@@ -44,6 +44,11 @@
   --backdrop-plate: 0.45;
   /* Theme.Opacity.warningWash — подложка серьёзного предупреждения (смена проверенных ключей). */
   --warning-wash: 14%;
+  /* Theme.Tint — «Тонировать интерфейс»: акцент поверх всего; ч/б — вполовину. */
+  --tint-interface: 8%;
+  --tint-mono: 4%;
+  /* Лист тонировки — над всем, что нарисовано страницей (окна `<dialog>` — в своём слое выше). */
+  --z-tint: 100;
   /* Затемнение за диалогом и листом — серое, не чёрное: в тёмной теме чёрное по чёрному не
      видно, и диалог висел в пустоте. Серый `systemGray` поверх белого серит, поверх чёрного —
      высветляет, — одно значение на обе темы. */
@@ -54,6 +59,11 @@
   /* QR-код — чёрным по белому в любой теме: камера читает тёмное на светлом (`QRCodeImage` нативной). */
   --color-qr-ground: #ffffff;
   --color-qr-ink: #000000;
+  /* AnswerStyle — два ответа на вопрос приглашения: да зелёным, нет красным, белым по ним в обеих
+     темах. Глубже системных: белое на них держит 4,5:1. */
+  --color-answer-yes: rgb(28 125 56);
+  --color-answer-no: rgb(196 38 28);
+  --color-on-answer: #ffffff;
 
   /* Theme.Size */
   --size-avatar: 2.5rem; /* 40 */
@@ -96,6 +106,9 @@
   --size-emoji-panel: 16.75rem; /* 268 — Theme.Size.emojiPanel: высота панели «Больше эмодзи» */
   --size-emoji-panel-width: 22.5rem; /* 360 — Theme.Size.emojiPanelWidth: полторы ширины меню */
   --size-emoji-header: 1.75rem; /* 28 — Theme.Size.emojiHeader: заголовок раздела */
+  --size-sticker-cell: 4.5rem; /* 72 — Theme.Size.stickerCell: стикер в панели, четыре в ряд на телефоне */
+  --size-search-results: 20rem; /* 320 — найденное в «Поиске в чате»: окно не прыгает, пока ищут */
+  --size-sticker-tab: 2rem; /* 32 — Theme.Size.stickerTab: картинка набора на вкладке */
   --emoji-recent-columns: 6; /* недавние — по шесть, под ряд быстрых реакций */
   --size-video-note: 12.5rem; /* 200 — «кружочек» */
   --size-attachment-tile: 4.5rem; /* 72 — вложение в лотке над полем */

@@ -20,19 +20,21 @@ import {
   type MatrixClient,
   type ValidatedAuthMetadata,
 } from 'matrix-js-sdk';
+import { AllDevicesIsolationMode } from 'matrix-js-sdk/lib/crypto-api';
 import { fetchFor } from '../auth/server';
 import { MediaLoader } from '../media/media';
 import { sendAttachment, uploadClientFor, type OutgoingFile } from '../media/upload';
 import { ThumbnailCache } from '../media/thumbnails';
 import { RoomListStore } from '../rooms/roomListStore.svelte.ts';
 import { RoomDetailsStore } from '../rooms/roomDetails.svelte.ts';
-import { createDirect, createGroup } from '../rooms/create';
-import { joinByAddress, PublicRoomDirectory, searchPeople, type Person } from '../rooms/directory.svelte.ts';
+import { createDirect, createGroup, existingDirect } from '../rooms/create';
+import { joinByAddress, joinedRoom, profileOf, PublicRoomDirectory, searchPeople, type Person } from '../rooms/directory.svelte.ts';
 import { TimelineStore } from '../timeline/timelineStore.svelte.ts';
 import { canForward, forwardContent } from '../timeline/forward';
 import type { Message } from '../timeline/message';
 import { RecoveryStore } from '../encryption/recovery.svelte.ts';
 import { SecretStorageKeyHolder } from '../encryption/secretStorageKey';
+import { applyPresence, PresenceWatch } from './presence.svelte.ts';
 import { IdentityChangesStore } from '../encryption/identityChanges.svelte.ts';
 import { VerificationStore } from '../encryption/verification.svelte.ts';
 import { deleteDatabase } from '../storage/idb';
@@ -42,7 +44,10 @@ import { quietLogger } from '../support/logger';
 import { BlockList } from './blockList.svelte.ts';
 import { NotificationRules } from './notificationRules.svelte.ts';
 import { ChatFolders } from './chatFolders.svelte.ts';
+import { StickerLibrary } from '../stickers/stickerLibrary.svelte.ts';
 import { LocalNames } from '../rooms/localNames.svelte.ts';
+import { MessageIndexer, MessageSearch } from '../search/messageSearch.svelte.ts';
+import { searchDatabaseName } from '../search/searchIndex';
 
 export type Connection = 'connecting' | 'online' | 'offline';
 
@@ -71,6 +76,17 @@ export function databaseNames(userId: string) {
   };
 }
 
+export interface AccountDevice {
+  id: string;
+  name: string;
+  lastSeen?: number;
+  ip?: string;
+  current: boolean;
+}
+
+/** Чем кончилось «Завершить»: спросить пароль, пароль не тот, это на сайте сервера, не вышло. */
+export type EndSessions = 'done' | 'needsPassword' | 'wrongPassword' | 'managed' | 'failed';
+
 export class UserSession {
   connection = $state<Connection>('connecting');
   /** Как меня зовут и как я выгляжу — живое: меняется, когда поменяли в настройках или где-то ещё. */
@@ -97,12 +113,18 @@ export class UserSession {
   readonly folders: ChatFolders;
   /** Как я зову собеседников на этом устройстве. */
   readonly localNames: LocalNames;
+  /** Стикеры аккаунта: свой набор, подписки, недавние, «Искорки». */
+  readonly stickers: StickerLibrary;
+  /** Поисковый индекс сообщений — на устройстве, зашифрованный (`core/search/`). */
+  readonly searchIndex: MessageIndexer;
+  /** Поиск по сообщениям над списком чатов. */
+  readonly search: MessageSearch;
   private readonly client: MatrixClient;
   private readonly account: Account;
   private readonly detach: Array<() => void> = [];
   private stopped = false;
 
-  private constructor(client: MatrixClient, account: Account, keys: SecretStorageKeyHolder | null) {
+  private constructor(client: MatrixClient, account: Account, keys: SecretStorageKeyHolder | null, persistent: boolean) {
     this.client = client;
     this.account = account;
     this.userId = account.userId;
@@ -124,11 +146,51 @@ export class UserSession {
     this.blocked = new BlockList(client);
     this.notificationRules = new NotificationRules(client);
     this.folders = new ChatFolders(client);
+    const uploader = uploadClientFor(client, account.method === 'demo' ? fetchFor(true) : undefined);
+    this.stickers = new StickerLibrary(client, (blob, type) => uploader.upload(blob, { type }));
+    this.searchIndex = new MessageIndexer(client, persistent ? searchDatabaseName(account.userId) : null);
+    this.search = new MessageSearch(this.searchIndex, this.senderName);
+  }
+
+  /**
+   * Кто написал найденное. В личном чате с локальным именем собеседник и здесь «Мама», а не
+   * `anna_1987`, — но только он сам: третий, позванный в чат, своё имя сохраняет.
+   */
+  private readonly senderName = (roomId: string, senderId: string): string => {
+    const local = this.localNames.get(roomId);
+    const summary = this.rooms.get(roomId);
+    if (local && summary?.kind === 'direct' && summary.avatarSeed === senderId) return local;
+    return this.client.getRoom(roomId)?.getMember(senderId)?.name || this.client.getUser(senderId)?.displayName || senderId;
+  };
+
+  /** Поиск в одном чате. Живёт, пока открыто его окно. */
+  roomSearch(roomId: string): MessageSearch {
+    return new MessageSearch(this.searchIndex, this.senderName, roomId);
+  }
+
+  /** Сколько места занимает поисковый индекс — для «Хранилища». */
+  searchIndexSize(): Promise<number> {
+    return this.searchIndex.size();
+  }
+
+  /** «Очистить поисковый индекс»: соберётся заново из того, что откроют и пролистают. */
+  clearSearchIndex(): Promise<void> {
+    return this.searchIndex.clear();
   }
 
   /** Лента комнаты. Живёт, пока открыт чат: тот, кто открыл, её и `destroy()`. */
-  timeline(roomId: string): TimelineStore {
-    return new TimelineStore(this.client, roomId, uploadClientFor(this.client, this.account.method === 'demo' ? fetchFor(true) : undefined));
+  timeline(roomId: string, threadRootId?: string): TimelineStore {
+    return new TimelineStore(this.client, roomId, uploadClientFor(this.client, this.account.method === 'demo' ? fetchFor(true) : undefined), threadRootId);
+  }
+
+  /** Где собеседник — «в сети», «был(а) …». Живёт, пока открыт его чат. */
+  presence(userId: string): PresenceWatch {
+    return new PresenceWatch(this.client, userId);
+  }
+
+  /** Время захода скрыто или нет — сказать серверу (см. `presence.svelte.ts`). */
+  applyPresence(hidden: boolean): Promise<void> {
+    return applyPresence(this.client, hidden);
   }
 
   /** Кто в комнате сменил ключи. Живёт, пока открыт чат, — как и лента. */
@@ -271,9 +333,19 @@ export class UserSession {
     return new PublicRoomDirectory(this.client);
   }
 
-  /** Войти в комнату по адресу или ID — или из каталога. */
-  joinRoom(address: string): Promise<string> {
-    return joinByAddress(this.client, address);
+  /** Войти в комнату по адресу или ID — или из каталога; `via` — для ID из чужой ссылки. */
+  joinRoom(address: string, via: string[] = []): Promise<string> {
+    return joinByAddress(this.client, address, via);
+  }
+
+  /** Куда ссылка ведёт без вопроса: личный чат с человеком уже есть, в комнате уже состоим. */
+  existingRoomFor(target: string): string | undefined {
+    return target.startsWith('@') ? existingDirect(this.client, target) : joinedRoom(this.client, target);
+  }
+
+  /** Имя и фото человека — для вопроса «Написать …?». */
+  profileOf(userId: string): Promise<Person> {
+    return profileOf(this.client, userId);
   }
 
   // ————— Профиль, устройства, аккаунт —————
@@ -299,8 +371,8 @@ export class UserSession {
     await this.readProfile();
   }
 
-  /** Мои устройства — список с сервера; это отмечено. */
-  async devices(): Promise<Array<{ id: string; name: string; lastSeen?: number; current: boolean }>> {
+  /** Мои устройства — список с сервера; это первым, остальные — по последней активности. */
+  async devices(): Promise<AccountDevice[]> {
     const { devices } = await this.client.getDevices();
     const mine = this.client.getDeviceId();
     return devices
@@ -308,9 +380,76 @@ export class UserSession {
         id: d.device_id,
         name: d.display_name || d.device_id,
         ...(d.last_seen_ts ? { lastSeen: d.last_seen_ts } : {}),
+        ...(d.last_seen_ip ? { ip: d.last_seen_ip } : {}),
         current: d.device_id === mine,
       }))
       .sort((a, b) => +b.current - +a.current || (b.lastSeen ?? 0) - (a.lastSeen ?? 0));
+  }
+
+  /** Сеансы аккаунта завершаются на странице сервера (вход через MAS), а не здесь. */
+  get sessionsManagedByServer(): boolean {
+    return !!this.account.oauth;
+  }
+
+  /**
+   * Страница сервера, где завершают сеанс (MSC4191): один — сразу на нём, несколько — список.
+   * Нет страницы — `undefined`.
+   */
+  sessionEndPage(deviceId?: string): string | undefined {
+    const page = this.accountPage();
+    if (!page) return undefined;
+    // Разовый расчёт адреса, не состояние.
+    // eslint-disable-next-line svelte/prefer-svelte-reactivity
+    const url = new URL(page);
+    if (deviceId) {
+      url.searchParams.set('action', 'org.matrix.session_end');
+      url.searchParams.set('device_id', deviceId);
+    } else {
+      url.searchParams.set('action', 'org.matrix.sessions_list');
+    }
+    return url.href;
+  }
+
+  /**
+   * Завершить сеансы — выйти из аккаунта на тех устройствах (`AccountDevices.end` нативной).
+   * Сначала без пароля: некоторым серверам он не нужен, а ответ скажет, нужен ли. Это
+   * устройство не завершается никогда: выход — другая кнопка.
+   */
+  async endSessions(deviceIds: string[], password?: string): Promise<EndSessions> {
+    const others = deviceIds.filter((id) => id !== this.client.getDeviceId());
+    if (!others.length) return 'done';
+    if (this.sessionsManagedByServer) return 'managed';
+    const refused = (error: unknown): EndSessions => {
+      const e = error as { httpStatus?: number; errcode?: string; data?: { errcode?: string } };
+      const errcode = e.errcode ?? e.data?.errcode;
+      if (e.httpStatus === 404 || errcode === 'M_UNRECOGNIZED') return 'managed';
+      if (e.httpStatus === 401) return password ? 'wrongPassword' : 'needsPassword';
+      return 'failed';
+    };
+    try {
+      if (!password) {
+        await this.client.deleteMultipleDevices(others);
+        return 'done';
+      }
+      // Пароль — в сессию UIA, которую сервер выдаёт на первый запрос без него.
+      let session: string | undefined;
+      try {
+        await this.client.deleteMultipleDevices(others);
+        return 'done';
+      } catch (error) {
+        session = (error as { data?: { session?: string } }).data?.session;
+        if ((error as { httpStatus?: number }).httpStatus !== 401) return refused(error);
+      }
+      await this.client.deleteMultipleDevices(others, {
+        type: 'm.login.password',
+        identifier: { type: 'm.id.user', user: this.userId },
+        password,
+        ...(session ? { session } : {}),
+      } as never);
+      return 'done';
+    } catch (error) {
+      return refused(error);
+    }
   }
 
   /**
@@ -328,6 +467,8 @@ export class UserSession {
    */
   async clearCache(): Promise<void> {
     this.stop();
+    // Индекс — вместе с кэшем, как в нативной: в нём могут оставаться слова удалённого.
+    await deleteDatabase(searchDatabaseName(this.userId)).catch(() => {});
     try {
       await this.client.store.deleteAllData();
     } catch {
@@ -395,9 +536,13 @@ export class UserSession {
         cryptoDatabasePrefix: names.cryptoPrefix,
         useIndexedDB: persistent,
       });
+      // Как нативная: у проверенного собеседника сменилась личность или появилось не
+      // подписанное им устройство — сообщение не уходит, пока читающий не решит
+      // «Отправить всё равно» (`TimelineStore.sendAnyway`). По умолчанию SDK молча шифрует.
+      client.getCrypto()?.setDeviceIsolationMode(new AllDevicesIsolationMode(true));
     }
 
-    const session = new UserSession(client, account, keys);
+    const session = new UserSession(client, account, keys, persistent);
     session.listen(events);
     // До синхронизации: иначе список на миг покажет `anna_1987`, а потом «Маму».
     await session.localNames.load();
@@ -462,6 +607,9 @@ export class UserSession {
     this.blocked.destroy();
     this.notificationRules.destroy();
     this.folders.destroy();
+    this.stickers.destroy();
+    this.search.destroy();
+    this.searchIndex.destroy();
     this.verification?.destroy();
     this.thumbnails.clear();
     this.media.clear();
@@ -517,5 +665,6 @@ export async function wipeUserData(userId: string, client?: MatrixClient): Promi
     deleteDatabase(`matrix-js-sdk:${names.sync}`),
     deleteDatabase(`${names.cryptoPrefix}::matrix-sdk-crypto`),
     deleteDatabase(`${names.cryptoPrefix}::matrix-sdk-crypto-meta`),
+    deleteDatabase(searchDatabaseName(userId)),
   ]);
 }

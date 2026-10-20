@@ -5,10 +5,10 @@
  * реакциями, группа с опросом, беззвучный чат, приглашение и длинная комната для
  * подгрузки истории. Время — от «сейчас», чтобы «вчера» было вчера.
  */
+import { DEMO_SERVER } from './address';
 import { demoVoice } from './voice';
 
-export const DEMO_SERVER = 'demo.iskra.invalid';
-export const DEMO_BASE_URL = `https://${DEMO_SERVER}`;
+export { DEMO_BASE_URL, DEMO_SERVER } from './address';
 
 export const demoUsers = {
   alice: `@alice:${DEMO_SERVER}`,
@@ -64,6 +64,8 @@ export interface DemoRoom {
   tags?: Record<string, Record<string, unknown>>;
   /** Данные комнаты, кроме тегов и маркера, — метка «непрочитано» (`m.marked_unread`). */
   accountData?: Record<string, unknown>;
+  /** Сколько вошло — для сводки синхронизации, если комната «больше», чем её участники в демо. */
+  joinedCount?: number;
 }
 
 export interface DemoInvite {
@@ -240,6 +242,8 @@ export function buildDemoWorld(now: number): { rooms: DemoRoom[]; invites: DemoI
       // Реакции от других — на фото озера и голосовое Веры.
       { type: 'm.reaction', sender: boris, content: { 'm.relates_to': { rel_type: 'm.annotation', event_id: '$weekend-6', key: '🔥' } } },
       { type: 'm.reaction', sender: boris, content: { 'm.relates_to': { rel_type: 'm.annotation', event_id: '$weekend-9', key: '❤️' } } },
+      // Стикер из набора «Выходных» — у Алисы его нет, можно добавить себе.
+      { type: 'm.sticker', sender: boris, event_id: '$weekend-sticker', content: demoStickerImage('connected') },
       text(vera, 'Алиса, ты с нами?', {
         format: 'org.matrix.custom.html',
         formatted_body: `<a href="https://matrix.to/#/${alice}">Алиса</a>, ты с нами?`,
@@ -276,6 +280,37 @@ export function buildDemoWorld(now: number): { rooms: DemoRoom[]; invites: DemoI
     // Отправлены разом: через четыре секунды друг за другом, а не через полчаса, как прочее.
     index > 2 && index < 5 ? { ...event, origin_server_ts: all[2]!.origin_server_ts! + (index - 2) * 4_000 } : event,
   );
+  // Тред под «собранием»: чат подъезда большой (`joinedCount`), и ответы собираются под сообщением.
+  const meetingId = quietTimeline[0]!.event_id!;
+  const meetingTs = quietTimeline[0]!.origin_server_ts!;
+  const meetingReplies = (
+    [
+      [vera, 'Во сколько?'],
+      [boris, 'В семь, во дворе'],
+      [vera, 'Приду'],
+    ] as const
+  ).map(([sender, body], index): DemoEvent => ({
+    type: 'm.room.message',
+    sender,
+    event_id: `$quiet-thread-${index}`,
+    origin_server_ts: meetingTs + (index + 1) * 5 * MINUTE,
+    content: {
+      msgtype: 'm.text',
+      body,
+      'm.relates_to': {
+        rel_type: 'm.thread',
+        event_id: meetingId,
+        is_falling_back: true,
+        'm.in_reply_to': { event_id: index ? `$quiet-thread-${index - 1}` : meetingId },
+      },
+    },
+  }));
+  // Сводка на корне — как её кладёт настоящий сервер (`unsigned.m.relations.m.thread`).
+  quietTimeline[0] = {
+    ...quietTimeline[0]!,
+    unsigned: { 'm.relations': { 'm.thread': { count: meetingReplies.length, latest_event: meetingReplies.at(-1), current_user_participated: false } } },
+  };
+  quietTimeline.splice(1, 0, ...meetingReplies);
 
   const history = demoRooms.history;
   const historyTimeline = stamp(
@@ -315,6 +350,13 @@ export function buildDemoWorld(now: number): { rooms: DemoRoom[]; invites: DemoI
           { type: 'm.room.name', sender: boris, state_key: '', content: { name: 'Выходные' }, event_id: `$name-${weekend}` },
           // Закреплено Борисом; Алиса здесь не админ — закреплять сама не может.
           { type: 'm.room.pinned_events', sender: boris, state_key: '', content: { pinned: ['$weekend-2'] }, event_id: `$pinned-${weekend}` },
+          {
+            type: 'im.ponies.room_emotes',
+            sender: boris,
+            state_key: '',
+            content: { pack: { display_name: 'Искра', usage: ['sticker'] }, images: demoStickerPack(['connected', 'unlocked', 'surprise', 'bypass']) },
+            event_id: `$stickers-${weekend}`,
+          },
         ]),
         timeline: weekendTimeline,
         unread: { notifications: 3, highlights: 1 },
@@ -325,6 +367,7 @@ export function buildDemoWorld(now: number): { rooms: DemoRoom[]; invites: DemoI
           { type: 'm.room.name', sender: boris, state_key: '', content: { name: 'Дом 14, подъезд 2' }, event_id: `$name-${quiet}` },
         ]),
         timeline: quietTimeline,
+        joinedCount: 128,
         // Беззвучный: сервер уведомлений не считает, но новые сообщения есть.
         unread: { notifications: 0, highlights: 0 },
       },
@@ -381,6 +424,29 @@ export function buildDemoWorld(now: number): { rooms: DemoRoom[]; invites: DemoI
     ],
   };
 }
+
+/**
+ * Стикеры демо — «Искорки» приложения (`public/stickers`), как в `MockWorld` нативной: одни
+ * картинки и в наборах, и в переписке. Четыре — свои у Алисы, четыре других — набор
+ * «Выходных», чтобы в чате попался стикер, которого у неё *ещё нет*, и его можно было добавить.
+ */
+const STICKER_EMOJI: Record<string, string> = {
+  hello: '👋', joy: '🎉', love: '❤️', curious: '🤔', surprise: '😮', sleepy: '😴',
+  sad: '😢', grumpy: '😒', loading: '⏳', unlocked: '🔓', bypass: '🏃', connected: '📶',
+};
+
+function demoStickerImage(code: string) {
+  return { url: `mxc://${DEMO_SERVER}/sticker-${code}`, body: STICKER_EMOJI[code] ?? code, info: { w: 512, h: 512, mimetype: 'image/png' } };
+}
+
+function demoStickerPack(codes: readonly string[]) {
+  return Object.fromEntries(codes.map((code) => [code, demoStickerImage(code)]));
+}
+
+/** Данные аккаунта Алисы до первой правки: свой набор стикеров. */
+export const demoAccountData: Record<string, unknown> = {
+  'im.ponies.user_emotes': { images: demoStickerPack(['hello', 'love', 'joy', 'sleepy']) },
+};
 
 /** `m.direct` Алисы: с кем какие личные чаты. */
 export const demoDirect = { [demoUsers.anya]: [demoRooms.anya] };

@@ -1,6 +1,7 @@
 <!--
-  Полоса закреплённого над лентой — есть, только когда что-то закреплено. Нажатие ведёт к
-  сообщению (подгружая историю, если надо); «Открепить» — тем, у кого есть право.
+  Полоса закреплённого над лентой — `PinnedStrip` нативной: есть, только когда что-то закреплено.
+  Нажатие ведёт к последнему закреплённому (подгружая историю, если надо), шеврон — ко всем
+  («Закреплённые»). Число — когда закреплено больше одного: «Закреплённое 1» никто не спрашивал.
 -->
 <script lang="ts">
   import { ICON_VIEWBOX, icons } from '../../design/icons.ts';
@@ -11,11 +12,12 @@
 
   interface Props {
     message: Message | undefined;
-    canUnpin: boolean;
+    /** Сколько закреплено всего. */
+    count: number;
     onjump: () => void;
-    onunpin: () => void;
+    onlist: () => void;
   }
-  let { message, canUnpin, onjump, onunpin }: Props = $props();
+  let { message, count, onjump, onlist }: Props = $props();
 
   const text = $derived.by(() => {
     const kind = message?.kind;
@@ -31,15 +33,13 @@
   <button type="button" class="jump" aria-label={t('room.pinnedJump')} title={t('room.pinnedJump')} onclick={onjump} disabled={!message}>
     <svg viewBox={ICON_VIEWBOX} aria-hidden="true"><path d={icons.pin} /></svg>
     <span class="what">
-      <strong>{t('room.pinned')}</strong>
+      <span class="title"><strong>{t('room.pinned')}</strong>{#if count > 1}<span class="count">{count}</span>{/if}</span>
       <span class="text">{text}</span>
     </span>
   </button>
-  {#if canUnpin && message}
-    <button type="button" class="unpin" aria-label={t('room.unpin')} title={t('room.unpin')} onclick={onunpin}>
-      <svg viewBox={ICON_VIEWBOX} aria-hidden="true"><path d={icons.close} /></svg>
-    </button>
-  {/if}
+  <button type="button" class="list" aria-label={t('room.pinnedTitle')} title={t('room.pinnedTitle')} onclick={onlist}>
+    <svg viewBox={ICON_VIEWBOX} aria-hidden="true"><path d={icons.forward} /></svg>
+  </button>
 </div>
 
 <style>
@@ -92,7 +92,16 @@
     text-overflow: ellipsis;
     white-space: nowrap;
   }
-  .unpin {
+  .title {
+    display: flex;
+    align-items: baseline;
+    gap: var(--space-tight);
+  }
+  .count {
+    color: var(--color-text-secondary);
+    font-variant-numeric: tabular-nums;
+  }
+  .list {
     display: grid;
     place-items: center;
     flex: none;

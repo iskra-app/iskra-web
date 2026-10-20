@@ -20,9 +20,9 @@ async function openSettings(page: Page, row?: string) {
 
 async function openPanel(page: Page) {
   await page.getByRole('button', { name: 'О чате' }).click();
-  const panel = page.getByRole('radiogroup', { name: 'Уведомления' }).locator('xpath=ancestor::div[contains(@class,"panel")][1]');
-  await expect(panel).toBeVisible();
-  return panel;
+  // Вся колонка «О чате»: в ней и сама панель, и страница человека, открытая из неё.
+  await expect(page.getByRole('radiogroup', { name: 'Уведомления' })).toBeVisible();
+  return page.locator('aside.panel');
 }
 
 test('«О чате» в личном чате: ID собеседника, «Поделиться», «Заблокировать», «Удалить чат»', async ({ page }, info) => {
@@ -31,12 +31,12 @@ test('«О чате» в личном чате: ID собеседника, «П�
   await signInToDemo(page);
   await openRoom(page, /^Аня/);
   const panel = await openPanel(page);
-  await expect(panel.locator('header')).toContainText('@anya:demo.iskra.invalid');
-  await expect(panel.locator('header')).toContainText('Переписка зашифрована');
+  await expect(panel.locator('header').last()).toContainText('@anya:demo.iskra.invalid');
+  await expect(panel.locator('header').last()).toContainText('Переписка зашифрована');
   if (!isPhone(info.project.name) && info.project.name.startsWith('chromium')) {
     await panel.getByRole('button', { name: 'Поделиться' }).click();
     await expect(panel.getByRole('status')).toHaveText('Ссылка скопирована');
-    expect(await page.evaluate(() => navigator.clipboard.readText())).toBe('https://matrix.to/#/%40anya%3Ademo.iskra.invalid');
+    expect(await page.evaluate(() => navigator.clipboard.readText())).toBe('https://s.iskra.wtf/@anya:demo.iskra.invalid');
   } else {
     await expect(panel.getByRole('button', { name: 'Поделиться' })).toBeVisible();
   }
@@ -49,7 +49,7 @@ test('«О чате» в личном чате: ID собеседника, «П�
   expect(problems).toEqual([]);
 });
 
-test('«О чате» там, где прав нет: шапка, кнопки, уведомления, закреплённые, участники', async ({ page }) => {
+test('«О чате» там, где прав нет: шапка, кнопки, уведомления, участники', async ({ page }) => {
   const problems = watchForProblems(page);
   await signInToDemo(page);
   await openRoom(page, /^Выходные/);
@@ -59,8 +59,8 @@ test('«О чате» там, где прав нет: шапка, кнопки, 
   await expect(panel).toContainText('3 участника');
 
   // Шапка — как в нативной: сколько участников и что с шифрованием; под ней — кнопки.
-  await expect(panel.locator('header')).toContainText('3 участника');
-  await expect(panel.locator('header')).toContainText('Переписка не зашифрована');
+  await expect(panel.locator('header').last()).toContainText('3 участника');
+  await expect(panel.locator('header').last()).toContainText('Переписка не зашифрована');
   await expect(panel.getByRole('button', { name: 'Пригласить' })).toBeVisible();
 
   const alerts = panel.getByRole('radiogroup', { name: 'Уведомления' });
@@ -70,9 +70,8 @@ test('«О чате» там, где прав нет: шапка, кнопки, 
   await expect(alerts.getByRole('radio', { name: 'Выключены' })).toHaveAttribute('aria-checked', 'true');
   await expect(panel.getByRole('button', { name: 'Со звуком' })).toBeVisible();
 
-  // Закреплённое из панели ведёт к сообщению.
-  await panel.getByRole('button', { name: /Кто что берёт на пикник/ }).click();
-  await expect(page.getByRole('log').getByRole('article').filter({ hasText: 'Кто что берёт на пикник?' })).toBeInViewport();
+  // Закреплённых в панели нет, как в нативной: они — по шеврону на полосе над лентой.
+  await expect(panel).not.toContainText('Кто что берёт на пикник?');
   expect(problems).toEqual([]);
 });
 
@@ -88,19 +87,21 @@ test('своя комната: изменить название, дать ро�
   await expect(edit).toBeHidden();
   await expect(panel.getByRole('heading', { name: 'Очень длинная история' })).toBeVisible({ timeout: 10_000 });
 
+  // Страница человека: роль выбором — и назад, к списку.
   await panel.getByRole('button', { name: /^Борис/ }).click();
-  await page.getByRole('menuitem', { name: 'Роль' }).click();
-  const role = page.getByRole('dialog', { name: 'Что может Борис?' });
-  await role.getByRole('radio', { name: 'Модератор' }).click();
+  await expect(panel.getByRole('heading', { name: 'Борис' })).toBeVisible();
+  await panel.getByRole('radio', { name: 'Модератор' }).click();
+  await expect(panel.getByRole('radio', { name: 'Модератор' })).toHaveAttribute('aria-checked', 'true', { timeout: 10_000 });
+  await panel.getByRole('button', { name: 'Назад' }).click();
   await expect(panel.getByRole('button', { name: /Борис.*Модератор/ })).toBeVisible({ timeout: 10_000 });
 
+  // «Пригласить» — галочкой из знакомых, как в нативной; кто уже здесь — серым.
   await panel.getByRole('button', { name: 'Пригласить' }).click();
-  const invite = page.getByRole('dialog', { name: 'Кого пригласить?' });
-  await invite.getByRole('textbox').fill('аня');
-  await invite.getByRole('button', { name: 'Пригласить' }).click();
-  await expect(invite).toContainText('Проверьте адрес');
-  await invite.getByRole('textbox').fill('@anya:demo.iskra.invalid');
-  await invite.getByRole('button', { name: 'Пригласить' }).click();
+  const invite = page.getByRole('dialog', { name: 'Пригласить' });
+  await expect(invite.getByRole('button', { name: 'Пригласить', exact: true })).toBeDisabled();
+  await invite.getByRole('checkbox', { name: /^Аня/ }).click();
+  await expect(invite.getByRole('checkbox', { name: /^Аня/ })).toHaveAttribute('aria-checked', 'true');
+  await invite.getByRole('button', { name: 'Пригласить (1)' }).click();
   await expect(invite).toBeHidden();
   await expect(panel.getByRole('button', { name: /Аня.*Приглашение отправлено/ })).toBeVisible({ timeout: 10_000 });
 });
@@ -157,16 +158,29 @@ test('настройки по разделам: имя, язык, тема, шр
   await expect(page.getByRole('heading', { name: 'Настройки', level: 1 })).toBeVisible();
   await expect(page.getByText('Алиса Петровна', { exact: true })).toBeVisible({ timeout: 10_000 });
   await page.getByRole('link', { name: 'Безопасность' }).click();
+  // Устройства и заблокированные — строками со своими страницами; «Назад» — в «Безопасность».
+  await page.getByRole('link', { name: 'Устройства' }).click();
   await expect(page.getByText('Это устройство', { exact: true })).toBeVisible();
-  await expect(page.getByRole('region', { name: 'Заблокированные' })).toBeVisible();
+  await back.click();
+  await page.getByRole('link', { name: 'Заблокированные пользователи' }).click();
+  await expect(page.getByRole('region', { name: 'Заблокированные пользователи' })).toBeVisible();
+  await back.click();
+  await expect(page.getByRole('heading', { name: 'Безопасность', level: 1 })).toBeVisible();
   await back.click();
   await page.getByRole('link', { name: 'Хранилище' }).click();
   await expect(page.getByRole('heading', { name: 'Хранилище', level: 1 })).toBeVisible();
   await back.click();
   await page.getByRole('link', { name: 'Внешний вид' }).click();
 
-  await page.getByRole('radio', { name: 'Тёмное' }).click();
+  await page.getByRole('radio', { name: 'Тёмная' }).click();
   await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark');
+  // «Тонировать интерфейс» — лист акцента поверх всего; выключено по умолчанию.
+  const tint = page.getByRole('switch', { name: 'Тонировать интерфейс' });
+  await expect(tint).not.toBeChecked();
+  await tint.check();
+  await expect(page.locator('html')).toHaveAttribute('data-tint', '');
+  await tint.uncheck();
+  await expect(page.locator('html')).not.toHaveAttribute('data-tint');
   // Inter — по умолчанию и из своих файлов под боевой CSP: кириллица и латиница загрузились.
   await expect(page.getByRole('radio', { name: 'Inter' })).toHaveAttribute('aria-checked', 'true');
   const bodyFont = () => page.evaluate(() => getComputedStyle(document.body).fontFamily);
@@ -188,9 +202,9 @@ test('настройки по разделам: имя, язык, тема, шр
   await page.getByRole('radio', { name: 'Русский' }).click();
   await expect(page.getByRole('heading', { name: 'Внешний вид', level: 1 })).toBeVisible();
 
-  // Старый адрес раздела ведёт туда, куда раздел переехал.
+  // Адрес страницы открывает её саму — заблокированные снова своя страница, как в нативной.
   await page.goto('/#/settings/blocked', { waitUntil: 'domcontentloaded' });
-  await expect(page.getByRole('heading', { name: 'Безопасность', level: 1 })).toBeVisible({ timeout: 20_000 });
+  await expect(page.getByRole('heading', { name: 'Заблокированные пользователи', level: 1 })).toBeVisible({ timeout: 20_000 });
 
   if (!isPhone(info.project.name)) {
     // `Ctrl/⌘ ,` — из любого места.
@@ -201,27 +215,35 @@ test('настройки по разделам: имя, язык, тема, шр
   }
 });
 
-test('заблокировать из меню сообщения — сообщений не видно; разблокировать — в настройках', async ({ page }) => {
+test('заблокировать со страницы человека (имя у сообщения) — сообщений не видно; разблокировать — в настройках', async ({ page }) => {
   const problems = watchForProblems(page);
   await signInToDemo(page);
   await openRoom(page, /^Дом 14/);
   const bubble = page.getByRole('log').getByRole('article').filter({ hasText: 'Лифт опять не работает' });
+  await expect(bubble).toBeVisible();
+  // Меню сообщения блокировки не предлагает — как в нативной: она на странице человека.
   await bubble.click({ button: 'right' });
-  await page.getByRole('menu', { name: 'Ещё' }).getByRole('menuitem', { name: 'Заблокировать' }).click();
+  await expect(page.getByRole('menu', { name: 'Ещё' }).getByRole('menuitem', { name: 'Заблокировать' })).toHaveCount(0);
+  await page.keyboard.press('Escape');
+  await page.getByRole('log').getByText('Вера', { exact: true }).last().click();
+  await page.getByRole('button', { name: 'Заблокировать пользователя' }).click();
   const dialog = page.getByRole('dialog', { name: 'Заблокировать Вера?' });
   await expect(dialog).toContainText('Разблокировать можно в настройках');
   await dialog.getByRole('button', { name: 'Заблокировать' }).click();
+  await expect(page.getByRole('button', { name: 'Разблокировать пользователя' })).toBeVisible({ timeout: 10_000 });
+  await page.getByRole('button', { name: 'Закрыть', exact: true }).click();
   await expect(bubble).toHaveCount(0, { timeout: 10_000 });
   // Служебная строка о ней остаётся: блокировка прячет слова, а не факт, что человек в чате.
   await expect(page.getByRole('log')).toContainText('Повестка');
 
-  const back = page.getByRole('button', { name: 'Назад' });
+  const back = page.getByRole('button', { name: 'Назад' }).first();
   if (await back.isVisible()) await back.click();
   // И в списке чатов её слова не превью.
   await expect(page.getByRole('link', { name: /^Дом 14/ })).not.toContainText('Лифт опять');
 
   await openSettings(page, 'Безопасность');
-  const section = page.getByRole('region', { name: 'Заблокированные' });
+  await page.getByRole('link', { name: 'Заблокированные пользователи' }).click();
+  const section = page.getByRole('region', { name: 'Заблокированные пользователи' });
   await expect(section).toContainText('@vera:demo.iskra.invalid');
   await section.getByRole('button', { name: 'Разблокировать' }).click();
   await expect(section).toContainText('Никто не заблокирован', { timeout: 10_000 });
@@ -289,7 +311,7 @@ test('локальное имя личного чата: видно везде, 
 
   panel = await openPanel(page);
   await panel.getByRole('button', { name: 'Изменить' }).click();
-  await page.getByRole('dialog', { name: 'Изменить чат' }).getByRole('button', { name: 'Вернуть настоящее имя' }).click();
+  await page.getByRole('dialog', { name: 'Изменить чат' }).getByRole('button', { name: 'Вернуть «Аня»' }).click();
   await expect(panel.getByRole('heading', { name: 'Аня' })).toBeVisible();
   // На телефоне панель — лист поверх чата: сначала закрыть её.
   await page.getByRole('button', { name: 'Закрыть', exact: true }).click();
@@ -451,7 +473,7 @@ test('«Реакции»: быстрая реакция — из шести ил
     await page.getByRole('log').getByRole('button', { name: 'Реакция 👍' }).first().click();
   }
   // Реакций в демо до этого ни у кого не было: «👍 1» — та, что поставили сейчас, и своя.
-  await expect(page.getByRole('log').getByRole('list', { name: 'Реакции' }).getByRole('button', { name: '👍 1', pressed: true })).toBeVisible({ timeout: 10_000 });
+  await expect(page.getByRole('log').getByRole('list', { name: 'Реакции' }).getByRole('button', { name: '👍, 1 человек', pressed: true })).toBeVisible({ timeout: 10_000 });
 
   // Не из шести — из каталога: встаёт в ряд последней и подсвечена.
   await openSettings(page, 'Реакции');
@@ -535,4 +557,140 @@ test('«Об Iskra» — как в нативной: версия, сборка,
   await page.getByRole('button', { name: 'Назад' }).click();
   await expect(page.getByRole('heading', { name: 'Об Iskra', level: 1 })).toBeVisible();
   expect(problems).toEqual([]);
+});
+
+test('«Конфиденциальность»: скрыть время захода — и чужого не видно; выбор переживает перезагрузку', async ({ page }) => {
+  await signInToDemo(page);
+  await openRoom(page, /^Аня/);
+  const subtitle = page.locator('.main-column header .subtitle');
+  await expect(subtitle).toHaveText('был(а) 5 мин назад');
+
+  await openSettings(page, 'Безопасность');
+  const presence = page.getByRole('switch', { name: 'Скрывать время захода' });
+  const typing = page.getByRole('switch', { name: 'Скрывать «печатает…»' });
+  await expect(presence).not.toBeChecked();
+  await presence.check();
+  await typing.check();
+
+  // Своё спрятал — чужого не спрашиваем: под именем снова ID.
+  await openRoom(page, /^Аня/);
+  await expect(subtitle).toHaveText('@anya:demo.iskra.invalid');
+
+  await page.reload({ waitUntil: 'domcontentloaded' });
+  await expect(subtitle).toHaveText('@anya:demo.iskra.invalid', { timeout: 20_000 });
+  await openSettings(page, 'Безопасность');
+  await expect(presence).toBeChecked();
+  await expect(typing).toBeChecked();
+});
+
+test('своя комната: история для новых, адрес (занятый — так и сказано), каталог; заблокированного — обратно', async ({ page }) => {
+  await signInToDemo(page);
+  await openRoom(page, /^Длинная история/);
+  const panel = await openPanel(page);
+  const openEdit = async () => {
+    await panel.getByRole('button', { name: 'Изменить' }).click();
+    const dialog = page.getByRole('dialog', { name: 'Изменить чат' });
+    await expect(dialog).toBeVisible();
+    return dialog;
+  };
+
+  let edit = await openEdit();
+  await expect(edit.getByRole('radio', { name: 'Вся история' })).toBeChecked();
+  // Закрытая комната: «всем, даже без вступления» не предлагается.
+  await expect(edit.getByRole('radio', { name: 'Всем, даже без вступления' })).toHaveCount(0);
+  await edit.getByRole('radio', { name: 'С момента вступления' }).check();
+  const address = edit.getByRole('textbox', { name: 'Адрес' });
+  await address.fill('lounge');
+  await edit.getByRole('button', { name: 'Сохранить' }).click();
+  await expect(edit.getByRole('alert')).toHaveText('Этот адрес уже занят. Попробуйте другой.');
+  await address.fill('Длинная История');
+  await expect(edit).toContainText('#длинная-история:demo.iskra.invalid');
+  await edit.getByRole('button', { name: 'Сохранить' }).click();
+  await expect(edit).toBeHidden({ timeout: 10_000 });
+
+  edit = await openEdit();
+  await expect(edit.getByRole('radio', { name: 'С момента вступления' })).toBeChecked();
+  await expect(address).toHaveValue('длинная-история');
+  // Открыли для всех — появились каталог и четвёртый вариант истории.
+  await edit.getByRole('switch', { name: /^Открытый чат/ }).check();
+  await expect(edit.getByRole('radio', { name: 'Всем, даже без вступления' })).toBeVisible();
+  await edit.getByRole('switch', { name: /Показывать в каталоге сервера/ }).check();
+  await edit.getByRole('button', { name: 'Сохранить' }).click();
+  await expect(edit).toBeHidden({ timeout: 10_000 });
+
+  // Заблокировать Веру — и пустить обратно из настроек.
+  await panel.getByRole('button', { name: /^Вера/ }).click();
+  await panel.getByRole('button', { name: 'Заблокировать в чате' }).click();
+  await page.getByRole('dialog').getByRole('button', { name: 'Заблокировать в чате' }).click();
+  await expect(panel.getByRole('button', { name: /^Вера/ })).toHaveCount(0, { timeout: 10_000 });
+  edit = await openEdit();
+  await edit.getByRole('button', { name: 'Разблокировать' }).click();
+  const question = page.getByRole('dialog', { name: 'Разблокировать Вера?' });
+  await question.getByRole('button', { name: 'Разблокировать' }).click();
+  await expect(edit.getByRole('button', { name: 'Разблокировать' })).toHaveCount(0, { timeout: 10_000 });
+});
+
+test('устройства: «Активные сеансы» — завершить один (сервер просит пароль), потом все другие', async ({ page }) => {
+  await signInToDemo(page);
+  await openSettings(page, 'Безопасность');
+  await page.getByRole('link', { name: 'Устройства' }).click();
+  const sessions = page.getByRole('region', { name: 'Активные сеансы' });
+  await expect(sessions.getByRole('listitem')).toHaveCount(2);
+  await expect(sessions.getByRole('listitem').first()).toContainText('Iskra (iPhone)');
+  await expect(sessions).toContainText('203.0.113.7');
+
+  await sessions.getByRole('listitem').filter({ hasText: 'Iskra (iPhone)' }).getByRole('button', { name: 'Завершить' }).click();
+  await page.getByRole('dialog', { name: 'Завершить этот сеанс?' }).getByRole('button', { name: 'Завершить' }).click();
+  const password = page.getByRole('dialog', { name: 'Нужен пароль' });
+  await password.getByLabel('Пароль').fill('не тот');
+  await password.getByRole('button', { name: 'Завершить' }).click();
+  await expect(password.getByRole('alert')).toHaveText('Пароль не подошёл.');
+  await password.getByLabel('Пароль').fill('password');
+  await password.getByRole('button', { name: 'Завершить' }).click();
+  await expect(password).toBeHidden();
+  await expect(sessions.getByRole('listitem')).toHaveCount(1, { timeout: 10_000 });
+
+  await page.getByRole('button', { name: 'Завершить все другие сеансы' }).click();
+  await page.getByRole('dialog', { name: 'Завершить все другие сеансы?' }).getByRole('button', { name: 'Завершить все другие сеансы' }).click();
+  await password.getByLabel('Пароль').fill('password');
+  await password.getByRole('button', { name: 'Завершить' }).click();
+  await expect(sessions).toContainText('Других сеансов нет', { timeout: 10_000 });
+  await expect(page.getByRole('button', { name: 'Завершить все другие сеансы' })).toHaveCount(0);
+});
+
+test('«Роли и разрешения»: кому что можно; назначить модератора и снять роль', async ({ page }) => {
+  await signInToDemo(page);
+  await openRoom(page, /^Длинная история/);
+  const panel = await openPanel(page);
+  await panel.getByRole('button', { name: 'Изменить' }).click();
+  await page.getByRole('dialog', { name: 'Изменить чат' }).getByRole('button', { name: 'Роли и разрешения' }).click();
+  const rules = page.getByRole('dialog', { name: 'Роли и разрешения' });
+  const staff = rules.getByRole('region', { name: 'Управляют чатом' });
+  await expect(staff.getByRole('listitem').first()).toContainText('Алиса');
+
+  const rename = rules.getByRole('combobox', { name: 'Менять название' });
+  await expect(rename).toHaveValue('moderator');
+  await rename.selectOption('administrator');
+  await expect(rename).toHaveValue('administrator');
+  await expect(rules.getByRole('combobox', { name: 'Писать сообщения' })).toHaveValue('member');
+
+  await staff.getByRole('button', { name: 'Добавить' }).click();
+  await expect(page.getByRole('dialog', { name: 'Назначить' })).toBeVisible();
+  await page.getByRole('dialog', { name: 'Назначить' }).getByRole('button', { name: 'Борис' }).click();
+  await page.getByRole('dialog', { name: 'Что может Борис?' }).getByRole('radio', { name: 'Модератор' }).click();
+  const boris = rules.getByRole('region', { name: 'Управляют чатом' }).getByRole('listitem').filter({ hasText: 'Борис' });
+  await expect(boris).toContainText('Модератор', { timeout: 10_000 });
+  await boris.getByRole('button', { name: 'Снять роль' }).click();
+  await expect(boris).toHaveCount(0, { timeout: 10_000 });
+});
+
+test('«Внешний вид»: предпросмотр переписки следует за видом ленты', async ({ page }) => {
+  await signInToDemo(page);
+  await openSettings(page, 'Внешний вид');
+  const preview = page.getByRole('img', { name: 'Так будут выглядеть ваши сообщения' });
+  await expect(preview.locator('.bubble.own')).toHaveText('Вот этот. Как тебе?');
+  await page.getByRole('switch', { name: 'Компактный вид' }).check();
+  // В компактном пузырей нет: своя строка — под «Вы», у второй подряд от Ани имени нет.
+  await expect(preview.locator('.bubble')).toHaveCount(0);
+  await expect(preview.locator('.sender')).toHaveText(['Аня', 'Вы', 'Аня']);
 });

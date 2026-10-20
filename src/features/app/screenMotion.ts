@@ -18,8 +18,8 @@ interface ViewTransitionLike {
   finished: Promise<void>;
 }
 
-/** Глубина экрана: список — ноль, чат и настройки — над ним. */
-const depth = (route: Route): number => (route.name === 'home' ? 0 : 1);
+/** Глубина экрана: список — ноль, чат и настройки — над ним. Чужая ссылка — вопрос над списком. */
+const depth = (route: Route): number => (route.name === 'home' || route.name === 'open' ? 0 : 1);
 
 export function installScreenMotion(): () => void {
   router.transition = (apply, from, to) => {

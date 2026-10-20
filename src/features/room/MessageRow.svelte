@@ -21,7 +21,7 @@
   import { clock } from '../../design/time';
   import { viewport } from '../../design/viewport.svelte.ts';
   import type { Message } from '../../core/timeline/message';
-  import { i18n, t } from '../../i18n/index.svelte.ts';
+  import { i18n, plural, t } from '../../i18n/index.svelte.ts';
   import { preferences } from '../app/preferences.svelte.ts';
   import type { MessageActions } from './actions';
   import { touchGestures } from './gestures';
@@ -33,6 +33,7 @@
   import VoiceMessage from '../media/VoiceMessage.svelte';
   import MediaPreview from '../media/MediaPreview.svelte';
   import AlbumView from './AlbumView.svelte';
+  import ThreadLine from './ThreadLine.svelte';
   import type { MediaLoader } from '../../core/media/media';
   import { attachmentLabel, serviceText } from './text';
 
@@ -57,6 +58,8 @@
   const failed = $derived(message.delivery.state === 'failed' ? message.delivery : null);
   /** С ушедшим можно что-то делать; с удалённым и служебным — нет. */
   const interactive = $derived(!!message.eventId && kind.type !== 'deleted' && kind.type !== 'service');
+  /** Меню — и у удалённого: действий в нём нет, но когда отправили и когда удалили — есть. */
+  const hasMenu = $derived(!!message.eventId && kind.type !== 'service');
   /** Картинка во весь пузырь: отступы пузыря — тоньше, фон — у самой картинки. */
   const visual = $derived(kind.type === 'image' || kind.type === 'video' || kind.type === 'videoNote' || kind.type === 'sticker');
 
@@ -72,7 +75,7 @@
   }
 
   function oncontextmenu(event: MouseEvent) {
-    if (!interactive) return;
+    if (!hasMenu) return;
     const target = event.target as Element | null;
     const hadSelection = selectedBefore ?? selected();
     selectedBefore = null;
@@ -91,7 +94,7 @@
   const gestures = $derived({
     ondoubletap: () => interactive && actions.react(message, preferences.quickReaction),
     onswipe: () => interactive && actions.canReply && actions.reply(message),
-    onlongpress: (at: { x: number; y: number }) => interactive && actions.openMenu(message, at, true),
+    onlongpress: (at: { x: number; y: number }) => hasMenu && actions.openMenu(message, at, true),
   });
 </script>
 
@@ -100,16 +103,30 @@
 {:else}
   <div class="row" class:own={message.own && !compact} class:compact class:first={firstInRun} class:grouped={withFace} class:interactive>
     {#if withFace}
+      <!-- Лицо и имя ведут на страницу человека. Мышью и пальцем; скринридеру и Tab — через
+           список участников в «О чате»: сотня одинаковых остановок в ленте ему не нужна. -->
       <span class="face">
         {#if faceHere}
-          <Avatar name={message.senderName} seed={message.senderId} photo={senderPhoto} mode={preferences.faces} />
+          {#if actions.openProfile}
+            {@const open = actions.openProfile}
+            <button type="button" class="to-profile" tabindex="-1" aria-hidden="true" onclick={() => open(message.senderId)}>
+              <Avatar name={message.senderName} seed={message.senderId} photo={senderPhoto} mode={preferences.faces} />
+            </button>
+          {:else}
+            <Avatar name={message.senderName} seed={message.senderId} photo={senderPhoto} mode={preferences.faces} />
+          {/if}
         {/if}
       </span>
     {/if}
     <div class="stack">
       {#if nameHere}
         <!-- Видимое имя — для глаз; скринридеру его говорит само сообщение, у каждого. -->
-        <span class="sender" aria-hidden="true">{message.senderName}</span>
+        {#if actions.openProfile}
+          {@const open = actions.openProfile}
+          <button type="button" class="sender to-profile" tabindex="-1" aria-hidden="true" onclick={() => open(message.senderId)}>{message.senderName}</button>
+        {:else}
+          <span class="sender" aria-hidden="true">{message.senderName}</span>
+        {/if}
       {/if}
       <div class="bubble-wrap">
       <!-- Пузырь — `article`: запись в `role="log"` ленты и её остановка с клавиатуры
@@ -159,8 +176,9 @@
           {:else if kind.type === 'poll'}
             <PollView poll={kind.poll} canVote={!!message.eventId} own={message.own && !compact} onvote={(ids) => actions.vote(message, ids)} />
           {:else if message.album}
-            <AlbumView items={message.album} {media} onopen={(item) => actions.openMedia(item)} />
-            {#if (kind.type === 'image' || kind.type === 'video') && kind.attachment.caption}<span class="caption text"><LinkedText text={kind.attachment.caption} /></span>{/if}
+            {@const albumCaption = (kind.type === 'image' || kind.type === 'video') && kind.attachment.caption ? kind.attachment.caption : ''}
+            <AlbumView items={message.album} {media} captioned={!!albumCaption} onopen={(item) => actions.openMedia(item)} />
+            {#if albumCaption}<span class="caption album-caption text"><LinkedText text={albumCaption} /></span>{/if}
           {:else if kind.type === 'image' || kind.type === 'video' || kind.type === 'videoNote' || kind.type === 'sticker'}
             <MediaPreview kind={kind.type} attachment={kind.attachment} {media} own={message.own} onopen={() => actions.openMedia(message)} />
             {#if kind.attachment.caption}<span class="caption text"><LinkedText text={kind.attachment.caption} /></span>{/if}
@@ -209,16 +227,23 @@
           </div>
         {/if}
       </div>
+      {#if message.thread && actions.openThread}
+        {@const open = actions.openThread}
+        <ThreadLine thread={message.thread} onopen={() => open(message)} />
+      {/if}
       {#if message.reactions.length}
         <ul class="reactions" aria-label={t('message.reactions')}>
           {#each message.reactions as reaction (reaction.key)}
             <li>
+              <!-- Число — когда есть что считать: одного человека и так говорит эмодзи. -->
               <button
                 type="button"
                 class:mine={reaction.mine}
                 aria-pressed={reaction.mine}
+                aria-label={plural('message.menu.reaction', reaction.count, { emoji: reaction.key })}
                 disabled={!interactive}
-                onclick={() => actions.react(message, reaction.key)}>{reaction.key} {reaction.count}</button
+                onclick={() => actions.react(message, reaction.key)}
+                >{reaction.key}{#if reaction.count > 1}<span class="count">{reaction.count}</span>{/if}</button
               >
             </li>
           {/each}
@@ -230,7 +255,11 @@
           <span>{t(`sendFailure.${failed.reason}`)}</span>
           <span class="actions">
             <button type="button" onclick={() => actions.discard(message.key)}>{t('message.delivery.discard')}</button>
-            <button type="button" class="again" onclick={() => actions.retry(message.key)}>{t('message.delivery.sendAgain')}</button>
+            {#if failed.reason === 'identityChanged' || failed.reason === 'insecureDevices'}
+              <button type="button" class="again" onclick={() => actions.sendAnyway(message.key)}>{t('message.delivery.sendAnyway')}</button>
+            {:else}
+              <button type="button" class="again" onclick={() => actions.retry(message.key)}>{t('message.delivery.sendAgain')}</button>
+            {/if}
           </span>
         </div>
       {/if}
@@ -280,6 +309,15 @@
   }
   .own .stack {
     align-items: flex-end;
+  }
+  .to-profile {
+    display: block;
+    padding: 0;
+    border: none;
+    background: none;
+    font: inherit;
+    text-align: start;
+    cursor: pointer;
   }
   .sender {
     padding-inline: var(--bubble-pad-x);
@@ -430,9 +468,18 @@
   .reactions button:active:not(:disabled) {
     transform: scale(var(--motion-scale-from));
   }
+  /* Своя — тоном серого, а не рамкой: заметно, когда ищешь, и не кричит, когда нет. Число своей — акцентом. */
   .reactions button.mine {
-    border-color: var(--accent);
     background: var(--color-own-reaction);
+  }
+  .count {
+    margin-inline-start: var(--space-tight);
+    color: var(--color-text-secondary);
+    font-variant-numeric: tabular-nums;
+    font-weight: 500;
+  }
+  .mine .count {
+    color: var(--accent);
   }
   .reactions button:disabled {
     cursor: default;
@@ -458,6 +505,11 @@
   .bubble.visual .caption {
     display: block;
     padding: var(--space-tight) var(--space-close) 0;
+  }
+  /* Подпись альбома — с воздухом над и под ней: под мозаикой из нескольких фото прижатая
+     строка терялась. Сверху чуть меньше, чем снизу вместе с краем пузыря: подпись — к фото. */
+  .bubble.visual .album-caption {
+    padding: var(--space-close) var(--space-close) var(--space-close);
   }
   /* Стикер и «кружочек» — без пузыря: у них своя форма. */
   .bubble.bare,

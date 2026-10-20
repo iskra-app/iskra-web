@@ -8,9 +8,16 @@
   (`FolderTabs`), и папка показывает свои чаты в том же порядке.
 
   Стрелки ↑/↓ ходят по строкам, как в любом списке на десктопе.
+
+  «Поиск по сообщениям» — как в нативной: на телефоне полем внизу, под большим пальцем, на
+  широком экране — над списком, как боковая панель Mac. Пока в поле что-то есть, на месте
+  списка — найденное; нажатие открывает чат на этом сообщении.
 -->
 <script lang="ts">
   import EmptyState from '../../design/EmptyState.svelte';
+  import ConfirmDialog from '../../design/ConfirmDialog.svelte';
+  import NewSignInBanner from './NewSignInBanner.svelte';
+  import { NewSignIns } from '../../core/session/newSignIns.svelte.ts';
   import ProblemPanel from '../../design/ProblemPanel.svelte';
   import IconButton from '../../design/IconButton.svelte';
   import Icon from '../../design/Icon.svelte';
@@ -28,12 +35,20 @@
   import FolderMembership from './FolderMembership.svelte';
   import ChatPeek, { type PeekAction } from './ChatPeek.svelte';
   import { hasUnread } from '../../core/rooms/types';
+  import { viewport } from '../../design/viewport.svelte.ts';
+  import MessageSearchField from './MessageSearchField.svelte';
+  import SearchHits from './SearchHits.svelte';
+  import { revealRequest } from '../app/revealRequest.svelte.ts';
 
   let { session }: { session: UserSession } = $props();
 
   type View = { kind: 'all' } | { kind: 'archive' } | { kind: 'space'; id: string };
 
   let view = $state<View>({ kind: 'all' });
+
+  let query = $state('');
+  const searching = $derived(view.kind === 'all' && query.trim().length > 0);
+  $effect(() => session.search.search(query));
   let failure = $state<TextKey | null>(null);
   $effect(() => {
     if (!failure) return;
@@ -89,6 +104,27 @@
   let choosingFolders = $state<RoomSummary | null>(null);
 
   let peeking = $state<RoomSummary | null>(null);
+  /**
+   * Новые входы в аккаунт — при запуске и при каждом возвращении на вкладку: вход — то, что
+   * случается, пока вкладка в фоне.
+   */
+  const signIns = $derived(new NewSignIns(session.userId, () => session.devices()));
+  $effect(() => {
+    const store = signIns;
+    void store.check();
+    const onvisible = () => document.visibilityState === 'visible' && void store.check();
+    document.addEventListener('visibilitychange', onvisible);
+    return () => document.removeEventListener('visibilitychange', onvisible);
+  });
+
+  /** Из какого чата выйти — ждёт ответа на вопрос. */
+  let leaving = $state<RoomSummary | null>(null);
+
+  async function leave(room: RoomSummary) {
+    leaving = null;
+    if (!(await session.rooms.leave(room.id))) failure = 'roomAction.leaveFailed';
+    else if (selectedId === room.id) router.go({ name: 'home' });
+  }
 
   /** Подглядеть: меню уступает место карточке. */
   function peekAt(room: RoomSummary) {
@@ -126,6 +162,8 @@
             },
           ]),
       ...(folders.length > 0 ? [{ label: t('folders.addToFolder'), run: act(() => void (choosingFolders = room)) }] : []),
+      // Смахивание «Удалить» нативной: единственное, что не отменить, — поэтому сначала вопрос.
+      { label: t('roomList.swipe.delete'), run: act(() => void (leaving = room)) },
     ];
   }
 
@@ -144,7 +182,27 @@
   }
 </script>
 
-{#if view.kind === 'all' && folders.length > 0}
+{#if view.kind === 'all' && signIns.sessions[0]}
+  {@const device = signIns.sessions[0]}
+  <NewSignInBanner
+    {device}
+    more={signIns.sessions.length - 1}
+    onconfirm={() => void signIns.confirm(device)}
+    ondeny={() => router.go({ name: 'settings', section: 'devices' })}
+  />
+{/if}
+
+{#snippet searchField()}
+  {#if view.kind === 'all'}
+    <div class="search" class:bottom={viewport.layout === 'stack'}>
+      <MessageSearchField bind:value={query} />
+    </div>
+  {/if}
+{/snippet}
+
+{#if viewport.layout !== 'stack'}{@render searchField()}{/if}
+
+{#if view.kind === 'all' && folders.length > 0 && !searching}
   <FolderTabs {folders} list={organized.list} archived={organized.archived} selected={folder?.id ?? ''} onselect={(id) => (folderSelection.id = id)} />
 {/if}
 
@@ -162,13 +220,17 @@
 {/if}
 
 <!-- svelte-ignore a11y_no_static_element_interactions -->
-<div class="list" {onkeydown}>
-  {#if !session.ready && session.rooms.rooms.length === 0}
+<div class="list" class:above-search={viewport.layout === 'stack' && view.kind === 'all'} {onkeydown}>
+  {#if searching}
+    <SearchHits hits={session.search.hits} foundNothing={session.search.foundNothing} onopen={(hit) => revealRequest.open(hit.roomId, hit.id)} />
+  {:else if !session.ready && session.rooms.rooms.length === 0}
     <EmptyState title={t('roomList.loading')} />
   {:else if nothingAtAll}
     <EmptyState title={t('roomList.emptyTitle')} message={t('roomList.emptyMessage')} />
   {:else if view.kind === 'space' && shown.length === 0}
-    <EmptyState title={t('room.spaceEmptyTitle')} />
+    <EmptyState title={t('room.spaceEmptyTitle')} message={t('room.spaceEmptyMessage')} />
+  {:else if view.kind === 'archive' && shown.length === 0}
+    <EmptyState title={t('roomList.archive.emptyTitle')} message={t('roomList.archive.emptyMessageWeb')} />
   {:else if folder && shown.length === 0}
     <EmptyState title={t('folders.emptyTitle')} message={t('folders.emptyMessage')} />
   {:else}
@@ -195,6 +257,8 @@
   {/if}
 </div>
 
+{#if viewport.layout === 'stack'}{@render searchField()}{/if}
+
 <Menu
   open={!!menu}
   x={menu?.at.x ?? 0}
@@ -216,6 +280,17 @@
 
 <ChatPeek room={peeking} {session} actions={peeking ? rowActions(peeking) : []} onclose={() => (peeking = null)} />
 
+<ConfirmDialog
+  open={!!leaving}
+  title={t('roomList.swipe.leaveConfirmTitle')}
+  message={t('roomList.swipe.leaveConfirmMessage')}
+  confirmLabel={t('roomList.swipe.leaveConfirm')}
+  cancelLabel={t('roomList.swipe.cancel')}
+  destructive
+  onclose={() => (leaving = null)}
+  onconfirm={() => leaving && void leave(leaving)}
+/>
+
 <FolderMembership room={choosingFolders} {session} onclose={() => (choosingFolders = null)} />
 
 <style>
@@ -224,6 +299,10 @@
     overflow-y: auto;
     overscroll-behavior: contain;
     padding-block-end: max(var(--space-close), env(safe-area-inset-bottom));
+  }
+  /* Нижний край на телефоне — у поля поиска, ему и отступ от края экрана. */
+  .list.above-search {
+    padding-block-end: var(--space-close);
   }
   .subheader {
     display: flex;
@@ -265,5 +344,12 @@
   }
   .failure {
     padding: var(--space-close);
+  }
+  .search {
+    padding: var(--space-tight) var(--space-close) var(--space-close);
+  }
+  .search.bottom {
+    padding-block: var(--space-close) max(var(--space-close), env(safe-area-inset-bottom));
+    border-block-start: var(--border-hairline) solid var(--color-separator);
   }
 </style>

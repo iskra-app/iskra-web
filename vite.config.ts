@@ -98,6 +98,8 @@ export default defineConfig({
         // Только оболочка: HTML, JS, CSS, WASM, иконки. Никаких ответов API и медиа —
         // медиа в кэше SW лежало бы расшифрованным.
         globPatterns: ['**/*.{html,js,css,wasm,svg,png,webmanifest}'],
+        // «Искорки» нужны раз на аккаунт — загрузить на сервер; держать их в кэше незачем.
+        globIgnores: ['stickers/**'],
         // Rust-крипто в WASM весит несколько мегабайт.
         maximumFileSizeToCacheInBytes: 16 * 1024 * 1024,
         navigateFallback: 'index.html',
@@ -113,6 +115,9 @@ export default defineConfig({
           },
         ],
         cleanupOutdatedCaches: true,
+        // `sw.js` отдаётся с боевой CSP, где Trusted Types запрещают строку в `importScripts`:
+        // Workbox кладём прямо в него, отдельным файлом он не подгрузится.
+        inlineWorkboxRuntime: true,
       },
     }),
     staticHeaders(),
@@ -132,5 +137,6 @@ export default defineConfig({
   test: {
     include: ['tests/unit/**/*.test.ts'],
     environment: 'node',
+    setupFiles: ['tests/unit/setup.ts'],
   },
 });

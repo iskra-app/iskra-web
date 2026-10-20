@@ -1,5 +1,6 @@
 <!--
-  «Изменить чат»: название, описание, фото, открытость — только то, на что есть право.
+  «Изменить чат» — `RoomEditView` нативной: название, описание, фото, открытость, история для
+  новых участников, адрес и каталог сервера, заблокированные — только то, на что есть право.
   Фото чата уходит открыто: оно в состоянии комнаты, которое Matrix не шифрует.
 
   Личный чат — другое: его имя, описание и фото принадлежат собеседнику, и менять их так,
@@ -7,13 +8,17 @@
   устройстве (`LocalNames`); сервер о нём не знает, поэтому и без сети оно работает.
 -->
 <script lang="ts">
+  import { untrack } from 'svelte';
   import Dialog from '../../design/Dialog.svelte';
   import PlainButton from '../../design/PlainButton.svelte';
   import PrimaryButton from '../../design/PrimaryButton.svelte';
   import TextField from '../../design/TextField.svelte';
-  import type { RoomDetailsStore } from '../../core/rooms/roomDetails.svelte.ts';
+  import ConfirmDialog from '../../design/ConfirmDialog.svelte';
+  import { addressName, historyChoices, type HistoryAccess, type MemberSummary, type RoomDetailsStore } from '../../core/rooms/roomDetails.svelte.ts';
   import type { UserSession } from '../../core/session/userSession.svelte.ts';
   import { t } from '../../i18n/index.svelte.ts';
+  import { roomFailureText } from './text';
+  import RoomRulesDialog from './RoomRulesDialog.svelte';
 
   let { open, details, session, onclose }: { open: boolean; details: RoomDetailsStore; session: UserSession; onclose: () => void } = $props();
 
@@ -21,16 +26,35 @@
   let localName = $state('');
   let topic = $state('');
   let isOpen = $state(false);
+  let history = $state<HistoryAccess>('shared');
+  let address = $state('');
+  let listed = $state(false);
+  /** Кого пускают обратно — ждёт ответа на вопрос. */
+  let unbanning = $state<MemberSummary | null>(null);
+  /** «Роли и разрешения» поверх. */
+  let rulesOpen = $state(false);
+  const historyKey = (h: HistoryAccess) => (h === 'world_readable' ? 'room.access.history.worldReadable' : (`room.access.history.${h}` as const));
   let picker: HTMLInputElement | undefined = $state();
   const id = $props.id();
 
-  // Открыли — поля заполняются тем, что сейчас; правки прошлого раза не висят.
+  // Открыли — поля заполняются тем, что сейчас; правки прошлого раза не висят. Только в миг
+  // открытия: пока окно сохраняет, комната меняется (история уже ушла), и перечитать поля тогда —
+  // стереть то, что человек ещё только сохраняет.
   $effect(() => {
     if (!open) return;
-    name = details.serverName;
-    localName = details.localName ?? '';
-    topic = details.topic;
-    isOpen = details.open;
+    untrack(() => {
+      name = details.serverName;
+      localName = details.localName ?? '';
+      topic = details.topic;
+      isOpen = details.open;
+      history = details.history;
+      address = details.addressName;
+      if (details.permissions.canChangeAddress) void details.loadDirectory();
+    });
+  });
+  // Сервер ответил про каталог — переключатель встаёт как есть.
+  $effect(() => {
+    if (open && details.inDirectory !== undefined) listed = details.inDirectory;
   });
 
   async function save(event: SubmitEvent) {
@@ -45,7 +69,10 @@
     const done =
       (!p.canRename || (await details.rename(name))) &&
       (!p.canChangeTopic || (await details.setTopic(topic))) &&
-      (!p.canChangeVisibility || (await details.setOpen(isOpen)));
+      (!p.canChangeVisibility || (await details.setOpen(isOpen))) &&
+      (!p.canChangeHistory || (await details.setHistory(historyChoices(isOpen).includes(history) ? history : 'shared'))) &&
+      (!p.canChangeAddress || (await details.setAddress(address))) &&
+      (!p.canChangeAddress || details.inDirectory === undefined || !isOpen || listed === details.inDirectory || (await details.setInDirectory(listed)));
     if (done) onclose();
   }
 
@@ -72,7 +99,7 @@
           onclick={async () => {
             await details.renameLocally(null);
             onclose();
-          }}>{t('room.localName.reset')}</PlainButton
+          }}>{t('room.localName.reset', { name: details.serverName })}</PlainButton
         >
       {/if}
     {:else}
@@ -104,16 +131,128 @@
           <input type="checkbox" role="switch" bind:checked={isOpen} />
         </label>
       {/if}
+      {#if details.permissions.canChangeHistory}
+        <fieldset class="field">
+          <legend>{t('room.access.historyHeader')}</legend>
+          <div class="choices" role="radiogroup" aria-label={t('room.access.historyHeader')}>
+            {#each historyChoices(isOpen) as choice (choice)}
+              <label class="choice"><input type="radio" name="{id}-history" value={choice} bind:group={history} />{t(historyKey(choice))}</label>
+            {/each}
+          </div>
+          <span class="help">{t('room.access.historyFooter')}</span>
+        </fieldset>
+      {/if}
+      {#if details.permissions.canChangeAddress}
+        <TextField bind:value={address} label={t('room.access.addressHeader')} showLabel placeholder={t('room.access.addressPlaceholder')} />
+        <span class="help">
+          {#if addressName(address)}<span class="address">#{addressName(address)}:{details.addressServer}</span><br />{/if}
+          {t('room.access.addressFooter')}
+        </span>
+        {#if isOpen && details.inDirectory !== undefined}
+          <label class="toggle">
+            <span>
+              <strong>{t('room.access.inDirectory')}</strong>
+              <span class="help">{t('room.access.inDirectoryHelp', { server: details.addressServer })}</span>
+            </span>
+            <input type="checkbox" role="switch" bind:checked={listed} />
+          </label>
+        {/if}
+      {/if}
+      {#if details.permissions.canChangeRoles}
+        <PlainButton onclick={() => (rulesOpen = true)}>{t('room.rules.title')}</PlainButton>
+      {/if}
+      {#if details.permissions.canBan && details.banned.length > 0}
+        <fieldset class="field">
+          <legend>{t('room.access.banned')}</legend>
+          <ul class="banned">
+            {#each details.banned as member (member.id)}
+              <li>
+                <span class="who">{member.name}</span>
+                <PlainButton onclick={() => (unbanning = member)}>{t('room.access.unban')}</PlainButton>
+              </li>
+            {/each}
+          </ul>
+          <span class="help">{t('room.access.bannedFooter')}</span>
+        </fieldset>
+      {/if}
     {/if}
     {#if details.failure}
-      <p class="problem" role="alert">{t(`roomAction.${details.failure}Failed`)}</p>
+      <p class="problem" role="alert">{roomFailureText(details.failure)}</p>
     {/if}
     <PrimaryButton type="submit" wide busy={details.working}>{t('room.manage.save')}</PrimaryButton>
     <PlainButton onclick={onclose}>{t('room.manage.cancel')}</PlainButton>
   </form>
 </Dialog>
 
+<RoomRulesDialog open={rulesOpen} {details} onclose={() => (rulesOpen = false)} />
+
+<ConfirmDialog
+  open={!!unbanning}
+  title={t('room.access.unbanQuestion', { name: unbanning?.name ?? '' })}
+  message={t('room.access.unbanHelp')}
+  confirmLabel={t('room.access.unban')}
+  cancelLabel={t('room.manage.cancel')}
+  onclose={() => (unbanning = null)}
+  onconfirm={() => {
+    if (unbanning) void details.unban(unbanning);
+    unbanning = null;
+  }}
+/>
+
 <style>
+  fieldset {
+    margin: 0;
+    padding: 0;
+    border: none;
+  }
+  legend {
+    padding: 0;
+    margin-block-end: var(--space-tight);
+    font-size: var(--font-size-caption);
+    color: var(--color-text-secondary);
+  }
+  .choices {
+    display: flex;
+    flex-direction: column;
+    border-radius: var(--radius-card);
+    background: var(--color-surface);
+    overflow: hidden;
+  }
+  .choice {
+    display: flex;
+    align-items: center;
+    gap: var(--space-close);
+    min-height: var(--tap-target);
+    padding: 0 var(--space-normal);
+    font-size: var(--font-size-body);
+    color: var(--color-text);
+    cursor: pointer;
+  }
+  .choice + .choice {
+    border-block-start: var(--border-hairline) solid var(--color-separator);
+  }
+  .address {
+    color: var(--color-text);
+  }
+  .banned {
+    display: flex;
+    flex-direction: column;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+  .banned li {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-close);
+  }
+  .who {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
   form {
     display: flex;
     flex-direction: column;

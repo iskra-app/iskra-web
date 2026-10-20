@@ -33,11 +33,16 @@ const DEFAULT_DIMMING = 0.25;
 export const layouts = ['bubbles', 'compact'] as const;
 export type MessageLayout = (typeof layouts)[number];
 
+/** Где треды — `ThreadSettings.Shown` нативной: всегда, в больших чатах (по умолчанию), никогда. */
+export const threadPlaces = ['always', 'inLargeRooms', 'never'] as const;
+export type ThreadPlace = (typeof threadPlaces)[number];
+
 /** Язык: как в браузере или выбранный вручную (план: «с выбором вручную в настройках»). */
 export type LanguageChoice = 'system' | Locale;
 
 const keys = {
   accent: 'appearance.accent',
+  tintsInterface: 'appearance.tintsInterface',
   appearance: 'appearance.mode',
   listWidth: 'layout.listWidth',
   faces: 'appearance.faces',
@@ -55,6 +60,13 @@ const keys = {
   hideNameChanges: 'chats.hidesNameChanges',
   hideMembershipChanges: 'chats.hidesMembershipChanges',
   sendWithModEnter: 'composer.sendsWithCommandReturn',
+  hidePresence: 'privacy.hidesPresence',
+  hideTyping: 'privacy.hidesTyping',
+  stickersBuiltIn: 'stickers.showsBuiltIn',
+  stickersRoomPack: 'stickers.showsRoomPack',
+  stickersMine: 'stickers.showsMine',
+  threadsShown: 'chats.threads.shown',
+  threadsHideReplies: 'chats.threads.hidesReplies',
 } as const;
 
 function read(key: string): string | null {
@@ -94,6 +106,11 @@ function recentList(value: string | null): string[] {
 
 class Preferences {
   accent = $state<Accent>(oneOf(read(keys.accent), accents, 'blue'));
+  /**
+   * «Тонировать интерфейс» — `AccentTheme.tintsInterface` нативной: акцент лёгким листом поверх
+   * всего. Выключено по умолчанию: цвет, разлитый везде, ничего не выделяет.
+   */
+  tintsInterface = $state<boolean>(read(keys.tintsInterface) === 'true');
   appearance = $state<Appearance>(oneOf(read(keys.appearance), ['system', 'light', 'dark'], 'system'));
   listWidth = $state<number>(clampListWidth(Number(read(keys.listWidth) ?? LIST_IDEAL)));
   faces = $state<FaceMode>(oneOf(read(keys.faces), faceModes, 'initials'));
@@ -112,6 +129,19 @@ class Preferences {
   hideMembershipChanges = $state<boolean>(read(keys.hideMembershipChanges) === 'true');
   /** Enter переносит строку, отправляет `Ctrl/⌘ Enter` — для тех, кто пишет абзацами. */
   sendWithModEnter = $state<boolean>(read(keys.sendWithModEnter) === 'true');
+  /**
+   * «Конфиденциальность» — `PrivacySettings` нативной, те же ключи, по умолчанию выключены.
+   * Скрыл своё время захода — не видишь и чужого; скрыл «печатает…» — чужое видишь.
+   */
+  hidePresence = $state<boolean>(read(keys.hidePresence) === 'true');
+  hideTyping = $state<boolean>(read(keys.hideTyping) === 'true');
+  /** Какие наборы в панели стикеров — `StickerSettings` нативной; все включены, пока не выключили. */
+  stickersBuiltIn = $state<boolean>(read(keys.stickersBuiltIn) !== 'false');
+  stickersRoomPack = $state<boolean>(read(keys.stickersRoomPack) !== 'false');
+  stickersMine = $state<boolean>(read(keys.stickersMine) !== 'false');
+  threadsShown = $state<ThreadPlace>(oneOf(read(keys.threadsShown), threadPlaces, 'inLargeRooms'));
+  /** Ответы в тредах — только в треде, не в чате. Выключено: ответы видны и там, и там. */
+  threadsHideReplies = $state<boolean>(read(keys.threadsHideReplies) === 'true');
   /** Что ставит двойное касание сообщения — любая эмодзи, ключ нативной (`QuickReaction`). */
   quickReaction = $state<string>(emojiOr(read(keys.quickReaction), defaultQuickReaction));
   /** Недавние реакции — наверху панели «Больше эмодзи» (`RecentEmoji` нативной, тот же ключ). */
@@ -121,6 +151,7 @@ class Preferences {
   persist(): () => void {
     return $effect.root(() => {
       $effect(() => write(keys.accent, this.accent));
+      $effect(() => write(keys.tintsInterface, String(this.tintsInterface)));
       $effect(() => write(keys.appearance, this.appearance));
       $effect(() => write(keys.listWidth, String(this.listWidth)));
       $effect(() => write(keys.faces, this.faces));
@@ -137,6 +168,13 @@ class Preferences {
       $effect(() => write(keys.hideNameChanges, String(this.hideNameChanges)));
       $effect(() => write(keys.hideMembershipChanges, String(this.hideMembershipChanges)));
       $effect(() => write(keys.sendWithModEnter, String(this.sendWithModEnter)));
+      $effect(() => write(keys.hidePresence, String(this.hidePresence)));
+      $effect(() => write(keys.hideTyping, String(this.hideTyping)));
+      $effect(() => write(keys.stickersBuiltIn, String(this.stickersBuiltIn)));
+      $effect(() => write(keys.stickersRoomPack, String(this.stickersRoomPack)));
+      $effect(() => write(keys.stickersMine, String(this.stickersMine)));
+      $effect(() => write(keys.threadsShown, this.threadsShown));
+      $effect(() => write(keys.threadsHideReplies, String(this.threadsHideReplies)));
       $effect(() => {
         write(keys.language, this.language);
         i18n.locale = this.language === 'system' ? preferredLocale(navigator.languages ?? []) : this.language;
@@ -144,6 +182,8 @@ class Preferences {
       $effect(() => {
         const root = document.documentElement;
         root.dataset.accent = this.accent;
+        if (this.tintsInterface) root.dataset.tint = '';
+        else delete root.dataset.tint;
         if (this.font === 'inter') delete root.dataset.font;
         else root.dataset.font = this.font;
         if (this.appearance === 'system') delete root.dataset.theme;

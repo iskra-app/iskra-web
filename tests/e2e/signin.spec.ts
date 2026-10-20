@@ -56,3 +56,14 @@ test('внизу экрана входа — версия и сборка; не 
   // Сайт Искры — в любой сборке.
   await expect(page.getByRole('link', { name: 'iskra.wtf' })).toHaveAttribute('href', 'https://iskra.wtf');
 });
+
+test('тёмная тема: иконки в списке серверов — цветом текста, а не чёрные', async ({ page }) => {
+  await page.emulateMedia({ colorScheme: 'dark' });
+  await openApp(page);
+  await page.getByRole('button', { name: 'Не знаете, какой сервер выбрать?' }).click();
+  const dialog = page.getByRole('dialog');
+  await expect(dialog.locator('svg path').first()).toBeVisible();
+  const fills = await dialog.locator('svg path').evaluateAll((paths) => paths.map((p) => getComputedStyle(p).fill));
+  expect(fills.length).toBeGreaterThan(0);
+  expect(fills.filter((f) => f === 'rgb(0, 0, 0)')).toEqual([]);
+});

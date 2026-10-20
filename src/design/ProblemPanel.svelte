@@ -5,7 +5,7 @@
 -->
 <script lang="ts">
   import { ICON_VIEWBOX, icons } from './icons.ts';
-  let { title, message }: { title?: string; message: string } = $props();
+  let { title, message, detail }: { title?: string; message: string; detail?: string } = $props();
 </script>
 
 <div class="problem" role="alert">
@@ -13,6 +13,7 @@
   <div>
     {#if title}<strong>{title}</strong>{/if}
     <p>{message}</p>
+    {#if detail}<p class="detail">{detail}</p>{/if}
   </div>
 </div>
 
@@ -39,5 +40,12 @@
   }
   p {
     margin: 0;
+  }
+  .detail {
+    margin-block-start: var(--space-tight);
+    font-size: var(--font-size-caption);
+    font-weight: 400;
+    opacity: 0.8;
+    overflow-wrap: anywhere;
   }
 </style>

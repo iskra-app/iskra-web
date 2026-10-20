@@ -7,7 +7,8 @@
  *   цитату мы рисуем сами;
  * - ссылки — только `https:`, `http:` и `mailto:`, и всегда в новой вкладке, с
  *   `noopener noreferrer`;
- * - упоминание человека (`https://matrix.to/#/@…`) — не ссылка на чужой сайт, а имя;
+ * - упоминание человека (`https://matrix.to/#/@…` или `https://s.iskra.wtf/@…`) — не ссылка
+ *   на чужой сайт, а имя;
  * - картинки не грузятся никогда: `mxc://` внутри HTML сам не качается (план), а чужой
  *   `https:` раскрыл бы адрес читающего. Вместо картинки — её подпись.
  *
@@ -16,6 +17,7 @@
  * Trusted Types `dompurify` — она есть в CSP.
  */
 import DOMPurify, { type Config } from 'dompurify';
+import { linkTarget } from '../../core/navigation/links';
 
 const TAGS = [
   'font', 'del', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'blockquote', 'p', 'a', 'ul', 'ol', 'sup', 'sub', 'li',
@@ -24,7 +26,6 @@ const TAGS = [
 ];
 const ATTRIBUTES = ['href', 'alt', 'title', 'start', 'data-mx-spoiler'];
 const SAFE_LINK = /^(https?:|mailto:)/i;
-const USER_MENTION = /^https:\/\/matrix\.to\/#\/(@[^/?]+)/;
 
 const config: Config = {
   ALLOWED_TAGS: TAGS,
@@ -61,11 +62,11 @@ export function sanitizeMatrixHtml(html: string, win: Window = window): Document
     img.replaceWith(label ? doc.createTextNode(`[${label}]`) : doc.createTextNode(''));
   }
   for (const link of [...fragment.querySelectorAll('a')]) {
-    const mention = USER_MENTION.exec(link.getAttribute('href') ?? '');
-    if (!mention) continue;
+    const mention = linkTarget(link.getAttribute('href') ?? '')?.target;
+    if (!mention?.startsWith('@')) continue;
     const pill = doc.createElement('span');
     pill.className = 'mention';
-    pill.textContent = link.textContent || decodeURIComponent(mention[1]!);
+    pill.textContent = link.textContent || mention;
     link.replaceWith(pill);
   }
   for (const spoiler of [...fragment.querySelectorAll('[data-mx-spoiler]')]) spoiler.classList.add('spoiler');

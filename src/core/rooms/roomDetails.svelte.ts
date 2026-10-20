@@ -10,8 +10,9 @@
  * сравнивает сервер: два администратора оба «администраторы», но тронуть друг друга не
  * могут, а создатель комнаты версии 12 выше любого числа (`Infinity`).
  */
-import { Direction, EventType, MatrixEvent, RoomEvent, RoomMemberEvent, RoomStateEvent, type MatrixClient, type Room } from 'matrix-js-sdk';
-import { firstLineOf } from '../timeline/words';
+import { Direction, EventType, MatrixEvent, Visibility, RoomEvent, RoomMemberEvent, RoomStateEvent, type MatrixClient, type Room } from 'matrix-js-sdk';
+import { previewOf } from './preview';
+import type { Preview } from './types';
 import type { LocalNameSource } from './localNames.svelte.ts';
 import { alertsRules, roomAlerts, type RoomAlerts } from './pushRules';
 
@@ -30,12 +31,14 @@ export interface MemberSummary {
   invited: boolean;
 }
 
-/** Закреплённое — для списка в панели: кто и что, одной строкой. */
+/** Закреплённое — для списка «Закреплённые»: кто, когда и что. */
 export interface PinnedSummary {
   eventId: string;
+  senderId?: string;
   senderName?: string;
-  /** Первая строка текста; пусто — не текст или не загрузилось. */
-  text: string;
+  ts?: number;
+  /** Что в нём — словами, как в строке списка чатов; нет — ещё не загрузилось. */
+  preview?: Preview;
   /** Достать не вышло: удалено или недоступно. */
   unavailable: boolean;
 }
@@ -49,7 +52,17 @@ export interface RoomPermissions {
   canRemove: boolean;
   canBan: boolean;
   canChangeRoles: boolean;
+  canChangeHistory: boolean;
+  canChangeAddress: boolean;
 }
+
+/**
+ * Что из сказанного раньше видит пришедший позже — `HistoryAccess` нативной. «Всем, даже без
+ * вступления» — только в открытой комнате.
+ */
+export type HistoryAccess = 'shared' | 'invited' | 'joined' | 'world_readable';
+export const historyChoices = (open: boolean): HistoryAccess[] =>
+  open ? ['shared', 'invited', 'joined', 'world_readable'] : ['shared', 'invited', 'joined'];
 
 const DENIED: RoomPermissions = {
   canRename: false,
@@ -60,16 +73,83 @@ const DENIED: RoomPermissions = {
   canRemove: false,
   canBan: false,
   canChangeRoles: false,
+  canChangeHistory: false,
+  canChangeAddress: false,
 };
 
 /** Что не получилось — ключи текстов нативной Искры (`roomAction.*Failed`). */
-export type RoomActionFailure = 'rename' | 'topic' | 'picture' | 'visibility' | 'invite' | 'remove' | 'ban' | 'role' | 'leave' | 'alerts';
+export type RoomActionFailure =
+  | 'rename'
+  | 'topic'
+  | 'picture'
+  | 'visibility'
+  | 'invite'
+  | 'remove'
+  | 'ban'
+  | 'unban'
+  | 'role'
+  | 'leave'
+  | 'alerts'
+  | 'history'
+  | 'address'
+  | 'addressTaken'
+  | 'directory'
+  | 'rules';
 
 /** Уровни ролей — как их пишут Element и нативная Искра. */
 export const ROLE_LEVEL: Record<RoomRole, number> = { administrator: 100, moderator: 50, member: 0 };
 
+/**
+ * Что в комнате кому можно — `RoomRule` нативной: восемь порогов `m.room.power_levels`, каждый
+ * показан нижней ступенью, которой можно: все, модераторы, администраторы.
+ */
+export const roomRules = ['sendMessages', 'invite', 'remove', 'ban', 'deleteOthers', 'rename', 'changeTopic', 'changePicture'] as const;
+export type RoomRule = (typeof roomRules)[number];
+
+/** Где порог правила живёт в power levels и чему он равен, если его нет (спецификация). */
+const RULE_LEVELS: Record<RoomRule, { key: string; event?: string; fallback: (powers: Record<string, unknown>) => number }> = {
+  sendMessages: { key: 'events_default', fallback: () => 0 },
+  invite: { key: 'invite', fallback: () => 0 },
+  remove: { key: 'kick', fallback: () => 50 },
+  ban: { key: 'ban', fallback: () => 50 },
+  deleteOthers: { key: 'redact', fallback: () => 50 },
+  rename: { key: 'events', event: EventType.RoomName, fallback: stateDefault },
+  changeTopic: { key: 'events', event: EventType.RoomTopic, fallback: stateDefault },
+  changePicture: { key: 'events', event: EventType.RoomAvatar, fallback: stateDefault },
+};
+
+function stateDefault(powers: Record<string, unknown>): number {
+  return typeof powers['state_default'] === 'number' ? powers['state_default'] : 50;
+}
+
+function ruleLevel(powers: Record<string, unknown>, rule: RoomRule): number {
+  const { key, event, fallback } = RULE_LEVELS[rule];
+  const value = event ? ((powers['events'] ?? {}) as Record<string, unknown>)[event] : powers[key];
+  return typeof value === 'number' ? value : fallback(powers);
+}
+
+const roleAt = (level: number): RoomRole =>
+  level >= ROLE_LEVEL.administrator ? 'administrator' : level >= ROLE_LEVEL.moderator ? 'moderator' : 'member';
+
 /** Версии комнат, где создатель — вне чисел (MSC4289). */
 const CREATOR_IS_UNLIMITED = new Set(['12', 'org.matrix.hydra.11']);
+
+/**
+ * Что можно сделать адресом из набранного: строчные, дефисы вместо пробелов, ничего, на чём
+ * споткнётся ссылка. Набранные целиком `#имя:сервер` прощаются — адреса вставляют.
+ */
+export function addressName(typed: string): string {
+  let text = typed.trim();
+  if (text.startsWith('#')) text = text.slice(1);
+  const colon = text.indexOf(':');
+  if (colon >= 0) text = text.slice(0, colon);
+  return text
+    .toLowerCase()
+    .replace(/\s+/g, '-')
+    .replace(/[^\p{L}\p{N}._=-]/gu, '')
+    .replace(/-+/g, '-')
+    .replace(/^-|-$/g, '');
+}
 
 export class RoomDetailsStore {
   /** Что на экране: локальное имя личного чата, если оно есть, иначе — `serverName`. */
@@ -85,6 +165,18 @@ export class RoomDetailsStore {
   /** Открытый: войти может любой, кто найдёт. */
   open = $state(false);
   members = $state.raw<MemberSummary[]>([]);
+  /** Кого сюда не пускают — для тех, кто может пустить обратно (`unban`). */
+  banned = $state.raw<MemberSummary[]>([]);
+  history = $state<HistoryAccess>('shared');
+  /** Главный адрес комнаты, `#имя:сервер`; нет — нет. */
+  alias = $state<string | undefined>(undefined);
+  /** Кому что можно — нижней ступенью; `null` — power levels ещё не пришли. */
+  rules = $state.raw<Record<RoomRule, RoomRole> | null>(null);
+  /** Порог каждого правила числом — чтобы знать, можно ли его тронуть. */
+  private ruleLevels: Record<string, number> = {};
+  private powers: Record<string, unknown> = {};
+  /** В каталоге сервера? Знает только сервер, и спрашивают его только из настроек: `undefined`. */
+  inDirectory = $state<boolean | undefined>(undefined);
   permissions = $state.raw<RoomPermissions>(DENIED);
   alerts = $state<RoomAlerts>('all');
   /** Закреплённые — последнее закреплённое первым. */
@@ -190,6 +282,27 @@ export class RoomDetailsStore {
       // Администраторы, модераторы, остальные; внутри — по имени. Приглашённые — в конце.
       .sort((a, b) => +a.invited - +b.invited || rank[a.role] - rank[b.role] || a.name.localeCompare(b.name));
 
+    this.banned = room
+      .getMembers()
+      .filter((m) => m.membership === 'ban')
+      .map((m): MemberSummary => {
+        const authority = authorityOf(m.userId);
+        // В событии блокировки имени нет — человек назван так, как его знали в чате до неё.
+        const before = m.events.member?.getPrevContent()['displayname'];
+        const name = m.name && m.name !== m.userId ? m.name : typeof before === 'string' && before ? before : m.userId;
+        return { id: m.userId, name, role: roleOf(authority), authority, ambiguous: m.disambiguate, invited: false };
+      })
+      .sort((a, b) => a.name.localeCompare(b.name));
+    const visibility = state.getStateEvents(EventType.RoomHistoryVisibility, '')?.getContent()['history_visibility'];
+    // Своё расширение сервера описать нечем — как умолчание спецификации, «вся история».
+    this.history = visibility === 'invited' || visibility === 'joined' || visibility === 'world_readable' ? visibility : 'shared';
+    const alias = state.getStateEvents(EventType.RoomCanonicalAlias, '')?.getContent()['alias'];
+    this.alias = typeof alias === 'string' ? alias : undefined;
+
+    this.powers = powers;
+    this.ruleLevels = Object.fromEntries(roomRules.map((rule) => [rule, ruleLevel(powers, rule)]));
+    this.rules = Object.fromEntries(roomRules.map((rule) => [rule, roleAt(this.ruleLevels[rule]!)])) as Record<RoomRule, RoomRole>;
+
     this.ownAuthority = authorityOf(this.me);
     const level = (key: string, fallback: number) => (typeof powers[key] === 'number' ? (powers[key] as number) : fallback);
     const may = (type: string) => state.maySendStateEvent(type, this.me);
@@ -202,6 +315,8 @@ export class RoomDetailsStore {
       canRemove: this.ownAuthority >= level('kick', 50),
       canBan: this.ownAuthority >= level('ban', 50),
       canChangeRoles: may(EventType.RoomPowerLevels),
+      canChangeHistory: may(EventType.RoomHistoryVisibility) && !this.direct,
+      canChangeAddress: may(EventType.RoomCanonicalAlias) && !this.direct,
     };
     this.readAlerts();
     this.readPinned(room, state.getStateEvents('m.room.pinned_events', '')?.getContent()['pinned']);
@@ -212,15 +327,14 @@ export class RoomDetailsStore {
     this.pinned = ids.map((eventId): PinnedSummary => {
       const event = room.findEventById(eventId) ?? this.fetched.get(eventId) ?? undefined;
       if (event === undefined && !this.fetched.has(eventId)) void this.fetchPinned(eventId);
-      if (!event) return { eventId, text: '', unavailable: this.fetched.get(eventId) === null };
+      if (!event) return { eventId, unavailable: this.fetched.get(eventId) === null };
       const sender = event.getSender();
-      const content = event.isRedacted() ? {} : event.getContent();
-      const body = content['body'];
-      const html = content['format'] === 'org.matrix.custom.html' && typeof content['formatted_body'] === 'string' ? content['formatted_body'] : undefined;
+      const preview = event.isRedacted() ? undefined : previewOf(event);
       return {
         eventId,
-        ...(sender ? { senderName: room.getMember(sender)?.name || sender } : {}),
-        text: typeof body === 'string' ? firstLineOf(body, html) : '',
+        ...(sender ? { senderId: sender, senderName: room.getMember(sender)?.name || sender } : {}),
+        ts: event.getTs(),
+        ...(preview ? { preview } : {}),
         unavailable: event.isRedacted(),
       };
     });
@@ -356,6 +470,115 @@ export class RoomDetailsStore {
       if (add) await this.client.addPushRule('global', add.kind as never, add.ruleId, add.body as never);
     }).then((ok) => {
       if (!ok) this.alerts = previous;
+      return ok;
+    });
+  }
+
+  /** Кто управляет чатом — администраторы и модераторы. */
+  get staff(): MemberSummary[] {
+    return this.members.filter((m) => m.role !== 'member' && !m.invited);
+  }
+
+  /**
+   * Какие ступени можно поставить правилу. Пусто — правило не тронуть: оно выше моей ступени
+   * (или менять роли нельзя вовсе), и экран показывает его как факт.
+   */
+  rolesForRule(rule: RoomRule): RoomRole[] {
+    if (!this.permissions.canChangeRoles || (this.ruleLevels[rule] ?? 0) > this.ownAuthority) return [];
+    return (['member', 'moderator', 'administrator'] as const).filter((role) => ROLE_LEVEL[role] <= this.ownAuthority);
+  }
+
+  /** Сменить, кому можно одно дело. Сразу на экране; сервер отказал — обратно. */
+  setRule(rule: RoomRule, role: RoomRole): Promise<boolean> {
+    if (!this.rules || this.rules[rule] === role || !this.rolesForRule(rule).includes(role)) return Promise.resolve(true);
+    const before = this.rules;
+    this.rules = { ...before, [rule]: role };
+    const { key, event } = RULE_LEVELS[rule];
+    const level = ROLE_LEVEL[role];
+    const content = event
+      ? { ...this.powers, events: { ...((this.powers['events'] ?? {}) as Record<string, unknown>), [event]: level } }
+      : { ...this.powers, [key]: level };
+    return this.act('rules', () => this.client.sendStateEvent(this.roomId, EventType.RoomPowerLevels, content as never, '')).then((ok) => {
+      if (!ok) this.rules = before;
+      return ok;
+    });
+  }
+
+  /** Пустить обратно: запрет снят, а сам человек в чат не вернётся — его зовут заново. */
+  unban(member: MemberSummary): Promise<boolean> {
+    return this.act('unban', () => this.client.unban(this.roomId, member.id));
+  }
+
+  setHistory(history: HistoryAccess): Promise<boolean> {
+    if (history === this.history) return Promise.resolve(true);
+    const previous = this.history;
+    this.history = history;
+    return this.act('history', () =>
+      this.client.sendStateEvent(this.roomId, EventType.RoomHistoryVisibility, { history_visibility: history } as never, ''),
+    ).then((ok) => {
+      if (!ok) this.history = previous;
+      return ok;
+    });
+  }
+
+  /** Сервер адресов этой комнаты — тот, что после двоеточия в моём ID. */
+  get addressServer(): string {
+    return this.me.slice(this.me.indexOf(':') + 1);
+  }
+
+  /** Имя адреса без `#` и сервера — что стоит в поле. */
+  get addressName(): string {
+    return this.alias ? this.alias.slice(1, this.alias.indexOf(':') > 0 ? this.alias.indexOf(':') : undefined) : '';
+  }
+
+  /**
+   * Дать комнате адрес `#имя:сервер` или убрать его (пустое имя). Сначала адрес занимается на
+   * сервере, потом записывается в комнату главным: наоборот в комнате оказался бы адрес, ведущий
+   * в никуда или в чужую комнату. Занят — так и сказать. Старый адрес своего сервера отпускается.
+   */
+  async setAddress(typed: string): Promise<boolean> {
+    const local = addressName(typed);
+    const alias = local ? `#${local}:${this.addressServer}` : undefined;
+    if (alias === this.alias) return true;
+    const previous = this.alias;
+    this.working = true;
+    this.failure = null;
+    try {
+      if (alias) {
+        try {
+          await this.client.createAlias(alias, this.roomId);
+        } catch (error) {
+          this.failure = (error as { httpStatus?: number }).httpStatus === 409 ? 'addressTaken' : 'address';
+          return false;
+        }
+      }
+      await this.client.sendStateEvent(this.roomId, EventType.RoomCanonicalAlias, (alias ? { alias } : {}) as never, '');
+      this.alias = alias;
+      if (previous?.endsWith(`:${this.addressServer}`)) await this.client.deleteAlias(previous).catch(() => {});
+      return true;
+    } catch {
+      this.failure = 'address';
+      return false;
+    } finally {
+      this.working = false;
+    }
+  }
+
+  /** Спросить сервер, в каталоге ли комната. Спрашивают только настройки. */
+  async loadDirectory(): Promise<void> {
+    try {
+      const { visibility } = await this.client.getRoomDirectoryVisibility(this.roomId);
+      this.inDirectory = visibility === 'public';
+    } catch {
+      this.inDirectory = undefined;
+    }
+  }
+
+  setInDirectory(listed: boolean): Promise<boolean> {
+    const previous = this.inDirectory;
+    this.inDirectory = listed;
+    return this.act('directory', () => this.client.setRoomDirectoryVisibility(this.roomId, listed ? Visibility.Public : Visibility.Private)).then((ok) => {
+      if (!ok) this.inDirectory = previous;
       return ok;
     });
   }
