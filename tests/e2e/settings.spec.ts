@@ -536,3 +536,27 @@ test('«Об Iskra» — как в нативной: версия, сборка,
   await expect(page.getByRole('heading', { name: 'Об Iskra', level: 1 })).toBeVisible();
   expect(problems).toEqual([]);
 });
+
+test('«Конфиденциальность»: скрыть время захода — и чужого не видно; выбор переживает перезагрузку', async ({ page }) => {
+  await signInToDemo(page);
+  await openRoom(page, /^Аня/);
+  const subtitle = page.locator('.main-column header .subtitle');
+  await expect(subtitle).toHaveText('был(а) 5 мин назад');
+
+  await openSettings(page, 'Безопасность');
+  const presence = page.getByRole('switch', { name: 'Скрывать время захода' });
+  const typing = page.getByRole('switch', { name: 'Скрывать «печатает…»' });
+  await expect(presence).not.toBeChecked();
+  await presence.check();
+  await typing.check();
+
+  // Своё спрятал — чужого не спрашиваем: под именем снова ID.
+  await openRoom(page, /^Аня/);
+  await expect(subtitle).toHaveText('@anya:demo.iskra.invalid');
+
+  await page.reload({ waitUntil: 'domcontentloaded' });
+  await expect(subtitle).toHaveText('@anya:demo.iskra.invalid', { timeout: 20_000 });
+  await openSettings(page, 'Безопасность');
+  await expect(presence).toBeChecked();
+  await expect(typing).toBeChecked();
+});

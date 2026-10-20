@@ -163,6 +163,7 @@ export class DemoHomeserver {
       ['GET', re(`${c}/v1/media/thumbnail/([^/]+)/([^/]+)`), (r) => this.downloadMedia(r)],
       ['GET', re(`${c}/v3/voip/turnServer`), () => json(200, {})],
       ['PUT', re(`${c}/v3/presence/([^/]+)/status`), () => json(200, {})],
+      ['GET', re(`${c}/v3/presence/([^/]+)/status`), (r) => this.presenceOf(r)],
       // Звонков (MatrixRTC) в демо нет — и SDK это спрашивает на старте.
       ['GET', re(`${c}/unstable/org.matrix.msc4143/rtc/transports`), () => unrecognized()],
       ['GET', re(`${c}/v1/rtc/transports`), () => unrecognized()],
@@ -719,6 +720,16 @@ export class DemoHomeserver {
     };
     this.enqueue({ kind: 'leave', roomId, body: { state: { events: [] }, timeline: { events: [leaveEvent] } } });
     return json(200, {});
+  }
+
+  /**
+   * Присутствие: Аня была пять минут назад, остальные — как на сервере с выключенным
+   * присутствием: `offline` без времени, и показывать нечего.
+   */
+  private presenceOf({ params }: DemoRequest): Response {
+    const userId = decodeURIComponent((params as [string])[0]);
+    if (userId === demoUsers.anya) return json(200, { presence: 'offline', last_active_ago: 5 * 60_000, currently_active: false });
+    return json(200, { presence: 'offline' });
   }
 
   /**

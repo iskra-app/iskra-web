@@ -164,7 +164,7 @@ test('закреплённое: полоса над лентой, нажатие
   await expect(menu.getByRole('menuitem', { name: /Закрепить|Открепить/ })).toHaveCount(0);
 });
 
-test('шапка чата, как в нативной: под именем — «печатает…», потом число участников; в личном — ID собеседника', async ({ page }) => {
+test('шапка чата, как в нативной: под именем — «печатает…», потом число участников; в личном — когда был собеседник', async ({ page }) => {
   await signInToDemo(page);
   await openRoom(page, /^Выходные/);
   const subtitle = page.locator('.main-column header .subtitle');
@@ -174,8 +174,9 @@ test('шапка чата, как в нативной: под именем — �
   await expect(subtitle).toHaveText('Вера печатает…', { timeout: 10_000 });
   await expect(subtitle).toHaveText('3 участника', { timeout: 15_000 });
 
+  // Присутствие из демо: Аня была пять минут назад. Сервер, который молчит, — ID собеседника.
   await openRoom(page, /^Аня/);
-  await expect(subtitle).toHaveText('@anya:demo.iskra.invalid');
+  await expect(subtitle).toHaveText('был(а) 5 мин назад');
 });
 
 test('HTML сообщения: разметка на месте, скрипта нет, картинка — подписью; под CSP без ошибок', async ({ page }) => {

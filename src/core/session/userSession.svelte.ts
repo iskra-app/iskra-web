@@ -33,6 +33,7 @@ import { canForward, forwardContent } from '../timeline/forward';
 import type { Message } from '../timeline/message';
 import { RecoveryStore } from '../encryption/recovery.svelte.ts';
 import { SecretStorageKeyHolder } from '../encryption/secretStorageKey';
+import { applyPresence, PresenceWatch } from './presence.svelte.ts';
 import { IdentityChangesStore } from '../encryption/identityChanges.svelte.ts';
 import { VerificationStore } from '../encryption/verification.svelte.ts';
 import { deleteDatabase } from '../storage/idb';
@@ -129,6 +130,16 @@ export class UserSession {
   /** Лента комнаты. Живёт, пока открыт чат: тот, кто открыл, её и `destroy()`. */
   timeline(roomId: string): TimelineStore {
     return new TimelineStore(this.client, roomId, uploadClientFor(this.client, this.account.method === 'demo' ? fetchFor(true) : undefined));
+  }
+
+  /** Где собеседник — «в сети», «был(а) …». Живёт, пока открыт его чат. */
+  presence(userId: string): PresenceWatch {
+    return new PresenceWatch(this.client, userId);
+  }
+
+  /** Время захода скрыто или нет — сказать серверу (см. `presence.svelte.ts`). */
+  applyPresence(hidden: boolean): Promise<void> {
+    return applyPresence(this.client, hidden);
   }
 
   /** Кто в комнате сменил ключи. Живёт, пока открыт чат, — как и лента. */

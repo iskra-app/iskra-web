@@ -201,6 +201,8 @@
 
   function oninput(value: string) {
     if (context?.kind !== 'edit') {
+      // Скрыл «печатает…» — о наборе никому не говорим; остановку — тоже незачем.
+      if (preferences.hideTyping) return;
       if (value.trim()) store?.typingActive();
       else store?.typingStopped();
     }

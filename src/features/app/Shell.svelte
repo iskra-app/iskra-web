@@ -14,8 +14,10 @@
   import { parseRoute } from '../../core/navigation/route';
   import { app } from '../../core/session/app.svelte.ts';
   import type { UserSession } from '../../core/session/userSession.svelte.ts';
-  import { plural, t } from '../../i18n/index.svelte.ts';
+  import { i18n, plural, t } from '../../i18n/index.svelte.ts';
   import { typingText } from '../room/text';
+  import { presenceLabel } from '../room/presenceLabel';
+  import type { PresenceWatch } from '../../core/session/presence.svelte.ts';
   import { describeHotkey, match } from '../../design/hotkeys';
   import { hasUnread } from '../../core/rooms/types';
   import { preferences } from './preferences.svelte.ts';
@@ -57,6 +59,26 @@
     session.connection === 'offline' ? t('roomList.waitingForNetwork') : session.connection === 'connecting' ? t('roomList.updating') : undefined,
   );
   /**
+   * Где собеседник личного чата — пока чат открыт. Скрыл своё время захода — не спрашиваем и о
+   * чужом: подглядывать, прячась, — то сочетание, которое переключатель исключает.
+   */
+  let presence = $state<PresenceWatch | null>(null);
+  const counterpart = $derived(room?.kind === 'direct' && !preferences.hidePresence ? room.counterpartId : undefined);
+  $effect(() => {
+    if (!counterpart) return;
+    const watch = session.presence(counterpart);
+    presence = watch;
+    return () => {
+      watch.destroy();
+      if (presence === watch) presence = null;
+    };
+  });
+  // Сказать серверу при входе и при каждом щелчке переключателя.
+  $effect(() => {
+    void session.applyPresence(preferences.hidePresence);
+  });
+
+  /**
    * Строка под именем чата — `headerSubtitle` нативной: связь, потом кто печатает, потом кто
    * это — ID собеседника в личном чате, число участников в группе.
    */
@@ -65,7 +87,7 @@
     const typing = roomTimeline?.typing ?? [];
     if (typing.length) return room?.kind === 'direct' ? t('room.typing') : typingText(typing);
     if (!room) return undefined;
-    if (room.kind === 'direct') return room.counterpartId;
+    if (room.kind === 'direct') return (presence?.presence && presenceLabel(presence.presence, Date.now(), i18n.locale)) || room.counterpartId;
     return room.memberCount > 0 ? plural('room.members', room.memberCount) : undefined;
   });
 

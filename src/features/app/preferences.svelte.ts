@@ -55,6 +55,8 @@ const keys = {
   hideNameChanges: 'chats.hidesNameChanges',
   hideMembershipChanges: 'chats.hidesMembershipChanges',
   sendWithModEnter: 'composer.sendsWithCommandReturn',
+  hidePresence: 'privacy.hidesPresence',
+  hideTyping: 'privacy.hidesTyping',
 } as const;
 
 function read(key: string): string | null {
@@ -112,6 +114,12 @@ class Preferences {
   hideMembershipChanges = $state<boolean>(read(keys.hideMembershipChanges) === 'true');
   /** Enter переносит строку, отправляет `Ctrl/⌘ Enter` — для тех, кто пишет абзацами. */
   sendWithModEnter = $state<boolean>(read(keys.sendWithModEnter) === 'true');
+  /**
+   * «Конфиденциальность» — `PrivacySettings` нативной, те же ключи, по умолчанию выключены.
+   * Скрыл своё время захода — не видишь и чужого; скрыл «печатает…» — чужое видишь.
+   */
+  hidePresence = $state<boolean>(read(keys.hidePresence) === 'true');
+  hideTyping = $state<boolean>(read(keys.hideTyping) === 'true');
   /** Что ставит двойное касание сообщения — любая эмодзи, ключ нативной (`QuickReaction`). */
   quickReaction = $state<string>(emojiOr(read(keys.quickReaction), defaultQuickReaction));
   /** Недавние реакции — наверху панели «Больше эмодзи» (`RecentEmoji` нативной, тот же ключ). */
@@ -137,6 +145,8 @@ class Preferences {
       $effect(() => write(keys.hideNameChanges, String(this.hideNameChanges)));
       $effect(() => write(keys.hideMembershipChanges, String(this.hideMembershipChanges)));
       $effect(() => write(keys.sendWithModEnter, String(this.sendWithModEnter)));
+      $effect(() => write(keys.hidePresence, String(this.hidePresence)));
+      $effect(() => write(keys.hideTyping, String(this.hideTyping)));
       $effect(() => {
         write(keys.language, this.language);
         i18n.locale = this.language === 'system' ? preferredLocale(navigator.languages ?? []) : this.language;

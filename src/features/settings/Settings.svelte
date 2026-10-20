@@ -434,6 +434,22 @@
       {/if}
     </section>
 
+    <!-- Что о вас узнают, пока вы ничего не пишете: что вы здесь и что набираете, — две вещи,
+         которые сервер Matrix действительно говорит другим. На этом устройстве. -->
+    <section aria-labelledby="privacy-title">
+      <h3 id="privacy-title">{t('privacy.title')}</h3>
+      <label class="switch">
+        <span>{t('privacy.hidePresence')}</span>
+        <input type="checkbox" role="switch" bind:checked={preferences.hidePresence} />
+      </label>
+      <p class="secondary">{t('privacy.hidePresenceHelp')}</p>
+      <label class="switch">
+        <span>{t('privacy.hideTyping')}</span>
+        <input type="checkbox" role="switch" bind:checked={preferences.hideTyping} />
+      </label>
+      <p class="secondary">{t('privacy.hideTypingHelp')}</p>
+    </section>
+
     {#if recovery?.protection === 'on'}
       <section aria-labelledby="new-code-title">
         <h3 id="new-code-title" class="visually-hidden">{t('settings.recoveryCode')}</h3>
