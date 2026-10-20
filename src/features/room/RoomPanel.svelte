@@ -26,6 +26,7 @@
   import RoomEditDialog from './RoomEditDialog.svelte';
   import InviteDialog from './InviteDialog.svelte';
   import RoleDialog from './RoleDialog.svelte';
+  import RoomSearchDialog from './RoomSearchDialog.svelte';
   import type { TimelineStore } from '../../core/timeline/timelineStore.svelte.ts';
   import { roomTimestamp } from '../../design/time';
   import { viewport } from '../../design/viewport.svelte.ts';
@@ -39,7 +40,7 @@
   interface Props {
     session: UserSession;
     roomId: string;
-    /** Перейти к закреплённому сообщению в ленте. */
+    /** Перейти к сообщению в ленте: закреплённому или найденному. */
     onjump: (eventId: string) => void;
     /** Лента открытого чата: вкладки «Что внутри» — из того, что она загрузила. */
     timeline?: TimelineStore;
@@ -65,6 +66,7 @@
   ];
 
   let editing = $state(false);
+  let searching = $state(false);
   let inviting = $state(false);
   let leaving = $state(false);
   let blocking = $state<MemberSummary | null>(null);
@@ -258,8 +260,12 @@
       {/if}
     </header>
 
-    <!-- Круглые кнопки под портретом: звук, пригласить, поделиться — `ProfileActionTile` нативной. -->
+    <!-- Круглые кнопки под портретом: поиск, звук, пригласить, поделиться — `ProfileActionTile` нативной. -->
     <div class="tiles">
+      <button type="button" class="tile" onclick={() => (searching = true)}>
+        <Icon name="search" />
+        <span>{t('profile.search')}</span>
+      </button>
       <button type="button" class="tile" onclick={() => details?.setAlerts(muted ? 'all' : 'muted')}>
         <Icon name={muted ? 'bellOff' : 'bell'} />
         <span>{t(muted ? 'profile.unmute' : 'profile.mute')}</span>
@@ -281,6 +287,16 @@
         </button>
       {/if}
     </div>
+    <RoomSearchDialog
+      open={searching}
+      {session}
+      {roomId}
+      onclose={() => (searching = false)}
+      onopen={(eventId) => {
+        searching = false;
+        onjump(eventId);
+      }}
+    />
     {#if link}
       <QrCodeDialog
         open={showingCode}

@@ -97,6 +97,7 @@
   --size-emoji-panel-width: 22.5rem; /* 360 — Theme.Size.emojiPanelWidth: полторы ширины меню */
   --size-emoji-header: 1.75rem; /* 28 — Theme.Size.emojiHeader: заголовок раздела */
   --size-sticker-cell: 4.5rem; /* 72 — Theme.Size.stickerCell: стикер в панели, четыре в ряд на телефоне */
+  --size-search-results: 20rem; /* 320 — найденное в «Поиске в чате»: окно не прыгает, пока ищут */
   --size-sticker-tab: 2rem; /* 32 — Theme.Size.stickerTab: картинка набора на вкладке */
   --emoji-recent-columns: 6; /* недавние — по шесть, под ряд быстрых реакций */
   --size-video-note: 12.5rem; /* 200 — «кружочек» */

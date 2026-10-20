@@ -8,6 +8,7 @@
   между чатами на десктопе его не теряло.
 -->
 <script lang="ts">
+  import { untrack } from 'svelte';
   import ConfirmDialog from '../../design/ConfirmDialog.svelte';
   import type { OutgoingFile } from '../../core/media/upload';
   import { fileSize } from '../media/files';
@@ -48,6 +49,7 @@
   import { distance } from './distance';
   import type { Place } from '../../core/timeline/location';
   import { preferences } from '../app/preferences.svelte.ts';
+  import { revealRequest } from '../app/revealRequest.svelte.ts';
   import { unlinkMentions, type ComposerMention } from '../../core/timeline/composerMentions';
   import { Photo, pixelsFor } from '../rooms/faces.svelte.ts';
   import type { MentionRow } from './MentionPicker.svelte';
@@ -68,6 +70,14 @@
 
   let composer: Composer | undefined = $state();
   let timeline: Timeline | undefined = $state();
+
+  // Открыли из поиска — лента открывается на найденном. Чат уже был открыт — к нему же.
+  const openAt = untrack(() => (thread ? undefined : revealRequest.take(roomId)));
+  $effect(() => {
+    if (!timeline || thread || revealRequest.pending?.roomId !== roomId) return;
+    const eventId = revealRequest.take(roomId);
+    if (eventId) void timeline.reveal(eventId);
+  });
 
   let text = $state('');
   let context = $state<ComposerContext>(null);
@@ -500,7 +510,7 @@
     return true;
   }
 
-  /** Из панели «О чате»: к закреплённому сообщению. */
+  /** Из панели «О чате»: к закреплённому сообщению или найденному в поиске по чату. */
   export function reveal(eventId: string): void {
     void timeline?.reveal(eventId);
   }
@@ -541,7 +551,7 @@
   {/if}
   {#if store}
     {#key store}
-      <Timeline bind:this={timeline} {store} {session} showSenders={room?.kind !== 'direct'} {actions} {selection} ontoggle={toggleSelected} />
+      <Timeline bind:this={timeline} {store} {session} {openAt} showSenders={room?.kind !== 'direct'} {actions} {selection} ontoggle={toggleSelected} />
     {/key}
   {/if}
   {#if videoNote.open}

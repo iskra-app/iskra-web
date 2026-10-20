@@ -46,6 +46,8 @@ import { NotificationRules } from './notificationRules.svelte.ts';
 import { ChatFolders } from './chatFolders.svelte.ts';
 import { StickerLibrary } from '../stickers/stickerLibrary.svelte.ts';
 import { LocalNames } from '../rooms/localNames.svelte.ts';
+import { MessageIndexer, MessageSearch } from '../search/messageSearch.svelte.ts';
+import { searchDatabaseName } from '../search/searchIndex';
 
 export type Connection = 'connecting' | 'online' | 'offline';
 
@@ -113,12 +115,16 @@ export class UserSession {
   readonly localNames: LocalNames;
   /** Стикеры аккаунта: свой набор, подписки, недавние, «Искорки». */
   readonly stickers: StickerLibrary;
+  /** Поисковый индекс сообщений — на устройстве, зашифрованный (`core/search/`). */
+  readonly searchIndex: MessageIndexer;
+  /** Поиск по сообщениям над списком чатов. */
+  readonly search: MessageSearch;
   private readonly client: MatrixClient;
   private readonly account: Account;
   private readonly detach: Array<() => void> = [];
   private stopped = false;
 
-  private constructor(client: MatrixClient, account: Account, keys: SecretStorageKeyHolder | null) {
+  private constructor(client: MatrixClient, account: Account, keys: SecretStorageKeyHolder | null, persistent: boolean) {
     this.client = client;
     this.account = account;
     this.userId = account.userId;
@@ -142,6 +148,34 @@ export class UserSession {
     this.folders = new ChatFolders(client);
     const uploader = uploadClientFor(client, account.method === 'demo' ? fetchFor(true) : undefined);
     this.stickers = new StickerLibrary(client, (blob, type) => uploader.upload(blob, { type }));
+    this.searchIndex = new MessageIndexer(client, persistent ? searchDatabaseName(account.userId) : null);
+    this.search = new MessageSearch(this.searchIndex, this.senderName);
+  }
+
+  /**
+   * Кто написал найденное. В личном чате с локальным именем собеседник и здесь «Мама», а не
+   * `anna_1987`, — но только он сам: третий, позванный в чат, своё имя сохраняет.
+   */
+  private readonly senderName = (roomId: string, senderId: string): string => {
+    const local = this.localNames.get(roomId);
+    const summary = this.rooms.get(roomId);
+    if (local && summary?.kind === 'direct' && summary.avatarSeed === senderId) return local;
+    return this.client.getRoom(roomId)?.getMember(senderId)?.name || this.client.getUser(senderId)?.displayName || senderId;
+  };
+
+  /** Поиск в одном чате. Живёт, пока открыто его окно. */
+  roomSearch(roomId: string): MessageSearch {
+    return new MessageSearch(this.searchIndex, this.senderName, roomId);
+  }
+
+  /** Сколько места занимает поисковый индекс — для «Хранилища». */
+  searchIndexSize(): Promise<number> {
+    return this.searchIndex.size();
+  }
+
+  /** «Очистить поисковый индекс»: соберётся заново из того, что откроют и пролистают. */
+  clearSearchIndex(): Promise<void> {
+    return this.searchIndex.clear();
   }
 
   /** Лента комнаты. Живёт, пока открыт чат: тот, кто открыл, её и `destroy()`. */
@@ -433,6 +467,8 @@ export class UserSession {
    */
   async clearCache(): Promise<void> {
     this.stop();
+    // Индекс — вместе с кэшем, как в нативной: в нём могут оставаться слова удалённого.
+    await deleteDatabase(searchDatabaseName(this.userId)).catch(() => {});
     try {
       await this.client.store.deleteAllData();
     } catch {
@@ -506,7 +542,7 @@ export class UserSession {
       client.getCrypto()?.setDeviceIsolationMode(new AllDevicesIsolationMode(true));
     }
 
-    const session = new UserSession(client, account, keys);
+    const session = new UserSession(client, account, keys, persistent);
     session.listen(events);
     // До синхронизации: иначе список на миг покажет `anna_1987`, а потом «Маму».
     await session.localNames.load();
@@ -572,6 +608,8 @@ export class UserSession {
     this.notificationRules.destroy();
     this.folders.destroy();
     this.stickers.destroy();
+    this.search.destroy();
+    this.searchIndex.destroy();
     this.verification?.destroy();
     this.thumbnails.clear();
     this.media.clear();
@@ -627,5 +665,6 @@ export async function wipeUserData(userId: string, client?: MatrixClient): Promi
     deleteDatabase(`matrix-js-sdk:${names.sync}`),
     deleteDatabase(`${names.cryptoPrefix}::matrix-sdk-crypto`),
     deleteDatabase(`${names.cryptoPrefix}::matrix-sdk-crypto-meta`),
+    deleteDatabase(searchDatabaseName(userId)),
   ]);
 }

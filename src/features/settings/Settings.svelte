@@ -182,8 +182,13 @@
   let clearing = $state(false);
   let confirmClear = $state(false);
   let clearFailed = $state(false);
+  /** Поисковый индекс: сколько занимает (`null` — считаем) и как идёт его очистка. */
+  let searchBytes = $state<number | null>(null);
+  let confirmSearchClear = $state(false);
+  let searchClearFailed = $state(false);
 
   async function readStorage() {
+    void session.searchIndexSize().then((bytes) => (searchBytes = bytes));
     persisted = await isPersisted().catch(() => null);
     try {
       const estimate = await navigator.storage?.estimate?.();
@@ -211,6 +216,20 @@
     } catch {
       clearing = false;
       clearFailed = true;
+    }
+  }
+
+  /** Как в нативной: после очистки — перезагрузка, индекс собирается заново. */
+  async function clearSearchIndex() {
+    confirmSearchClear = false;
+    clearing = true;
+    searchClearFailed = false;
+    try {
+      await session.clearSearchIndex();
+      location.reload();
+    } catch {
+      clearing = false;
+      searchClearFailed = true;
     }
   }
 
@@ -568,6 +587,16 @@
     <PlainButton danger busy={clearing} onclick={() => (confirmClear = true)}>{clearing ? t('storage.clearing') : t('storage.clear')}</PlainButton>
     <p class="secondary">{t('storage.cacheWeb')}</p>
     {#if clearFailed}<p class="problem" role="alert">{t('storage.failed')}</p>{/if}
+    <!-- Своей группой, как в нативной: это не про место, а про слова удалённого, которые индекс мог сохранить. -->
+    <h3>{t('storage.search')}</h3>
+    <PlainButton danger busy={clearing} disabled={!searchBytes} onclick={() => (confirmSearchClear = true)}>
+      {clearing ? t('storage.clearing') : t('storage.search.clear')}
+    </PlainButton>
+    <p class="secondary">
+      {t('storage.search.explained')}
+      {searchBytes === null ? t('storage.measuring') : fileSize(searchBytes, i18n.locale)}
+    </p>
+    {#if searchClearFailed}<p class="problem" role="alert">{t('storage.search.failed')}</p>{/if}
   {:else if section === 'about'}
     <!-- `AboutView` нативной, строка в строку: значок, имя и строка о себе; версия, сборка,
          устройство; сайт, исходный код и лицензии; внизу — чьё это и на каких условиях. -->
@@ -660,11 +689,22 @@
 <ConfirmDialog
   open={confirmClear}
   title={t('storage.confirm.title')}
-  message={t('storage.cacheWeb')}
+  message={t('storage.confirm.body')}
   confirmLabel={t('storage.confirm.action')}
   cancelLabel={t('storage.cancel')}
   onclose={() => (confirmClear = false)}
   onconfirm={() => void clearCache()}
+/>
+
+<ConfirmDialog
+  open={confirmSearchClear}
+  title={t('storage.search.confirm.title')}
+  message={t('storage.search.confirm.body')}
+  confirmLabel={t('storage.confirm.action')}
+  cancelLabel={t('storage.cancel')}
+  destructive
+  onclose={() => (confirmSearchClear = false)}
+  onconfirm={() => void clearSearchIndex()}
 />
 
 <ConfirmDialog

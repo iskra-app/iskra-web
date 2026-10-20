@@ -8,6 +8,10 @@
   (`FolderTabs`), и папка показывает свои чаты в том же порядке.
 
   Стрелки ↑/↓ ходят по строкам, как в любом списке на десктопе.
+
+  «Поиск по сообщениям» — как в нативной: на телефоне полем внизу, под большим пальцем, на
+  широком экране — над списком, как боковая панель Mac. Пока в поле что-то есть, на месте
+  списка — найденное; нажатие открывает чат на этом сообщении.
 -->
 <script lang="ts">
   import EmptyState from '../../design/EmptyState.svelte';
@@ -31,12 +35,20 @@
   import FolderMembership from './FolderMembership.svelte';
   import ChatPeek, { type PeekAction } from './ChatPeek.svelte';
   import { hasUnread } from '../../core/rooms/types';
+  import { viewport } from '../../design/viewport.svelte.ts';
+  import MessageSearchField from './MessageSearchField.svelte';
+  import SearchHits from './SearchHits.svelte';
+  import { revealRequest } from '../app/revealRequest.svelte.ts';
 
   let { session }: { session: UserSession } = $props();
 
   type View = { kind: 'all' } | { kind: 'archive' } | { kind: 'space'; id: string };
 
   let view = $state<View>({ kind: 'all' });
+
+  let query = $state('');
+  const searching = $derived(view.kind === 'all' && query.trim().length > 0);
+  $effect(() => session.search.search(query));
   let failure = $state<TextKey | null>(null);
   $effect(() => {
     if (!failure) return;
@@ -180,7 +192,17 @@
   />
 {/if}
 
-{#if view.kind === 'all' && folders.length > 0}
+{#snippet searchField()}
+  {#if view.kind === 'all'}
+    <div class="search" class:bottom={viewport.layout === 'stack'}>
+      <MessageSearchField bind:value={query} />
+    </div>
+  {/if}
+{/snippet}
+
+{#if viewport.layout !== 'stack'}{@render searchField()}{/if}
+
+{#if view.kind === 'all' && folders.length > 0 && !searching}
   <FolderTabs {folders} list={organized.list} archived={organized.archived} selected={folder?.id ?? ''} onselect={(id) => (folderSelection.id = id)} />
 {/if}
 
@@ -198,8 +220,10 @@
 {/if}
 
 <!-- svelte-ignore a11y_no_static_element_interactions -->
-<div class="list" {onkeydown}>
-  {#if !session.ready && session.rooms.rooms.length === 0}
+<div class="list" class:above-search={viewport.layout === 'stack' && view.kind === 'all'} {onkeydown}>
+  {#if searching}
+    <SearchHits hits={session.search.hits} foundNothing={session.search.foundNothing} onopen={(hit) => revealRequest.open(hit.roomId, hit.id)} />
+  {:else if !session.ready && session.rooms.rooms.length === 0}
     <EmptyState title={t('roomList.loading')} />
   {:else if nothingAtAll}
     <EmptyState title={t('roomList.emptyTitle')} message={t('roomList.emptyMessage')} />
@@ -232,6 +256,8 @@
     {/each}
   {/if}
 </div>
+
+{#if viewport.layout === 'stack'}{@render searchField()}{/if}
 
 <Menu
   open={!!menu}
@@ -274,6 +300,10 @@
     overscroll-behavior: contain;
     padding-block-end: max(var(--space-close), env(safe-area-inset-bottom));
   }
+  /* Нижний край на телефоне — у поля поиска, ему и отступ от края экрана. */
+  .list.above-search {
+    padding-block-end: var(--space-close);
+  }
   .subheader {
     display: flex;
     align-items: center;
@@ -314,5 +344,12 @@
   }
   .failure {
     padding: var(--space-close);
+  }
+  .search {
+    padding: var(--space-tight) var(--space-close) var(--space-close);
+  }
+  .search.bottom {
+    padding-block: var(--space-close) max(var(--space-close), env(safe-area-inset-bottom));
+    border-block-start: var(--border-hairline) solid var(--color-separator);
   }
 </style>

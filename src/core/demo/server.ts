@@ -1259,7 +1259,7 @@ export class DemoHomeserver {
         return relation?.rel_type === relType && relation.event_id === target;
       })
       .reverse()
-      .map((e) => withDefaults(e));
+      .map((e) => ({ ...withDefaults(e), room_id: room.roomId }));
     return json(200, { chunk });
   }
 
@@ -1274,14 +1274,15 @@ export class DemoHomeserver {
     if (dir === 'f') {
       const end = Math.min(room.timeline.length, position + limit);
       return json(200, {
-        chunk: room.timeline.slice(position, end).map((e) => withDefaults(e)),
+        chunk: room.timeline.slice(position, end).map((e) => ({ ...withDefaults(e), room_id: room.roomId })),
         start: `t${position}`,
         ...(end < room.timeline.length ? { end: `t${end}` } : {}),
       });
     }
 
     const start = Math.max(0, position - limit);
-    const chunk = room.timeline.slice(start, position).reverse().map((e) => withDefaults(e));
+    // С `room_id`, как у настоящего сервера: в `/messages` события — ClientEvent, не урезанные, как в `/sync`.
+    const chunk = room.timeline.slice(start, position).reverse().map((e) => ({ ...withDefaults(e), room_id: room.roomId }));
     return json(200, {
       chunk,
       start: `t${position}`,

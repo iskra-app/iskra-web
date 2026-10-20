@@ -37,8 +37,10 @@
     ontoggle?: (message: Message) => void;
     /** `false` — подглядывание из списка: лента не отмечает прочитанным ничего, сколько ни смотри. */
     reads?: boolean;
+    /** Открыть на этом сообщении, а не внизу, — так открывает найденное поиск. */
+    openAt?: string;
   }
-  let { store, session, showSenders, actions, selection = null, ontoggle, reads = true }: Props = $props();
+  let { store, session, showSenders, actions, selection = null, ontoggle, reads = true, openAt }: Props = $props();
 
   /** Имя строки-галочки: содержимое под ней `inert` и скринридеру не видно. */
   function spoken(message: Message): string {
@@ -124,6 +126,9 @@
   const TOP_REACH = 400;
   const BOTTOM_REACH = 80;
 
+  /** Открытие закончилось: история под окно набрана, лента встала, где ей стоять. */
+  let opened: Promise<void> = Promise.resolve();
+
   onMount(() => {
     const a = new ScrollAnchor(container!, content!, {
       topReach: TOP_REACH,
@@ -135,11 +140,12 @@
     // «Непрочитанные» — чат открывается на ней, как в Telegram: новое под ней, а не последнее
     // внизу и всё остальное выше, читать в обратную сторону. Всё новое влезает в экран —
     // лента и так стоит у конца.
-    void store.fill(() => a.needsMore()).then(async () => {
+    opened = store.fill(() => a.needsMore()).then(async () => {
       await tick();
       const divider = content?.querySelector<HTMLElement>(`[data-anchor="${UNREAD_DIVIDER_KEY}"]`);
       if (divider && content && content.scrollHeight > container!.clientHeight) a.reveal(divider, 'top');
     });
+    if (openAt) void reveal(openAt);
     // Окно выросло после открытия — развернули на весь экран — подгрузка продолжается.
     const grow = new ResizeObserver(() => {
       if (a.needsMore()) void store.fill(() => a.needsMore());
@@ -219,6 +225,8 @@
    * (не бесконечно), потом прокрутка в середину экрана и короткая подсветка.
    */
   export async function reveal(eventId: string): Promise<void> {
+    // Из поиска — сразу после открытия: иначе открытие поставило бы ленту вниз уже после.
+    await opened;
     if (!(await store.reveal(eventId))) return;
     // Фото внутри альбома своей строки не имеет — строка альбома та, что у первого.
     const key = store.items.find(
