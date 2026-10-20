@@ -168,6 +168,13 @@ test('настройки по разделам: имя, язык, тема, шр
 
   await page.getByRole('radio', { name: 'Тёмная' }).click();
   await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark');
+  // «Тонировать интерфейс» — лист акцента поверх всего; выключено по умолчанию.
+  const tint = page.getByRole('switch', { name: 'Тонировать интерфейс' });
+  await expect(tint).not.toBeChecked();
+  await tint.check();
+  await expect(page.locator('html')).toHaveAttribute('data-tint', '');
+  await tint.uncheck();
+  await expect(page.locator('html')).not.toHaveAttribute('data-tint');
   // Inter — по умолчанию и из своих файлов под боевой CSP: кириллица и латиница загрузились.
   await expect(page.getByRole('radio', { name: 'Inter' })).toHaveAttribute('aria-checked', 'true');
   const bodyFont = () => page.evaluate(() => getComputedStyle(document.body).fontFamily);

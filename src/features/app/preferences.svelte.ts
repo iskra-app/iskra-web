@@ -42,6 +42,7 @@ export type LanguageChoice = 'system' | Locale;
 
 const keys = {
   accent: 'appearance.accent',
+  tintsInterface: 'appearance.tintsInterface',
   appearance: 'appearance.mode',
   listWidth: 'layout.listWidth',
   faces: 'appearance.faces',
@@ -105,6 +106,11 @@ function recentList(value: string | null): string[] {
 
 class Preferences {
   accent = $state<Accent>(oneOf(read(keys.accent), accents, 'blue'));
+  /**
+   * «Тонировать интерфейс» — `AccentTheme.tintsInterface` нативной: акцент лёгким листом поверх
+   * всего. Выключено по умолчанию: цвет, разлитый везде, ничего не выделяет.
+   */
+  tintsInterface = $state<boolean>(read(keys.tintsInterface) === 'true');
   appearance = $state<Appearance>(oneOf(read(keys.appearance), ['system', 'light', 'dark'], 'system'));
   listWidth = $state<number>(clampListWidth(Number(read(keys.listWidth) ?? LIST_IDEAL)));
   faces = $state<FaceMode>(oneOf(read(keys.faces), faceModes, 'initials'));
@@ -145,6 +151,7 @@ class Preferences {
   persist(): () => void {
     return $effect.root(() => {
       $effect(() => write(keys.accent, this.accent));
+      $effect(() => write(keys.tintsInterface, String(this.tintsInterface)));
       $effect(() => write(keys.appearance, this.appearance));
       $effect(() => write(keys.listWidth, String(this.listWidth)));
       $effect(() => write(keys.faces, this.faces));
@@ -175,6 +182,8 @@ class Preferences {
       $effect(() => {
         const root = document.documentElement;
         root.dataset.accent = this.accent;
+        if (this.tintsInterface) root.dataset.tint = '';
+        else delete root.dataset.tint;
         if (this.font === 'inter') delete root.dataset.font;
         else root.dataset.font = this.font;
         if (this.appearance === 'system') delete root.dataset.theme;

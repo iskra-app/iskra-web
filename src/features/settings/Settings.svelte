@@ -502,6 +502,10 @@
     </div>
     <h3 id="accent-title">{t('appearance.accent')}</h3>
     <AccentSwatches labelledby="accent-title" />
+    <label class="switch">
+      <span>{t('appearance.tintInterface')}</span>
+      <input type="checkbox" role="switch" bind:checked={preferences.tintsInterface} />
+    </label>
     <h3 id="wallpaper-title">{t('appearance.wallpaper')}</h3>
     <WallpaperPicker labelledby="wallpaper-title" />
     <h3 id="font-title">{t('appearance.font')}</h3>
