@@ -29,6 +29,7 @@
   import RecoveryCode from '../recovery/RecoveryCode.svelte';
   import AccentSwatches from './AccentSwatches.svelte';
   import WallpaperPicker from './WallpaperPicker.svelte';
+  import AppearancePreview from './AppearancePreview.svelte';
   import { settingsTitles } from './sections';
   import QuickReactionPicker from './QuickReactionPicker.svelte';
   import { builtOn, describeDevice, iskraLicence, type Licence } from './licences';
@@ -436,7 +437,9 @@
 
   {:else if section === 'appearance'}
     <!-- Порядок `AppearanceView` нативной: вид ленты, тема, цвет, обои; дальше — то, что есть
-         только здесь: шрифт и язык (в iOS язык — в настройках системы). -->
+         только здесь: шрифт и язык (в iOS язык — в настройках системы). Первым — как это будет
+         выглядеть. -->
+    <AppearancePreview />
     <label class="switch">
       <span>{t('appearance.compact')}</span>
       <input

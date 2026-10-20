@@ -660,3 +660,14 @@ test('«Роли и разрешения»: кому что можно; назн
   await boris.getByRole('button', { name: 'Снять роль' }).click();
   await expect(boris).toHaveCount(0, { timeout: 10_000 });
 });
+
+test('«Внешний вид»: предпросмотр переписки следует за видом ленты', async ({ page }) => {
+  await signInToDemo(page);
+  await openSettings(page, 'Внешний вид');
+  const preview = page.getByRole('img', { name: 'Так будут выглядеть ваши сообщения' });
+  await expect(preview.locator('.bubble.own')).toHaveText('Вот этот. Как тебе?');
+  await page.getByRole('switch', { name: 'Компактный вид' }).check();
+  // В компактном пузырей нет: своя строка — под «Вы», у второй подряд от Ани имени нет.
+  await expect(preview.locator('.bubble')).toHaveCount(0);
+  await expect(preview.locator('.sender')).toHaveText(['Аня', 'Вы', 'Аня']);
+});
