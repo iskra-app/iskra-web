@@ -116,6 +116,7 @@
   "devices.passwordMessage": "Сервер просит пароль от аккаунта, чтобы завершить сеанс.",
   "devices.passwordTitle": "Нужен пароль",
   "devices.thisDevice": "Это устройство",
+  "devices.title": "Устройства",
   "devices.wrongPassword": "Пароль не подошёл.",
   "elsewhere.goThere": "Перейти туда",
   "elsewhere.message": "Iskra может работать только в одном окне за раз — иначе ключи шифрования перепутаются. Перейдите в то окно или откройте Iskra здесь: там она закроется.",

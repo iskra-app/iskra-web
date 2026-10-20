@@ -158,8 +158,14 @@ test('настройки по разделам: имя, язык, тема, шр
   await expect(page.getByRole('heading', { name: 'Настройки', level: 1 })).toBeVisible();
   await expect(page.getByText('Алиса Петровна', { exact: true })).toBeVisible({ timeout: 10_000 });
   await page.getByRole('link', { name: 'Безопасность' }).click();
+  // Устройства и заблокированные — строками со своими страницами; «Назад» — в «Безопасность».
+  await page.getByRole('link', { name: 'Устройства' }).click();
   await expect(page.getByText('Это устройство', { exact: true })).toBeVisible();
+  await back.click();
+  await page.getByRole('link', { name: 'Заблокированные пользователи' }).click();
   await expect(page.getByRole('region', { name: 'Заблокированные пользователи' })).toBeVisible();
+  await back.click();
+  await expect(page.getByRole('heading', { name: 'Безопасность', level: 1 })).toBeVisible();
   await back.click();
   await page.getByRole('link', { name: 'Хранилище' }).click();
   await expect(page.getByRole('heading', { name: 'Хранилище', level: 1 })).toBeVisible();
@@ -196,9 +202,9 @@ test('настройки по разделам: имя, язык, тема, шр
   await page.getByRole('radio', { name: 'Русский' }).click();
   await expect(page.getByRole('heading', { name: 'Внешний вид', level: 1 })).toBeVisible();
 
-  // Старый адрес раздела ведёт туда, куда раздел переехал.
+  // Адрес страницы открывает её саму — заблокированные снова своя страница, как в нативной.
   await page.goto('/#/settings/blocked', { waitUntil: 'domcontentloaded' });
-  await expect(page.getByRole('heading', { name: 'Безопасность', level: 1 })).toBeVisible({ timeout: 20_000 });
+  await expect(page.getByRole('heading', { name: 'Заблокированные пользователи', level: 1 })).toBeVisible({ timeout: 20_000 });
 
   if (!isPhone(info.project.name)) {
     // `Ctrl/⌘ ,` — из любого места.
@@ -236,6 +242,7 @@ test('заблокировать со страницы человека (имя 
   await expect(page.getByRole('link', { name: /^Дом 14/ })).not.toContainText('Лифт опять');
 
   await openSettings(page, 'Безопасность');
+  await page.getByRole('link', { name: 'Заблокированные пользователи' }).click();
   const section = page.getByRole('region', { name: 'Заблокированные пользователи' });
   await expect(section).toContainText('@vera:demo.iskra.invalid');
   await section.getByRole('button', { name: 'Разблокировать' }).click();
@@ -626,6 +633,7 @@ test('своя комната: история для новых, адрес (з�
 test('устройства: «Активные сеансы» — завершить один (сервер просит пароль), потом все другие', async ({ page }) => {
   await signInToDemo(page);
   await openSettings(page, 'Безопасность');
+  await page.getByRole('link', { name: 'Устройства' }).click();
   const sessions = page.getByRole('region', { name: 'Активные сеансы' });
   await expect(sessions.getByRole('listitem')).toHaveCount(2);
   await expect(sessions.getByRole('listitem').first()).toContainText('Iskra (iPhone)');

@@ -19,8 +19,9 @@ describe('адрес', () => {
     expect(parseRoute('#/settings')).toEqual({ name: 'settings' });
     expect(parseRoute('#/settings/storage')).toEqual({ name: 'settings', section: 'storage' });
     expect(formatRoute({ name: 'settings', section: 'security' })).toBe('#/settings/security');
-    // Устройства и заблокированные переехали в «Безопасность» — старые ссылки ведут туда.
-    expect(parseRoute('#/settings/blocked')).toEqual({ name: 'settings', section: 'security' });
+    // Устройства и заблокированные — свои страницы, как в нативной («Назад» — в «Безопасность»).
+    expect(parseRoute('#/settings/blocked')).toEqual({ name: 'settings', section: 'blocked' });
+    expect(parseRoute('#/settings/devices')).toEqual({ name: 'settings', section: 'devices' });
   });
 
   it('ID комнаты — и ничего больше', () => {

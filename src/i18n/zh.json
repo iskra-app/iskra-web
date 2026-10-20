@@ -116,6 +116,7 @@
   "devices.passwordMessage": "服务器需要您的账户密码来结束会话。",
   "devices.passwordTitle": "需要密码",
   "devices.thisDevice": "这台设备",
+  "devices.title": "设备",
   "devices.wrongPassword": "密码不对。",
   "elsewhere.goThere": "前往该窗口",
   "elsewhere.message": "Iskra 一次只能在一个窗口中运行，否则加密密钥会混乱。请切换到那个窗口，或者在这里打开 Iskra，那边会自动关闭。",

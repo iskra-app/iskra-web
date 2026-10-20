@@ -283,7 +283,7 @@ test('«Новый вход в аккаунт»: прежние сеансы —
   await expect(banner).toBeVisible({ timeout: 20_000 });
   await expect(banner).toContainText('Chrome на Windows · 192.0.2.44');
   await banner.getByRole('button', { name: 'Это не я' }).click();
-  await expect(page.getByRole('heading', { name: 'Безопасность', level: 1 })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Устройства', level: 1 })).toBeVisible();
   await expect(page.getByRole('region', { name: 'Активные сеансы' })).toContainText('Chrome на Windows');
 
   await page.goto('/#/', { waitUntil: 'domcontentloaded' });

@@ -188,7 +188,7 @@
     {device}
     more={signIns.sessions.length - 1}
     onconfirm={() => void signIns.confirm(device)}
-    ondeny={() => router.go({ name: 'settings', section: 'security' })}
+    ondeny={() => router.go({ name: 'settings', section: 'devices' })}
   />
 {/if}
 

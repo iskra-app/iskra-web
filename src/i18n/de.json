@@ -116,6 +116,7 @@
   "devices.passwordMessage": "Ihr Server möchte Ihr Kontopasswort, um die Sitzung zu beenden.",
   "devices.passwordTitle": "Passwort nötig",
   "devices.thisDevice": "Dieses Gerät",
+  "devices.title": "Geräte",
   "devices.wrongPassword": "Das Passwort hat nicht gepasst.",
   "elsewhere.goThere": "Dorthin wechseln",
   "elsewhere.message": "Iskra kann nur in einem Fenster gleichzeitig laufen — sonst geraten die Verschlüsselungsschlüssel durcheinander. Wechseln Sie zu jenem Fenster oder öffnen Sie Iskra hier, dann wird es dort geschlossen.",

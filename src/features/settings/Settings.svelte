@@ -432,27 +432,23 @@
       </section>
     {/if}
 
-    <DevicesSection {session} />
-
-    <section aria-labelledby="blocked-title">
-      <h3 id="blocked-title">{t('settings.blocked')}</h3>
-      {#if blocked.ids.length}
-        <ul class="list">
-          {#each blocked.ids as userId (userId)}
-            <li class="row">
-              <span class="id">{userId}</span>
-              <PlainButton busy={unblocking === userId} disabled={offline} onclick={() => void unblock(userId)}>{t('settings.unblock')}</PlainButton>
-            </li>
-          {/each}
-        </ul>
-      {:else}
-        <p>{t('settings.blockedEmptyTitle')}</p>
-        <p class="secondary">{t('settings.blockedEmptyMessage')}</p>
-      {/if}
-      {#if blocked.failure === 'unblockFailed'}
-        <p class="problem" role="alert">{t('account.unblockFailed')}</p>
-      {/if}
-    </section>
+    <!-- Устройства и заблокированные — строками со своими страницами, как в нативной. -->
+    <ul class="rows">
+      <li>
+        <a href={hrefOf('devices')}>
+          <span class="row-icon"><Icon name="devices" /></span>
+          <span class="row-label">{t('devices.title')}</span>
+          <span class="chevron"><Icon name="forward" /></span>
+        </a>
+      </li>
+      <li>
+        <a href={hrefOf('blocked')}>
+          <span class="row-icon"><Icon name="block" /></span>
+          <span class="row-label">{t('settings.blocked')}</span>
+          <span class="chevron"><Icon name="forward" /></span>
+        </a>
+      </li>
+    </ul>
 
     <!-- Что о вас узнают, пока вы ничего не пишете: что вы здесь и что набираете, — две вещи,
          которые сервер Matrix действительно говорит другим. На этом устройстве. -->
@@ -566,6 +562,27 @@
       </label>
       <p class="secondary">{preferences.sendWithModEnter ? t('chats.modReturnOnHelpWeb', { mod }) : t('chats.enterSendsHelpWeb')}</p>
     {/if}
+  {:else if section === 'devices'}
+    <DevicesSection {session} />
+  {:else if section === 'blocked'}
+    <section aria-label={t('settings.blocked')}>
+      {#if blocked.ids.length}
+        <ul class="list">
+          {#each blocked.ids as userId (userId)}
+            <li class="row">
+              <span class="id">{userId}</span>
+              <PlainButton busy={unblocking === userId} disabled={offline} onclick={() => void unblock(userId)}>{t('settings.unblock')}</PlainButton>
+            </li>
+          {/each}
+        </ul>
+      {:else}
+        <p>{t('settings.blockedEmptyTitle')}</p>
+        <p class="secondary">{t('settings.blockedEmptyMessage')}</p>
+      {/if}
+      {#if blocked.failure === 'unblockFailed'}
+        <p class="problem" role="alert">{t('account.unblockFailed')}</p>
+      {/if}
+    </section>
   {:else if section === 'media'}
     <h3 id="auto-download-title">{t('media.autoDownload')}</h3>
     <div class="options" role="radiogroup" aria-labelledby="auto-download-title">

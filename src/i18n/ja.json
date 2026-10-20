@@ -116,6 +116,7 @@
   "devices.passwordMessage": "セッションを終了するには、アカウントのパスワードが必要です。",
   "devices.passwordTitle": "パスワードが必要です",
   "devices.thisDevice": "このデバイス",
+  "devices.title": "デバイス",
   "devices.wrongPassword": "パスワードが違います。",
   "elsewhere.goThere": "そちらへ移動",
   "elsewhere.message": "Iskra は一度にひとつのウィンドウでしか動作できません。そうしないと暗号鍵が混乱します。そのウィンドウに切り替えるか、ここで Iskra を開くと、向こうは閉じられます。",

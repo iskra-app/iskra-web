@@ -6,10 +6,8 @@
  * Hash, а не путь, — чтобы статическому хостингу не нужны были правила перезаписи.
  */
 /** Разделы настроек — страницы, как в нативной Искре; без раздела — их список. */
-export const settingsSections = ['profile', 'appearance', 'reactions', 'chats', 'folders', 'notifications', 'security', 'media', 'storage', 'about', 'licences', 'beta'] as const;
+export const settingsSections = ['profile', 'appearance', 'reactions', 'chats', 'folders', 'notifications', 'security', 'devices', 'blocked', 'media', 'storage', 'about', 'licences', 'beta'] as const;
 export type SettingsSection = (typeof settingsSections)[number];
-/** Прежние адреса: устройства и заблокированные переехали в «Безопасность». */
-const movedSections: Record<string, SettingsSection> = { devices: 'security', blocked: 'security' };
 
 export type Route =
   | { name: 'home' }
@@ -48,7 +46,7 @@ export function parseRoute(hash: string): Route {
   }
   const settings = /^\/settings(?:\/([a-z]+))?$/.exec(path);
   if (settings) {
-    const section = settingsSections.find((name) => name === settings[1]) ?? movedSections[settings[1] ?? ''];
+    const section = settingsSections.find((name) => name === settings[1]);
     if (!settings[1]) return { name: 'settings' };
     if (section) return { name: 'settings', section };
   }
