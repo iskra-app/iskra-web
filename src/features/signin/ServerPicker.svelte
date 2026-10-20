@@ -101,5 +101,7 @@
     width: var(--space-roomy);
     height: var(--space-roomy);
     color: var(--color-text-secondary);
+    /* Без заливки путь чёрный при любой теме — в тёмной его не видно. */
+    fill: currentColor;
   }
 </style>

@@ -39,5 +39,6 @@
     flex: none;
     width: var(--size-icon);
     height: var(--size-icon);
+    fill: currentColor;
   }
 </style>
