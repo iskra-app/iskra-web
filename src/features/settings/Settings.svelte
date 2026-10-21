@@ -42,6 +42,7 @@
   import { isMac } from '../../design/hotkeys';
   import { viewport } from '../../design/viewport.svelte.ts';
   import { autoDownloads, compressions, type MediaAutoDownload } from '../media/mediaSettings';
+  import { canCompressVideo } from '../media/videoCompress';
   import { Photo, pixelsFor } from '../rooms/faces.svelte.ts';
 
   let { session, section }: { session: UserSession; section?: SettingsSection } = $props();
@@ -276,6 +277,13 @@
     taps = 0;
     router.go({ name: 'settings', section: 'beta' });
   }
+
+  /** Умеет ли браузер сжимать видео — спрашивается, когда открыли «Фото и видео»; `undefined` — ещё не знаем. */
+  let videoCompressible = $state<boolean | undefined>();
+  $effect(() => {
+    if (section !== 'media' || videoCompressible !== undefined) return;
+    void canCompressVideo().then((can) => (videoCompressible = can));
+  });
 
   let confirmingSignOut = $state(false);
   let showingCode = $state(false);
@@ -609,7 +617,7 @@
       <input type="checkbox" role="switch" bind:checked={preferences.stripMetadata} />
     </label>
     <label class="switch">
-      <span>{t('media.compressPhotos')}</span>
+      <span>{t('media.compress')}</span>
       <input type="checkbox" role="switch" bind:checked={preferences.compress} />
     </label>
     <!-- Появляется вместе с переключателем, от которого зависит, — а не стоит серым. -->
@@ -618,12 +626,13 @@
       <div class="options" role="radiogroup" aria-labelledby="compression-title">
         {#each compressions as level (level)}
           <button type="button" role="radio" aria-checked={preferences.compression === level} onclick={() => (preferences.compression = level)}>
-            {t(`media.compressionPhoto.${level}`)}
+            {t(`media.compression.${level}`)}
           </button>
         {/each}
       </div>
+      <!-- Видео сжимает сам браузер (WebCodecs); где он не умеет — сказать, а не обещать. -->
+      {#if videoCompressible === false}<p class="secondary">{t('media.videoUncompressedWeb')}</p>{/if}
     {/if}
-    <p class="secondary">{t('media.videoAsIsWeb')}</p>
   {:else if section === 'storage'}
     <!-- `StorageView` нативной: сначала — сколько всего, потом что с этим сделать. -->
     <dl>

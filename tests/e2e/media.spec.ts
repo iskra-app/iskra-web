@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs';
 import { expect, test, type Page } from '@playwright/test';
 import { consoleOf, isPhone, openRoom, signInToDemo, watchForProblems } from './helpers';
 
@@ -203,11 +204,66 @@ test('фото уходит без метаданных; выключили — 
   await page.getByRole('button', { name: 'Настройки' }).click();
   await page.getByRole('navigation', { name: 'Настройки' }).getByRole('link', { name: 'Фото и видео' }).click();
   await page.getByRole('switch', { name: 'Отправлять без метаданных' }).uncheck();
-  await page.getByRole('switch', { name: 'Сжимать фото' }).uncheck();
+  await page.getByRole('switch', { name: 'Сжимать фото и видео' }).uncheck();
   await expect(page.getByRole('radiogroup', { name: 'Степень сжатия' })).toHaveCount(0);
   await openRoom(page, /^Аня/);
   const asIs = await sendAndDownload(page, jpeg, 'Как есть');
   expect(asIs.bytes.equals(jpeg)).toBe(true);
+});
+
+/**
+ * Видео с телефона, как оно есть: 1080p, 60 кадров, H.264 + AAC, с меткой в `udta`
+ * (`tests/e2e/fixtures/phone-video.mp4`, сделано ffmpeg'ом — видео не нарисуешь).
+ */
+const PHONE_VIDEO = readFileSync(new URL('./fixtures/phone-video.mp4', import.meta.url));
+
+test('видео уходит без метаданных; где браузер умеет — сжатым в mp4 по ступени', async ({ page }) => {
+  await signInToDemo(page);
+  // «Сильное»: на ролике в полсекунды регулятор битрейта WebKit не успевает сойтись, и на
+  // «Среднем» сжатое выходит больше исходника — тогда уходит исходник, и проверять нечего.
+  await page.getByRole('button', { name: 'Настройки' }).click();
+  await page.getByRole('navigation', { name: 'Настройки' }).getByRole('link', { name: 'Фото и видео' }).click();
+  await page.getByRole('radiogroup', { name: 'Степень сжатия' }).getByRole('radio', { name: 'Сильное (540p)' }).click();
+  await openRoom(page, /^Аня/);
+  expect(PHONE_VIDEO.includes(EXIF_MARK)).toBe(true);
+  // Сжимает сам браузер: H.264 и AAC — не везде (Firefox без AAC, Linux-сборки без H.264).
+  const compressible = await page.evaluate(async () => {
+    if (typeof VideoEncoder === 'undefined' || typeof AudioEncoder === 'undefined') return false;
+    const video = await VideoEncoder.isConfigSupported({ codec: 'avc1.42001f', width: 960, height: 540 }).catch(() => ({ supported: false }));
+    const decode = await VideoDecoder.isConfigSupported({ codec: 'avc1.64002a' }).catch(() => ({ supported: false }));
+    // Звук ролика (AAC, 128 кбит/с) тяжелее «Сильного» — его перекодируют, и без AAC-кодера видео уходит как есть.
+    const sound = await AudioEncoder.isConfigSupported({ codec: 'mp4a.40.2', sampleRate: 48_000, numberOfChannels: 1, bitrate: 64_000 }).catch(() => ({ supported: false }));
+    return !!(video.supported && decode.supported && sound.supported);
+  });
+
+  await page.locator('input[type=file]').setInputFiles({ name: 'IMG_0002.MOV', mimeType: 'video/quicktime', buffer: PHONE_VIDEO });
+  await expect(page.getByRole('img', { name: 'Видео к сообщению' }).or(page.getByText('IMG_0002.MOV'))).toBeVisible({ timeout: 10_000 });
+  await page.getByRole('textbox', { name: 'Сообщение' }).fill('Видео без метаданных');
+  await page.getByRole('button', { name: 'Отправить' }).click();
+  const sent = page.getByRole('log').getByRole('article').filter({ hasText: 'Видео без метаданных' });
+  const viewer = page.getByRole('dialog', { name: 'Видео' });
+  await expect(async () => {
+    await sent.getByRole('button', { name: 'Видео' }).click();
+    await expect(viewer).toBeVisible({ timeout: 2_000 });
+  }).toPass({ timeout: 60_000 });
+  const download = page.waitForEvent('download');
+  await viewer.getByRole('button', { name: 'Сохранить' }).click();
+  const file = await download;
+  const bytes = await (await import('node:fs/promises')).readFile((await file.path())!);
+
+  expect(bytes.includes(EXIF_MARK)).toBe(false);
+  if (compressible) {
+    expect(file.suggestedFilename()).toBe('IMG_0002.mp4');
+    expect(bytes.length).toBeLessThan(PHONE_VIDEO.length);
+    // `tkhd` хранит ширину и высоту в 16.16, в конце (у версии 1 — дальше: времена 64-битные).
+    // У дорожки звука они нули; у видео — 960×540, рамка «Сильного».
+    const frames: number[][] = [];
+    for (let at = bytes.indexOf('tkhd'); at >= 0; at = bytes.indexOf('tkhd', at + 4)) {
+      const sizes = bytes[at + 4] === 1 ? at + 92 : at + 80;
+      frames.push([bytes.readUInt32BE(sizes) / 65536, bytes.readUInt32BE(sizes + 4) / 65536]);
+    }
+    expect(frames.filter(([width]) => (width ?? 0) > 0)).toEqual([[960, 540]]);
+  }
 });
 
 test('автозагрузка «Никогда»: чужое фото — рамкой с «Загрузить», нажатие загружает', async ({ page }) => {

@@ -31,6 +31,8 @@ export const builtOn: Licence[] = [
   { name: 'Inter', kind: 'OFL-1.1', text: raw(() => import('./licences/inter.txt?raw')) },
   { name: 'Material Symbols', kind: 'Apache 2.0', text: raw(() => import('./licences/material-symbols.txt?raw')) },
   { name: 'uqr', kind: 'MIT', text: raw(() => import('./licences/uqr.txt?raw')) },
+  // Сжатие видео: разбор и сборка mp4 — грузится, только когда видео уходит сжатым.
+  { name: 'Mediabunny', kind: 'MPL-2.0', text: raw(() => import('./licences/mediabunny.txt?raw')) },
 ];
 
 /** Браузер и система — для строки «Устройство», как модель и версия ОС у нативной. Порядок

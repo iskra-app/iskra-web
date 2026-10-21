@@ -55,9 +55,11 @@ export interface Upload {
   replyTo?: { eventId: string; senderId: string; own: boolean };
   /** Связь события целиком — у ответа в треде: `m.thread` и подпорка `m.in_reply_to`. */
   relatesTo?: Record<string, unknown>;
-  /** 0…1 */
+  /** 0…1 — того, что идёт сейчас: подготовки, пока `preparing`, потом загрузки. */
   progress: number;
   state: 'uploading' | 'failed';
+  /** Ещё готовится к отправке (`OutgoingFile.prepare` — сжатие видео). */
+  preparing?: boolean;
 }
 
 /** Что не получилось — ключи текстов нативной Искры (`timeline.*Failed`; `sendAnywayFailed` — из `message.delivery.*`). */
@@ -698,7 +700,7 @@ export class TimelineStore {
   }
 
   retryUpload(id: string): void {
-    this.patchUpload(id, { state: 'uploading', progress: 0 });
+    this.patchUpload(id, { state: 'uploading', progress: 0, preparing: false });
     this.enqueue(id);
   }
 
@@ -720,7 +722,14 @@ export class TimelineStore {
     const abort = new AbortController();
     this.aborts.set(id, abort);
     try {
-      await sendAttachment(this.uploader, this.roomId, upload.file, {
+      let file = upload.file;
+      if (file.prepare) {
+        this.patchUpload(id, { preparing: true, progress: 0 });
+        file = await file.prepare(abort.signal, (progress) => this.patchUpload(id, { progress }));
+        // Подготовленное — и для «Отправить заново»: второй раз не сжимаем.
+        this.patchUpload(id, { file, preparing: false, progress: 0 });
+      }
+      await sendAttachment(this.uploader, this.roomId, file, {
         ...(upload.caption ? { caption: upload.caption } : {}),
         ...(upload.replyTo ? { replyTo: upload.replyTo } : {}),
         ...(upload.relatesTo ? { relatesTo: upload.relatesTo } : {}),

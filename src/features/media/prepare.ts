@@ -9,6 +9,7 @@ import type { OutgoingFile, OutgoingKind } from '../../core/media/upload';
 import { photoPlan, renamed, type MediaSendSettings } from './mediaSettings';
 import { stripMp4Metadata } from '../../core/media/mp4Metadata';
 import { isWebP, stripWebPMetadata } from '../../core/media/webpMetadata';
+import { compressVideo } from './videoCompress';
 import { t } from '../../i18n/index.svelte.ts';
 
 /** Длинная сторона миниатюры, px. */
@@ -39,7 +40,10 @@ export async function prepareFile(file: File, settings: MediaSendSettings): Prom
       if (sticker) return sticker;
     }
     if (kind === 'image') return await image(base, settings);
-    if (kind === 'video') return { ...(await videoWithoutMetadata(base, settings)), ...(await videoInfo(file)) };
+    if (kind === 'video') {
+      const ready: OutgoingFile = { ...(await videoWithoutMetadata(base, settings)), ...(await videoInfo(file)) };
+      return settings.compress ? { ...ready, prepare: (signal, onProgress) => compressed(ready, settings, signal, onProgress) } : ready;
+    }
     if (kind === 'audio') return { ...base, ...(await audioInfo(file)) };
   } catch {
     // Не разобрали — отправим без размеров: получатель просто не узнает их заранее.
@@ -158,6 +162,18 @@ async function videoWithoutMetadata(base: OutgoingFile, settings: MediaSendSetti
   if (!settings.stripMetadata || !/^video\/(mp4|quicktime)$/.test(base.mimetype)) return base;
   const stripped = stripMp4Metadata(new Uint8Array(await base.blob.arrayBuffer()));
   return stripped ? { ...base, blob: new Blob([stripped], { type: base.mimetype }) } : base;
+}
+
+/**
+ * Сжатое видео — уже при отправке (`OutgoingFile.prepare`). Из того, что лоток показывал: без
+ * метаданных, если так велят настройки, — значит, и не сжавшись, уходит без них. Миниатюра и
+ * длительность — прежние: кадр тот же, только меньше.
+ */
+async function compressed(ready: OutgoingFile, settings: MediaSendSettings, signal: AbortSignal, onProgress: (fraction: number) => void): Promise<OutgoingFile> {
+  const result = await compressVideo(ready.blob, settings.compression, settings.stripMetadata, signal, onProgress);
+  if (!result) return ready;
+  const name = `${ready.name.replace(/\.[^./]+$/, '') || 'video'}.mp4`;
+  return { ...ready, blob: result.blob, mimetype: 'video/mp4', name, width: result.width, height: result.height };
 }
 
 /** Размеры, длительность и кадр для миниатюры — у `<video>` без звука и без показа. */
