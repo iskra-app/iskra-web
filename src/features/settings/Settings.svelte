@@ -261,9 +261,20 @@
     reading = { licence, text: await licence.text() };
   }
 
-  /** Тройной щелчок — `detail` считает щелчки подряд, как `onTapGesture(count: 3)`. */
-  function openBeta(event: MouseEvent) {
-    if (event.detail === 3) router.go({ name: 'settings', section: 'beta' });
+  /**
+   * Три касания или щелчка подряд, как `onTapGesture(count: 3)`. Считаем сами: `detail` у
+   * `click` копит щелчки мыши, но не касания — iOS и на третье касание пишет 1.
+   */
+  const TAP_GAP_MS = 500;
+  let taps = 0;
+  let lastTap = -Infinity;
+  function openBeta(event: PointerEvent) {
+    if (!event.isPrimary) return;
+    taps = event.timeStamp - lastTap < TAP_GAP_MS ? taps + 1 : 1;
+    lastTap = event.timeStamp;
+    if (taps < 3) return;
+    taps = 0;
+    router.go({ name: 'settings', section: 'beta' });
   }
 
   let confirmingSignOut = $state(false);
@@ -643,10 +654,9 @@
     <!-- `AboutView` нативной, строка в строку: значок, имя и строка о себе; версия, сборка,
          устройство; сайт, исходный код и лицензии; внизу — чьё это и на каких условиях. -->
     <div class="profile-header">
-      <!-- Три щелчка по значку — «Бета-функции», как в нативной: строки к ним нет, их находит тот,
+      <!-- Три щелчка или касания по значку — «Бета-функции», как в нативной: строки к ним нет, их находит тот,
            кто ищет. -->
-      <!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_noninteractive_element_interactions -->
-      <img class="app-icon" src={asset('icons/icon-192.png')} alt="" onclick={openBeta} />
+      <img class="app-icon" src={asset('icons/icon-192.png')} alt="" draggable="false" onpointerup={openBeta} />
       <strong class="profile-name">{t('about.appNameWeb')}</strong>
       <span class="secondary">{t('about.webTagline')}</span>
     </div>
@@ -847,6 +857,10 @@
     height: var(--size-avatar-profile);
     margin-block-end: var(--space-close);
     border-radius: var(--radius-card);
+    /* Касания подряд — счёт, а не зум двойным касанием; долгое — не меню «Сохранить фото». */
+    touch-action: manipulation;
+    -webkit-touch-callout: none;
+    user-select: none;
   }
   .profile-name {
     font-size: var(--font-size-title);
