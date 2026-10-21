@@ -50,6 +50,7 @@
   });
   $effect(() => {
     store?.setServiceHiding({ nameChanges: preferences.hideNameChanges, membership: preferences.hideMembershipChanges });
+    store?.setShowsAllEvents(preferences.showsAllEvents);
   });
 
   const noop = () => {};

@@ -690,6 +690,22 @@
         </button>
       {/each}
     </div>
+    <!-- «Для разработчиков» нативной: что веб может из этого — адрес сервера, JSON в меню, все события. -->
+    <h3>{t('beta.developers')}</h3>
+    <ul class="rows">
+      <li class="pair"><span>{t('beta.homeserver')}</span><span class="secondary selectable">{session.homeserver}</span></li>
+    </ul>
+    <p class="secondary">{t('beta.homeserverHelp')}</p>
+    <label class="switch">
+      <span>{t('beta.showsSource')}</span>
+      <input type="checkbox" role="switch" bind:checked={preferences.showsEventSource} />
+    </label>
+    <label class="switch">
+      <span>{t('beta.showsAllEvents')}</span>
+      <input type="checkbox" role="switch" bind:checked={preferences.showsAllEvents} />
+    </label>
+    <p class="secondary">{t('beta.showsSourceHelp')}</p>
+    <p class="secondary">{t('beta.showsAllEventsHelp')}</p>
   {:else if section === 'licences'}
     <!-- `LicensesView` нативной: своя лицензия, потом — на чём всё построено; строка открывает текст. -->
     <ul class="rows">

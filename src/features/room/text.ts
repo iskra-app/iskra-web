@@ -15,6 +15,8 @@ export function serviceText(event: ServiceEvent): string {
       return t('roomEvent.renamedThemselves', { from: event.from, to: event.to });
     case 'roomRenamed':
       return t('roomEvent.roomRenamed', { name: event.name });
+    case 'hidden':
+      return event.description;
     default:
       return t(`roomEvent.${event.type}` as TextKey);
   }

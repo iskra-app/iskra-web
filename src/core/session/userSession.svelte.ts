@@ -124,6 +124,11 @@ export class UserSession {
   private readonly detach: Array<() => void> = [];
   private stopped = false;
 
+  /** Сервер, с которым клиент разговаривает на самом деле — после поиска по имени аккаунта. */
+  get homeserver(): string {
+    return this.client.getHomeserverUrl();
+  }
+
   private constructor(client: MatrixClient, account: Account, keys: SecretStorageKeyHolder | null, persistent: boolean) {
     this.client = client;
     this.account = account;

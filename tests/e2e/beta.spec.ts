@@ -22,6 +22,13 @@ test('«Бета-функции» — тремя щелчками по знач�
   await faces.getByRole('radio', { name: /^Мордочки/ }).click();
   await expect(faces.getByRole('radio', { name: /^Мордочки/ })).toHaveAttribute('aria-checked', 'true');
 
+  // «Для разработчиков»: адрес сервера и два переключателя, выключенные по умолчанию.
+  await expect(page.getByRole('heading', { name: 'Для разработчиков' })).toBeVisible();
+  const source = page.getByRole('switch', { name: 'JSON сообщения в меню' });
+  await expect(source).not.toBeChecked();
+  await source.check();
+  await expect(page.getByRole('switch', { name: 'Все события в чате' })).not.toBeChecked();
+
   // Esc — назад туда, откуда пришли: в «Об Iskra», потом к списку.
   await page.keyboard.press('Escape');
   await expect(page).toHaveURL(/#\/settings\/about$/);

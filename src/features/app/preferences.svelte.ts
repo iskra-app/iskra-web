@@ -67,6 +67,8 @@ const keys = {
   stickersMine: 'stickers.showsMine',
   threadsShown: 'chats.threads.shown',
   threadsHideReplies: 'chats.threads.hidesReplies',
+  showsEventSource: 'beta.showsEventSource',
+  showsAllEvents: 'beta.showsAllEvents',
 } as const;
 
 function read(key: string): string | null {
@@ -127,6 +129,9 @@ class Preferences {
   /** «Чаты» — ключи нативной: служебные строки видны, Enter отправляет. */
   hideNameChanges = $state<boolean>(read(keys.hideNameChanges) === 'true');
   hideMembershipChanges = $state<boolean>(read(keys.hideMembershipChanges) === 'true');
+  /** «Бета-функции → Для разработчиков» — ключи нативной, выключено: «Просмотреть JSON» в меню и все события в чате. */
+  showsEventSource = $state<boolean>(read(keys.showsEventSource) === 'true');
+  showsAllEvents = $state<boolean>(read(keys.showsAllEvents) === 'true');
   /** Enter переносит строку, отправляет `Ctrl/⌘ Enter` — для тех, кто пишет абзацами. */
   sendWithModEnter = $state<boolean>(read(keys.sendWithModEnter) === 'true');
   /**
@@ -167,6 +172,8 @@ class Preferences {
       $effect(() => write(keys.autoDownload, this.autoDownload));
       $effect(() => write(keys.hideNameChanges, String(this.hideNameChanges)));
       $effect(() => write(keys.hideMembershipChanges, String(this.hideMembershipChanges)));
+      $effect(() => write(keys.showsEventSource, String(this.showsEventSource)));
+      $effect(() => write(keys.showsAllEvents, String(this.showsAllEvents)));
       $effect(() => write(keys.sendWithModEnter, String(this.sendWithModEnter)));
       $effect(() => write(keys.hidePresence, String(this.hidePresence)));
       $effect(() => write(keys.hideTyping, String(this.hideTyping)));

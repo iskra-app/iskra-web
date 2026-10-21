@@ -100,6 +100,7 @@ export class TimelineStore {
   items = $state.raw<TimelineItem[]>([]);
   /** Какие служебные строки спрятать — решают настройки устройства, наверху. */
   private hiding: ServiceHiding = SHOW_ALL_SERVICE;
+  private showsAllEvents = false;
   private unreadFrom: string | undefined;
   messages = $state.raw<Message[]>([]);
   /** Дошли до начала комнаты — больше просить нечего. */
@@ -248,6 +249,20 @@ export class TimelineStore {
     if (hiding.nameChanges === this.hiding.nameChanges && hiding.membership === this.hiding.membership) return;
     this.hiding = { ...hiding };
     this.items = reuse(this.items, layout(this.messages, this.unreadFrom, this.hiding));
+  }
+
+  /** «Все события в чате» (бета-функции): нужна новая сборка — какие события строки, решает маппер. */
+  setShowsAllEvents(on: boolean): void {
+    if (on === this.showsAllEvents) return;
+    this.showsAllEvents = on;
+    this.schedule();
+  }
+
+  /** «Просмотреть JSON»: событие, как есть в SDK (расшифрованное — если оно зашифровано). Нет события на сервере — `undefined`. */
+  sourceJSON(message: Message): string | undefined {
+    const id = message.eventId;
+    const event = id ? this.room?.findEventById(id) : undefined;
+    return event ? JSON.stringify(event.getEffectiveEvent(), null, 2) : undefined;
   }
 
   /** Треды в этой комнате — по настройкам и её размеру (см. `ThreadSettings` нативной). */
@@ -430,6 +445,7 @@ export class TimelineStore {
       isBlocked: (userId) => blocked.has(userId),
       ...(this.threads.enabled && !this.threadRootId ? { threadOf: this.threadSummaries(room, live, pending) } : {}),
       threaded: this.threads.enabled || !!this.threadRootId,
+      ...(this.showsAllEvents ? { showsAllEvents: true } : {}),
       keyOf: (event) => {
         let key = this.keys.get(event);
         if (!key) {

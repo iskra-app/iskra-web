@@ -10,6 +10,8 @@
 <script lang="ts">
   import { untrack } from 'svelte';
   import ConfirmDialog from '../../design/ConfirmDialog.svelte';
+  import Dialog from '../../design/Dialog.svelte';
+  import PlainButton from '../../design/PlainButton.svelte';
   import type { OutgoingFile } from '../../core/media/upload';
   import { fileSize } from '../media/files';
   import { prepareFile, stickerFile } from '../media/prepare';
@@ -94,6 +96,8 @@
   let reactorsOf = $state<Reactor[] | null>(null);
   /** На что жалуются; `null` — окно закрыто. */
   let reporting = $state<Message | null>(null);
+  /** «Просмотреть JSON»: событие текстом; `json` пусто — на сервере его ещё нет. */
+  let source = $state<{ json: string | undefined } | null>(null);
   let endingPoll = $state<Message | null>(null);
   let creatingPoll = $state(false);
   /** Выбранные сообщения — ключи, пока выбирают; `null` почти всегда. См. `selection.ts`. */
@@ -169,6 +173,9 @@
   // Служебные строки — по настройкам «Чаты»: лента перекладывается сразу, без перезагрузки.
   $effect(() => {
     store?.setServiceHiding({ nameChanges: preferences.hideNameChanges, membership: preferences.hideMembershipChanges });
+  });
+  $effect(() => {
+    store?.setShowsAllEvents(preferences.showsAllEvents);
   });
 
   $effect(() => {
@@ -462,6 +469,9 @@
     },
     reactors: (message) => (reactorsOf = store?.reactors(message) ?? []),
     report: (message) => (reporting = message),
+    get viewSource() {
+      return preferences.showsEventSource ? (message: Message) => (source = { json: store?.sourceJSON(message) }) : undefined;
+    },
     get canPin() {
       return !!store?.canPin;
     },
@@ -699,6 +709,12 @@
 
 <ReactorsDialog reactors={reactorsOf} {session} onclose={() => (reactorsOf = null)} />
 
+<Dialog open={!!source} title={t('beta.viewSource')} onclose={() => (source = null)}>
+  {#if source}
+    {#if source.json}<pre class="source">{source.json}</pre>{:else}<p>{t('beta.noSource')}</p>{/if}
+    <PlainButton onclick={() => (source = null)}>{t('beta.close')}</PlainButton>
+  {/if}
+</Dialog>
 <ReportDialog message={reporting} onreport={(message, reason) => store?.report(message, reason)} onclose={() => (reporting = null)} />
 
 <ForwardDialog open={!!forwarding} {session} onsend={(ids, comment) => void forwardTo(ids, comment)} onclose={() => (forwarding = null)} />
@@ -743,6 +759,15 @@
 
 
 <style>
+  .source {
+    max-height: var(--size-media-max-height);
+    margin: 0;
+    overflow: auto;
+    font-size: var(--font-size-caption);
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+    user-select: text;
+  }
   .room {
     position: relative;
     isolation: isolate;

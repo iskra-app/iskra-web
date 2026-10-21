@@ -38,6 +38,8 @@ export interface MapperContext {
    * корнем, как в нативной: без неё ответ из треда висел бы в чате ни к чему.
    */
   threaded?: boolean;
+  /** «Все события в чате»: и те, что лента не показывает, — серой строкой (`RoomEventKind.hidden` нативной). */
+  showsAllEvents?: boolean;
 }
 
 /** Корень треда, если событие — ответ в нём (`m.thread`). Связь лежит открытой и у зашифрованного. */
@@ -53,7 +55,7 @@ const HTML_FORMAT = 'org.matrix.custom.html';
 
 export function mapEvent(event: MatrixEvent, context: MapperContext): Message | undefined {
   if (event.status === EventStatus.CANCELLED) return undefined;
-  const kind = kindOf(event, context);
+  const kind = kindOf(event, context) ?? (context.showsAllEvents ? hiddenKind(event) : undefined);
   if (!kind) return undefined;
 
   const senderId = event.getSender() ?? '';
@@ -114,6 +116,21 @@ function kindOf(event: MatrixEvent, context: MapperContext): MessageKind | undef
     return service ? { type: 'service', event: service } : undefined;
   }
   return undefined;
+}
+
+/**
+ * Событие, которого лента не показывает, — словами протокола: тип, ключ состояния и отправитель.
+ * Связи (реакции, правки, ответы опроса, удаления) строками не были и не будут; событие, которое
+ * ещё расшифровывается, покажется, когда расшифруется.
+ */
+function hiddenKind(event: MatrixEvent): MessageKind | undefined {
+  const type = event.getType();
+  if (type === EventType.Reaction || type === EventType.RoomRedaction || type === EventType.RoomMessageEncrypted) return undefined;
+  if ((POLL_RESPONSE as readonly string[]).includes(type) || (POLL_END as readonly string[]).includes(type)) return undefined;
+  if (event.getRelation()?.rel_type === 'm.replace') return undefined;
+  const key = event.getStateKey();
+  const what = key ? `${type} · ${key}` : type;
+  return { type: 'service', event: { type: 'hidden', description: `${what} — ${event.getSender() ?? '?'}` } };
 }
 
 function isMessageLike(type: string): boolean {

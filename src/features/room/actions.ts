@@ -30,6 +30,8 @@ export interface MessageActions {
   /** «N реакций» — кто что поставил. Только в группе: в личном пилюля и так говорит, кто. */
   showsReactors: boolean;
   reactors(message: Message): void;
+  /** «Просмотреть JSON» (бета-функции) — окно с событием; нет — пункта в меню нет. */
+  viewSource?: (message: Message) => void;
   /** «Пожаловаться» — окно с необязательной причиной. */
   report(message: Message): void;
   /**
