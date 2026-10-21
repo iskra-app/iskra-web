@@ -49,10 +49,13 @@
   --tint-mono: 4%;
   /* Лист тонировки — над всем, что нарисовано страницей (окна `<dialog>` — в своём слое выше). */
   --z-tint: 100;
-  /* Затемнение за диалогом и листом — серое, не чёрное: в тёмной теме чёрное по чёрному не
-     видно, и диалог висел в пустоте. Серый `systemGray` поверх белого серит, поверх чёрного —
-     высветляет, — одно значение на обе темы. */
+  /* Затемнение за диалогом и листом. В светлой — серый `systemGray`: серит белое. В тёмной —
+     чёрный (ниже): серый там высветлял ленту, и окно не отделялось от неё; от чёрного фона
+     окно отделяет своя заливка `--color-surface`. */
   --color-scrim: rgb(120 120 128 / 0.4);
+  /* Край окна над затемнением: в светлой его видно и так, в тёмной чёрное окно на почти чёрном
+     затемнении держится только этой линией. */
+  --color-dialog-edge: transparent;
   /* Кружок тумблера — белый в обеих темах, как у UISwitch, с лёгкой тенью от дорожки. */
   --color-on-switch: #ffffff;
   --shadow-switch-knob: 0 1px 4px rgb(0 0 0 / 0.2);
@@ -262,6 +265,8 @@
   --color-watermark: rgb(255 255 255 / 0.07);
   --color-incoming-bubble-on-wallpaper: #2b2b2b;
   --color-mono-bubble-on-wallpaper: #4d4d4d;
+  --color-scrim: rgb(0 0 0 / 0.6);
+  --color-dialog-edge: rgb(84 84 88 / 0.6);
 }
 
 @media (prefers-color-scheme: dark) {
@@ -282,6 +287,8 @@
     --color-watermark: rgb(255 255 255 / 0.07);
     --color-incoming-bubble-on-wallpaper: #2b2b2b;
     --color-mono-bubble-on-wallpaper: #4d4d4d;
+    --color-scrim: rgb(0 0 0 / 0.6);
+    --color-dialog-edge: rgb(84 84 88 / 0.6);
   }
 }
 

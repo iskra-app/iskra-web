@@ -1,7 +1,8 @@
 <!--
   Найденные сообщения — строки `searchResults` нативной Искры: отправитель жирно, под ним
   отрывок в две строки. В поиске по чату — ещё и когда, справа от имени (`RoomSearchView`):
-  там чат и так понятен, а вопрос — «где в нём».
+  там чат и так понятен, а вопрос — «где в нём». В поиске по всем — на том же месте чат:
+  вопрос «где», только шире.
 
   Пусто после поиска — «Ничего не нашлось»; до первого — то, что скажет тот, кто показывает.
 -->
@@ -16,9 +17,11 @@
     foundNothing: boolean;
     /** Время справа от имени — в поиске по одному чату. */
     withTime?: boolean;
+    /** Название чата справа от имени — в поиске по всем чатам. */
+    chatOf?: (roomId: string) => string | undefined;
     onopen: (hit: SearchHit) => void;
   }
-  let { hits, foundNothing, withTime = false, onopen }: Props = $props();
+  let { hits, foundNothing, withTime = false, chatOf, onopen }: Props = $props();
 
   const now = Date.now();
 </script>
@@ -33,6 +36,7 @@
           <span class="top">
             <strong>{hit.senderName}</strong>
             {#if withTime}<time>{roomTimestamp(hit.timestamp, now, i18n.locale, t('room.yesterday'))}</time>{/if}
+            {#if chatOf?.(hit.roomId)}<span class="chat">{chatOf(hit.roomId)}</span>{/if}
           </span>
           <span class="excerpt">{hit.excerpt}</span>
         </button>
@@ -79,6 +83,16 @@
     min-width: 0;
     overflow: hidden;
     font-weight: 600;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .chat {
+    flex: 0 1 auto;
+    min-width: 0;
+    max-width: 50%;
+    overflow: hidden;
+    color: var(--color-text-secondary);
+    font-size: var(--font-size-caption);
     text-overflow: ellipsis;
     white-space: nowrap;
   }

@@ -91,6 +91,27 @@
     actions.openMenu(message, { x: rect.left, y: rect.bottom }, !viewport.finePointer);
   }
 
+  /**
+   * Панель по наведению — сбоку от пузыря, пока сбоку есть место. У широкого пузыря его нет:
+   * панель уходила за край ленты, и «ещё» было не нажать. Тогда — на верхний край пузыря, у
+   * его дальнего угла. Меряется при наведении: ширина колонки меняется, и запомнить нельзя.
+   */
+  let hoverBar: HTMLElement | undefined = $state();
+  let barInside = $state(false);
+  function placeHoverBar() {
+    const bar = hoverBar;
+    const wrap = bar?.parentElement;
+    if (!bar || !wrap) return;
+    // Край — у прокрутки ленты: она обрезает всё, что шире неё.
+    const clip = (bar.closest('[role="log"]')?.parentElement ?? document.documentElement).getBoundingClientRect();
+    const around = wrap.getBoundingClientRect();
+    const toLeft = (message.own && !compact) !== (getComputedStyle(wrap).direction === 'rtl');
+    const room = toLeft ? around.left - clip.left : clip.right - around.right;
+    const style = getComputedStyle(bar);
+    const gap = (parseFloat(style.marginInlineStart) || 0) + (parseFloat(style.marginInlineEnd) || 0);
+    barInside = room < bar.offsetWidth + gap;
+  }
+
   const gestures = $derived({
     ondoubletap: () => interactive && actions.react(message, preferences.quickReaction),
     onswipe: () => interactive && actions.canReply && actions.reply(message),
@@ -101,7 +122,18 @@
 {#if kind.type === 'service'}
   <p class="service">{serviceText(kind.event)}</p>
 {:else}
-  <div class="row" class:own={message.own && !compact} class:compact class:first={firstInRun} class:grouped={withFace} class:interactive>
+  <!-- Наведение и фокус здесь только ставят панель на место (`placeHoverBar`); действий нет. -->
+  <!-- svelte-ignore a11y_no_static_element_interactions -->
+  <div
+    class="row"
+    class:own={message.own && !compact}
+    class:compact
+    class:first={firstInRun}
+    class:grouped={withFace}
+    class:interactive
+    onpointerenter={placeHoverBar}
+    onfocusin={placeHoverBar}
+  >
     {#if withFace}
       <!-- Лицо и имя ведут на страницу человека. Мышью и пальцем; скринридеру и Tab — через
            список участников в «О чате»: сотня одинаковых остановок в ленте ему не нужна. -->
@@ -215,7 +247,7 @@
         {#if interactive && viewport.finePointer}
           <!-- Панель по наведению. В порядке табуляции — только «ещё»: остальное есть в меню,
                а три остановки на каждом из сотен сообщений сделали бы Tab бесполезным. -->
-          <div class="hover-bar">
+          <div class="hover-bar" class:inside={barInside} bind:this={hoverBar}>
             <button type="button" tabindex="-1" aria-label={t('message.menu.react', { emoji: preferences.quickReaction })} title={t('message.menu.react', { emoji: preferences.quickReaction })} onclick={() => actions.react(message, preferences.quickReaction)}>{preferences.quickReaction}</button>
             {#if actions.canReply}
               <button type="button" tabindex="-1" aria-label={t('message.menu.reply')} title={t('message.menu.reply')} onclick={() => actions.reply(message)}>
@@ -550,11 +582,12 @@
     min-width: 0;
   }
   /* Сбоку от пузыря, по его середине, — в пустоте ленты: не закрывает ни имя, ни текст,
-     ни время. У широкого пузыря может уйти за край колонки — лента его подрежет. */
+     ни время. Зазор — полем, а не в `inset`: его меряет `placeHoverBar`. */
   .hover-bar {
     position: absolute;
     inset-block-start: 50%;
-    inset-inline-start: calc(100% + var(--space-tight));
+    inset-inline-start: 100%;
+    margin-inline-start: var(--space-tight);
     translate: 0 -50%;
     /* Не `display: none`: спрятанное так не получает фокус, и «ещё» стало бы недоступно
        с клавиатуры. Прозрачная и не ловит мышь — пока над строкой не навели или не
@@ -573,7 +606,19 @@
   }
   .own .hover-bar {
     inset-inline-start: auto;
-    inset-inline-end: calc(100% + var(--space-tight));
+    inset-inline-end: 100%;
+    margin-inline: 0 var(--space-tight);
+  }
+  /* Сбоку не помещается — на верхнем крае пузыря, у дальнего угла: как у Slack и Telegram
+     Desktop, закрывает край пузыря, но не уходит за экран. */
+  .hover-bar.inside,
+  .own .hover-bar.inside {
+    inset-block-start: 0;
+    inset-inline: auto var(--space-close);
+    margin: 0;
+  }
+  .own .hover-bar.inside {
+    inset-inline: var(--space-close) auto;
   }
   /* Текущее сообщение с клавиатуры — обводкой акцента, как пункт меню. */
   .bubble:focus-visible {

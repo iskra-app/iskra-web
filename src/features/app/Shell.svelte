@@ -39,7 +39,7 @@
 
   let { session }: { session: UserSession } = $props();
   let confirmingSignOut = $state(false);
-  let switching = $state(false);
+  let searching = $state(false);
   let helping = $state(false);
   let creating = $state(false);
   let roomView: RoomView | undefined = $state();
@@ -50,7 +50,7 @@
   // Не каждому и не сразу — своими чанками, при первом показе (`design/lazy.svelte.ts`).
   const settingsScreen = new Lazy(() => import('../settings/Settings.svelte'));
   const roomPanel = new Lazy(() => import('../room/RoomPanel.svelte'));
-  const quickSwitcher = new Lazy(() => import('../rooms/QuickSwitcher.svelte'));
+  const messageSearch = new Lazy(() => import('../rooms/MessageSearchDialog.svelte'));
   const newChat = new Lazy(() => import('../rooms/NewChatDialog.svelte'));
   // Страница человека из ленты — в панели «О чате»: открыть её (и закрыть тред, если он на её месте).
   $effect(() => {
@@ -62,7 +62,7 @@
   const roomId = $derived(router.route.name === 'room' ? router.route.roomId : null);
   const Settings = $derived(settingsScreen.when(router.route.name === 'settings'));
   const RoomPanel = $derived(roomPanel.when(panelOpen && roomId !== null));
-  const QuickSwitcher = $derived(quickSwitcher.when(switching));
+  const MessageSearchDialog = $derived(messageSearch.when(searching));
   const NewChatDialog = $derived(newChat.when(creating));
   /** Открытый тред — на месте «О чате»: справа на широком экране, листом поверх чата на узком. */
   const threadId = $derived(router.route.name === 'room' ? router.route.thread : undefined);
@@ -169,8 +169,8 @@
     const action = match(event);
     if (!action) return;
     switch (action) {
-      case 'quickSwitch':
-        switching = true;
+      case 'search':
+        searching = true;
         break;
       case 'previousChat':
         step(-1, false);
@@ -259,7 +259,7 @@
     <div class="list-column">
       <Bar title={status ?? t('roomList.title')}>
         {#snippet trailing()}
-          <IconButton label={t('quickSwitch.label')} shortcut={describeHotkey('quickSwitch')} onclick={() => (switching = true)}>
+          <IconButton label={t('roomList.searchPrompt')} shortcut={describeHotkey('search')} onclick={() => (searching = true)}>
             <Icon name="search" />
           </IconButton>
           <IconButton label={t('roomList.newConversation')} onclick={() => (creating = true)}>
@@ -374,7 +374,7 @@
 
 <svelte:window {onkeydown} />
 
-{#if QuickSwitcher}<QuickSwitcher {session} open={switching} onclose={() => (switching = false)} />{/if}
+{#if MessageSearchDialog}<MessageSearchDialog {session} open={searching} onclose={() => (searching = false)} />{/if}
 <HotkeyHelp open={helping} onclose={() => (helping = false)} />
 {#if NewChatDialog}<NewChatDialog open={creating} {session} onclose={() => (creating = false)} />{/if}
 {#if link}

@@ -5,22 +5,26 @@ test.afterEach(async ({ page }, info) => {
   if (info.status !== info.expectedStatus) console.log(`Консоль «${info.title}»:\n${consoleOf(page).slice(-40).join('\n')}`);
 });
 
-test('поиск по сообщениям: над списком — найденное, нажатие открывает чат на сообщении', async ({ page }) => {
+test('поиск по сообщениям: окно по лупе, нажатие открывает чат на сообщении', async ({ page }) => {
   const problems = watchForProblems(page);
   await signInToDemo(page);
 
-  const field = page.getByRole('searchbox', { name: 'Поиск по сообщениям' });
-  // Слово, которого нет нигде, — «Ничего не нашлось»; крестик возвращает список.
+  await page.getByRole('button', { name: 'Поиск по сообщениям' }).click();
+  const dialog = page.getByRole('dialog', { name: 'Поиск по сообщениям' });
+  const field = dialog.getByRole('searchbox', { name: 'Поиск по сообщениям' });
+  await expect(field).toBeFocused();
+  // Слово, которого нет нигде, — «Ничего не нашлось»; крестик стирает запрос.
   await field.fill('йцукен');
-  await expect(page.getByRole('heading', { name: 'Ничего не нашлось' })).toBeVisible();
-  await page.getByRole('button', { name: 'Очистить поиск' }).click();
+  await expect(dialog.getByRole('heading', { name: 'Ничего не нашлось' })).toBeVisible();
+  await dialog.getByRole('button', { name: 'Очистить поиск' }).click();
   await expect(field).toHaveValue('');
-  await expect(page.getByRole('link', { name: /^Выходные/ })).toBeVisible();
 
   await field.fill('собран');
-  const hit = page.getByRole('button', { name: /Напоминаю: собрание дома в четверг/ });
+  const hit = dialog.getByRole('button', { name: /Напоминаю: собрание дома в четверг/ });
   await expect(hit).toContainText('Борис');
+  await expect(hit).toContainText('Дом 14, подъезд 2');
   await hit.click();
+  await expect(dialog).toBeHidden();
   await expect(page).toHaveURL(/#\/room\/!quiet/);
   await expect(page.getByRole('log').getByText('Напоминаю: собрание дома в четверг').first()).toBeVisible();
   expect(problems).toEqual([]);
