@@ -10,20 +10,23 @@
     /** Строка под заголовком — как у шапки чата в нативной: кто печатает, кто это, сколько их. */
     subtitle?: string;
     trailing?: Snippet;
+    /**
+     * Нажатие на заголовок с подписью — как на лицо чата: к «О чате». Кнопка невидима для
+     * скринридера и Tab: доступная кнопка для того же действия должна быть в `trailing`.
+     */
+    ontitle?: () => void;
   }
-  let { leading, title, subtitle, trailing }: Props = $props();
+  let { leading, title, subtitle, trailing, ontitle }: Props = $props();
 </script>
 
 <header class="bar glass" data-titlebar>
   <div class="side">{#if leading}{@render leading()}{/if}</div>
-  {#if subtitle}
-    <div class="titles">
-      <h1>{title}</h1>
-      <p class="subtitle">{subtitle}</p>
-    </div>
-  {:else}
+  <div class="titles" class:pressable={!!ontitle}>
     <h1>{title}</h1>
-  {/if}
+    {#if subtitle}<p class="subtitle">{subtitle}</p>{/if}
+    <!-- Поверх заголовка, а не вокруг: `h1` внутри `<button>` — не HTML. -->
+    {#if ontitle}<button type="button" class="title-press" aria-hidden="true" tabindex="-1" onclick={ontitle}></button>{/if}
+  </div>
   <div class="side end">{#if trailing}{@render trailing()}{/if}</div>
 </header>
 
@@ -55,9 +58,23 @@
     text-overflow: ellipsis;
   }
   .titles {
+    position: relative;
     display: flex;
     flex-direction: column;
     min-width: 0;
+  }
+  /* Нажимается текст, а не вся середина: за пустое место шапки в окне PWA таскают окно. */
+  .pressable {
+    justify-self: start;
+    max-width: 100%;
+  }
+  .title-press {
+    position: absolute;
+    inset: 0;
+    padding: 0;
+    border: none;
+    background: transparent;
+    cursor: pointer;
   }
   .subtitle {
     margin: 0;
