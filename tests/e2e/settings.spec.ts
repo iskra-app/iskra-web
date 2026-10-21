@@ -188,9 +188,12 @@ test('настройки по разделам: имя, язык, тема, шр
   expect(await bodyFont()).toMatch(/^"?Inter"?,/);
   expect(await page.evaluate(async () => (await document.fonts.load('1rem Inter', 'Привет, hello')).length)).toBeGreaterThan(0);
   expect(await page.evaluate(() => document.fonts.check('1rem Inter', 'Привет, hello'))).toBe(true);
+  // Фичи Inter (перечёркнутый ноль…) — только у него; у системного их нет.
+  expect(await page.evaluate(() => getComputedStyle(document.body).fontFeatureSettings)).toContain('"zero"');
   await page.getByRole('radio', { name: 'Системный' }).click();
   await expect(page.locator('html')).toHaveAttribute('data-font', 'system');
   expect(await bodyFont()).toMatch(/^system-ui,/);
+  expect(await page.evaluate(() => getComputedStyle(document.body).fontFeatureSettings)).toBe('normal');
   await page.getByRole('radio', { name: 'Inter' }).click();
   await expect(page.locator('html')).not.toHaveAttribute('data-font');
 
