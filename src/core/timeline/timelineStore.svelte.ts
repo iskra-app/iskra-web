@@ -34,6 +34,7 @@ import { stickerContent, type Sticker } from '../stickers/imagePack';
 import { geoUri, type Place } from './location';
 import type * as Markdown from './composerMarkdown';
 import { currentMarker, rememberMovedMarker } from './readMarker';
+import { reuse } from './reuse';
 import { canSendPoll, pollEndContent, pollStartContent, type PollDraft } from './poll';
 import { mentionsMarkdown, rankCandidates, unlinkMentions, type ComposerMention, type RankedCandidate } from './composerMentions';
 import { failureOf, mapEvent, threadRootOf, type MapperContext } from './mapper';
@@ -246,7 +247,7 @@ export class TimelineStore {
   setServiceHiding(hiding: ServiceHiding): void {
     if (hiding.nameChanges === this.hiding.nameChanges && hiding.membership === this.hiding.membership) return;
     this.hiding = { ...hiding };
-    this.items = layout(this.messages, this.unreadFrom, this.hiding);
+    this.items = reuse(this.items, layout(this.messages, this.unreadFrom, this.hiding));
   }
 
   /** Треды в этой комнате — по настройкам и её размеру (см. `ThreadSettings` нативной). */
@@ -291,9 +292,10 @@ export class TimelineStore {
       if (message) messages.push(message);
     }
     markRead(room, this.ownUserId, messages);
-    this.messages = messages;
+    // Не изменившееся — прежними объектами: экран перерисует только то, что правда другое.
+    this.messages = reuse(this.messages, messages);
     this.unreadFrom = unreadFrom;
-    this.items = layout(messages, unreadFrom, this.hiding);
+    this.items = reuse(this.items, layout(this.messages, unreadFrom, this.hiding));
     this.readPinnedMessage(room, context);
     if (!this.threadRootId && this.atStart === false && room.getLiveTimeline().getPaginationToken(Direction.Backward) === null) {
       this.atStart = true;
