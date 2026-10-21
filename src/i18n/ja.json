@@ -424,6 +424,7 @@
   "reactions.symbols": "記号",
   "recording.cancel": "キャンセル",
   "recording.hint": "タップで音声かビデオかを選べます。押したままで録音し、上にスワイプすると手を離して録音を続けられます。",
+  "recording.hintPointer": "クリックで手を使わず録音、右クリックで音声かビデオかを選べます。押したままで録音し、上へ動かすと手を離して録音を続けられます。",
   "recording.send": "送信",
   "recording.switchToVideo": "ビデオメッセージに切り替え",
   "recording.switchToVoice": "ボイスメッセージに切り替え",

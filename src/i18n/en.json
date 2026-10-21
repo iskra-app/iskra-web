@@ -428,6 +428,7 @@
   "reactions.symbols": "Symbols",
   "recording.cancel": "Cancel",
   "recording.hint": "Tap to choose voice or video. Hold to record, and swipe up to keep recording hands-free.",
+  "recording.hintPointer": "Click to record hands-free; right-click to choose voice or video. Hold to record, and move up to keep recording hands-free.",
   "recording.send": "Send",
   "recording.switchToVideo": "Switch to a video message",
   "recording.switchToVoice": "Switch to a voice message",

@@ -429,6 +429,7 @@
   "reactions.symbols": "Symboles",
   "recording.cancel": "Annuler",
   "recording.hint": "Touchez pour choisir vocal ou vidéo. Maintenez pour enregistrer, et glissez vers le haut pour continuer sans les mains.",
+  "recording.hintPointer": "Cliquez pour enregistrer sans les mains ; clic droit pour choisir vocal ou vidéo. Maintenez pour enregistrer, et déplacez vers le haut pour continuer sans les mains.",
   "recording.send": "Envoyer",
   "recording.switchToVideo": "Passer au message vidéo",
   "recording.switchToVoice": "Passer au message vocal",

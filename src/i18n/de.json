@@ -428,6 +428,7 @@
   "reactions.symbols": "Symbole",
   "recording.cancel": "Abbrechen",
   "recording.hint": "Tippen Sie, um zwischen Sprache und Video zu wählen. Halten Sie zum Aufnehmen gedrückt und wischen Sie nach oben, um freihändig weiterzumachen.",
+  "recording.hintPointer": "Klicken Sie, um freihändig aufzunehmen; mit der rechten Maustaste wählen Sie Sprache oder Video. Halten Sie zum Aufnehmen gedrückt und bewegen Sie nach oben, um freihändig weiterzumachen.",
   "recording.send": "Senden",
   "recording.switchToVideo": "Zu Videonachricht wechseln",
   "recording.switchToVoice": "Zu Sprachnachricht wechseln",

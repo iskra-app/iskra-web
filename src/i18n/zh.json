@@ -424,6 +424,7 @@
   "reactions.symbols": "符号",
   "recording.cancel": "取消",
   "recording.hint": "轻点选择语音或视频。按住录制，向上轻扫可免手持继续录制。",
+  "recording.hintPointer": "单击即可免手持录制；右键选择语音或视频。按住录制，向上移动可免手持继续录制。",
   "recording.send": "发送",
   "recording.switchToVideo": "切换到视频消息",
   "recording.switchToVoice": "切换到语音消息",

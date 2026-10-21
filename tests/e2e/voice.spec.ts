@@ -80,7 +80,7 @@ async function openChat(page: Page) {
   await expect(page.getByRole('log')).toBeVisible();
 }
 
-test('голосовое: Enter — запись без рук, «Отправить» — пузырь в ленте', async ({ page }) => {
+test('голосовое: Enter — запись без рук, «Отправить» — пузырь в ленте', async ({ page }, info) => {
   const problems = watchForProblems(page);
   await fakeMicrophone(page);
   await signInToDemo(page);
@@ -92,9 +92,11 @@ test('голосовое: Enter — запись без рук, «Отправи
   await composer.fill('черновик');
   await expect(record).toBeHidden();
   await composer.fill('');
-  // Щелчок только переключает голосовое и «кружочек»; без рук — Enter.
-  await record.focus();
-  await page.keyboard.press('Enter');
+  // Мышью щелчок сразу записывает без рук (десктоп); пальцем он переключает режим, там — Enter.
+  if (isPhone(info.project.name)) {
+    await record.focus();
+    await page.keyboard.press('Enter');
+  } else await record.click();
 
   const strip = page.getByRole('group', { name: 'Запись голосового' });
   await expect(strip).toBeVisible();
@@ -203,7 +205,8 @@ test('«кружочек»: камера поверх комнаты, кольц
 
   // Кнопка одна — и на телефоне, и на десктопе: нажатие переключает голосовое и видео.
   if (isPhone(info.project.name)) await page.getByRole('button', { name: 'Записать голосовое' }).tap();
-  else await page.getByRole('button', { name: 'Записать голосовое' }).click();
+  // Мышью щелчок записывает без рук, режим переключает правая кнопка.
+  else await page.getByRole('button', { name: 'Записать голосовое' }).click({ button: 'right' });
   await expect(page.getByRole('button', { name: 'Записать голосовое' })).toBeHidden();
   // Удержание — запись.
   const video = page.getByRole('button', { name: 'Записать видеосообщение' });
@@ -232,7 +235,7 @@ test('«кружочек»: «Отмена» и Esc — камера закры�
   await fakeMicrophone(page);
   await signInToDemo(page);
   await openChat(page);
-  await page.getByRole('button', { name: 'Записать голосовое' }).click();
+  await page.getByRole('button', { name: 'Записать голосовое' }).click({ button: 'right' });
   const record = page.getByRole('button', { name: 'Записать видеосообщение' });
   const camera = page.getByRole('dialog', { name: 'Видеосообщение' });
   await record.focus();
