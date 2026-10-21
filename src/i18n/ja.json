@@ -129,6 +129,7 @@
   "devices.title": "デバイス",
   "devices.wrongPassword": "パスワードが違います。",
   "elsewhere.goThere": "そちらへ移動",
+  "elsewhere.linkPassed": "リンクはもう一方のウィンドウで開きました。そちらに切り替えてください。",
   "elsewhere.message": "Iskra は一度にひとつのウィンドウでしか動作できません。そうしないと暗号鍵が混乱します。そのウィンドウに切り替えるか、ここで Iskra を開くと、向こうは閉じられます。",
   "elsewhere.openHere": "ここで開く",
   "elsewhere.pinged": "Iskra はこちら",

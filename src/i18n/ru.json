@@ -129,6 +129,7 @@
   "devices.title": "Устройства",
   "devices.wrongPassword": "Пароль не подошёл.",
   "elsewhere.goThere": "Перейти туда",
+  "elsewhere.linkPassed": "Ссылка открылась в том окне — перейдите туда.",
   "elsewhere.message": "Iskra может работать только в одном окне за раз — иначе ключи шифрования перепутаются. Перейдите в то окно или откройте Iskra здесь: там она закроется.",
   "elsewhere.openHere": "Открыть здесь",
   "elsewhere.pinged": "Iskra здесь",

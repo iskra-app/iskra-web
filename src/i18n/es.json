@@ -129,6 +129,7 @@
   "devices.title": "Dispositivos",
   "devices.wrongPassword": "La contraseña no es correcta.",
   "elsewhere.goThere": "Ir allí",
+  "elsewhere.linkPassed": "El enlace se abrió en esa ventana: cambie a ella.",
   "elsewhere.message": "Iskra solo puede funcionar en una ventana a la vez; si no, sus claves de cifrado se enredan. Cambie a esa ventana o abra Iskra aquí y se cerrará allí.",
   "elsewhere.openHere": "Abrir aquí",
   "elsewhere.pinged": "Iskra está aquí",

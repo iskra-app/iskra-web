@@ -68,6 +68,15 @@ class Router {
         this.route = parseRoute(pending);
       }
     }
+    // Установленное приложение: ссылка на него фокусирует уже открытое окно (`launch_handler:
+    // focus-existing` в манифесте), а адрес отдаёт сюда, не меняя страницы. Не прочитать — и
+    // окно просто всплывёт там, где было. Запуск из дока — адрес без маршрута: где был, там и стоим.
+    const launchQueue = (window as Window & { launchQueue?: { setConsumer: (consumer: (params: { targetURL?: string }) => void) => void } }).launchQueue;
+    launchQueue?.setConsumer(({ targetURL }) => {
+      if (!targetURL) return;
+      const route = parseRoute(new URL(targetURL).hash);
+      if (route.name === 'open' || route.name === 'room') this.go(route);
+    });
     window.addEventListener('popstate', (event: PopStateEvent & { hasUAVisualTransition?: boolean }) => {
       // Шаг без смены адреса `hashchange` не даст — запомненное узнаётся по адресу.
       this.traversal = { traversal: true, browserAnimated: event.hasUAVisualTransition === true, hash: window.location.hash };

@@ -7,14 +7,17 @@
  *
  * Web Locks: лок `iskra-session-<userId>` держит та вкладка, у которой поднят клиент.
  * Не получили — клиент не поднимаем. Разговор между вкладками — `BroadcastChannel`:
- * «перейди туда» (та вкладка просит фокус) и «открой здесь» (та отпускает лок).
+ * «перейди туда» (та вкладка просит фокус), «открой здесь» (та отпускает лок) и «открой
+ * ссылку» — чужая ссылка пришла сюда, а сессия там.
  */
 
-type Message = { type: 'focus' } | { type: 'release' };
+type Message = { type: 'focus' } | { type: 'release' } | { type: 'link'; hash: string };
 
 export interface LockCallbacks {
   /** Другая вкладка попросила её показать. Окно может и не дать себя сфокусировать. */
   onFocusRequested?: () => void;
+  /** Другая вкладка получила ссылку (`#/open/…`) — открыть её здесь. */
+  onLinkPassed?: (hash: string) => void;
   /**
    * Другая вкладка забрала сессию себе. Лок отпускается, **когда это закончится**:
    * сначала клиент останавливается и дописывает базы, потом их открывает другая вкладка.
@@ -56,6 +59,11 @@ export class SessionLock {
     SessionLock.post(userId, { type: 'focus' });
   }
 
+  /** Ссылка пришла не в ту вкладку: передать её держателю сессии. */
+  static passLink(userId: string, hash: string): void {
+    SessionLock.post(userId, { type: 'link', hash });
+  }
+
   private static post(userId: string, message: Message): void {
     if (typeof BroadcastChannel === 'undefined') return;
     const channel = new BroadcastChannel(SessionLock.channelName(userId));
@@ -85,6 +93,7 @@ export class SessionLock {
             if (channel) {
               channel.onmessage = (event: MessageEvent<Message>) => {
                 if (event.data?.type === 'focus') callbacks.onFocusRequested?.();
+                if (event.data?.type === 'link' && typeof event.data.hash === 'string') callbacks.onLinkPassed?.(event.data.hash);
                 if (event.data?.type === 'release') {
                   void Promise.resolve(callbacks.onTakenOver?.())
                     .catch(() => {})
