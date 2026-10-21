@@ -475,6 +475,36 @@ test('плавающая дата: пока листают — день того
   await expect(page.locator('.floating.shown')).toHaveCount(0, { timeout: 3000 });
 });
 
+test('подгрузка истории посреди инерции: место чтения не прыгает на начало подгруженного', async ({ page }) => {
+  await signInToDemo(page);
+  await openRoom(page, /^Длинная история/);
+  await expect(bubble(page, 'Сообщение номер 400')).toBeInViewport();
+  // Инерция тачпада или пальца: каждый кадр шаг вверх, и ещё шаг — сразу после того, как
+  // история легла в DOM, до раскладки. Верхнее видимое сообщение должно меняться понемногу,
+  // а не перескакивать на страницу подгруженного.
+  const jumps = await page.evaluate(async () => {
+    const scroller = document.querySelector<HTMLElement>('.scroller')!;
+    const topmost = () => {
+      const top = scroller.getBoundingClientRect().top;
+      const row = [...scroller.querySelectorAll<HTMLElement>('[data-anchor]')].find((r) => r.getBoundingClientRect().bottom > top);
+      return Number(row?.textContent?.match(/номер (\d+)/)?.[1]);
+    };
+    new MutationObserver(() => (scroller.scrollTop -= 10)).observe(scroller.querySelector('[role=log]')!, { childList: true });
+    const found: string[] = [];
+    let before = topmost();
+    for (let frame = 0; frame < 300; frame++) {
+      await new Promise(requestAnimationFrame);
+      scroller.scrollTop -= 40;
+      const now = topmost();
+      if (Math.abs(now - before) > 3) found.push(`${before} → ${now}`);
+      before = now;
+    }
+    return { found, reached: before };
+  });
+  expect(jumps.found).toEqual([]);
+  expect(jumps.reached).toBeLessThan(300);
+});
+
 test('заблокировали собеседника — вместо поля «Вы заблокировали…» и «Разблокировать»', async ({ page }) => {
   await signInToDemo(page);
   await openRoom(page, /^Аня/);
