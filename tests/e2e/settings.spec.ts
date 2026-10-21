@@ -182,10 +182,12 @@ test('настройки по разделам: имя, язык, тема, шр
   await tint.uncheck();
   await expect(page.locator('html')).not.toHaveAttribute('data-tint');
   // Inter — по умолчанию и из своих файлов под боевой CSP: кириллица и латиница загрузились.
+  // Файл один, вариативный, на все алфавиты (Inter 4.1) — значит, и начертание одно.
   await expect(page.getByRole('radio', { name: 'Inter' })).toHaveAttribute('aria-checked', 'true');
   const bodyFont = () => page.evaluate(() => getComputedStyle(document.body).fontFamily);
   expect(await bodyFont()).toMatch(/^"?Inter"?,/);
-  expect(await page.evaluate(async () => (await document.fonts.load('1rem Inter', 'Привет, hello')).length)).toBeGreaterThan(1);
+  expect(await page.evaluate(async () => (await document.fonts.load('1rem Inter', 'Привет, hello')).length)).toBeGreaterThan(0);
+  expect(await page.evaluate(() => document.fonts.check('1rem Inter', 'Привет, hello'))).toBe(true);
   await page.getByRole('radio', { name: 'Системный' }).click();
   await expect(page.locator('html')).toHaveAttribute('data-font', 'system');
   expect(await bodyFont()).toMatch(/^system-ui,/);
