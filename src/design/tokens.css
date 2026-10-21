@@ -166,6 +166,8 @@
     'Helvetica Neue', Arial, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji', 'Noto Color Emoji';
   /* Inter — перед системным: чего в нём нет (эмодзи), берётся из системных. */
   --font-body: 'Inter', var(--font-system);
+  /* Фичи Inter: зачёркнутый ноль, ss01, ss02, ss07 — только для него, не для системного. */
+  --font-features: 'zero', 'ss01', 'ss02', 'ss07';
   /* Код восстановления: моноширинный, чтобы «0» и «O», «l» и «1» не спорили. */
   --font-code: ui-monospace, 'SF Mono', Menlo, Consolas, 'Liberation Mono', monospace;
   --font-size-body: 1rem;
@@ -285,4 +287,5 @@
 
 :root[data-font='system'] {
   --font-body: var(--font-system);
+  --font-features: normal;
 }
