@@ -138,6 +138,7 @@
         class:bare={kind.type === 'sticker' || kind.type === 'videoNote'}
         role="article"
         class:notice={kind.type === 'notice'}
+        class:deleted={kind.type === 'deleted'}
         class:muted={kind.type === 'deleted' || kind.type === 'unreadable' || kind.type === 'unsupported'}
         {oncontextmenu}
         {onpointerdown}
@@ -360,6 +361,22 @@
   }
   .bubble.muted em {
     opacity: 0.7;
+  }
+  /* Надгробие — пунктирный контур вместо заливки, как `deletedBubble` нативной: тише слов внутри.
+     Рамка внутри пузыря, поэтому отступ уменьшен на её толщину. */
+  .bubble.deleted,
+  .own .bubble.deleted {
+    padding: calc(var(--bubble-pad-y) - var(--border-hairline)) calc(var(--bubble-pad-x) - var(--border-hairline));
+    border: var(--border-hairline) dashed var(--color-text-secondary);
+    background: transparent;
+    color: var(--color-text-secondary);
+  }
+  .bubble.deleted em {
+    opacity: 1;
+  }
+  /* В компактном столбце контура нет — слова серым, как у нативной в `.plain`. */
+  .compact .bubble.deleted {
+    border: none;
   }
   .quote {
     display: flex;
