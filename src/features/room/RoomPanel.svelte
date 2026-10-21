@@ -35,7 +35,8 @@
   import FileCard from '../media/FileCard.svelte';
   import VoiceMessage from '../media/VoiceMessage.svelte';
   import MediaTile from '../media/MediaTile.svelte';
-  import Viewer, { type ViewerItem } from '../media/Viewer.svelte';
+  import type { ViewerItem } from '../media/Viewer.svelte';
+  import { Lazy } from '../../design/lazy.svelte.ts';
   import { availableTabs, roomContents, type ContentItem, type ContentTab } from './contents';
 
   interface Props {
@@ -130,6 +131,8 @@
     else if (left + button.offsetWidth > strip.scrollLeft + strip.clientWidth) strip.scrollLeft = left + button.offsetWidth - strip.clientWidth;
   });
   let viewing = $state<{ items: ViewerItem[]; start: string } | null>(null);
+  const viewer = new Lazy(() => import('../media/Viewer.svelte'));
+  const Viewer = $derived(viewer.when(!!viewing));
   let loadingEarlier = $state(false);
   let now = $state(Date.now());
   $effect(() => {
@@ -440,7 +443,7 @@
   </div>
 
 
-  {#if viewing}
+  {#if viewing && Viewer}
     <Viewer items={viewing.items} start={viewing.start} media={session.media} onclose={() => (viewing = null)} />
   {/if}
 

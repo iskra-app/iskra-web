@@ -123,6 +123,14 @@ export default defineConfig({
     staticHeaders(),
     ...(process.env['ISKRA_META_CSP'] ? [metaPolicy()] : []),
   ],
+  resolve: {
+    alias: [
+      // Поле `browser` пакета ведёт в `browser-index.js`: он кладёт весь SDK в `globalThis.matrixcs`
+      // и так держит в сборке всё, что тот экспортирует, — клиент виджетов, звонки, sliding sync.
+      // `index.js` — тот же SDK без этого и без хранилища старого крипто (у нас только Rust).
+      { find: /^matrix-js-sdk$/, replacement: 'matrix-js-sdk/lib/index.js' },
+    ],
+  },
   server: { headers: securityHeaders(true) },
   preview: { headers: securityHeaders(false) },
   build: {
@@ -133,6 +141,19 @@ export default defineConfig({
     // размер первой загрузки меряется на телефоне (этап 0), а не этим порогом.
     chunkSizeWarningLimit: 1500,
     sourcemap: true,
+    rolldownOptions: {
+      treeshake: {
+        // У matrix-js-sdk нет `sideEffects` в package.json, и клиент виджетов (`embedded.js`)
+        // оставался бы в сборке вместе с `matrix-widget-api` (CommonJS, не вытряхивается) —
+        // хотя веб виджетов не открывает. Побочных действий при загрузке у модуля нет.
+        moduleSideEffects: (id) => !/\/matrix-js-sdk\/lib\/embedded\.js$/.test(id),
+      },
+      output: {
+        // Всё, без чего не стартовать, — одним чанком: иначе ленивые экраны дробят общее
+        // на два десятка файлов в килобайт, и каждый — отдельный запрос до первого кадра.
+        codeSplitting: { groups: [{ name: 'app', tags: ['$initial'] }] },
+      },
+    },
   },
   test: {
     include: ['tests/unit/**/*.test.ts'],

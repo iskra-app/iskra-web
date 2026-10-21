@@ -16,13 +16,12 @@
   import Menu from '../../design/Menu.svelte';
   import { viewport } from '../../design/viewport.svelte.ts';
   import { stickerOf, type Sticker } from '../../core/stickers/imagePack';
-  import StickerPanel from './StickerPanel.svelte';
   import { showsStickers } from './stickers';
   import type { Recording } from '../media/voiceRecorder.svelte.ts';
   import { VideoNoteRecorder } from '../media/videoNoteRecorder.svelte.ts';
   import { VIDEO_NOTE_SIDE } from '../media/videoNote';
-  import VideoNoteCapture from './VideoNoteCapture.svelte';
-  import Viewer, { type ViewerItem } from '../media/Viewer.svelte';
+  import type { ViewerItem } from '../media/Viewer.svelte';
+  import { Lazy } from '../../design/lazy.svelte.ts';
   import type { Message } from '../../core/timeline/message';
   import { router } from '../../core/navigation/router.svelte.ts';
   import { threadsShownIn } from './threads';
@@ -31,7 +30,6 @@
   import { i18n, t } from '../../i18n/index.svelte.ts';
   import type { ComposerContext, MessageActions } from './actions';
   import Composer from './Composer.svelte';
-  import PollComposer from './PollComposer.svelte';
   import SelectionBar from './SelectionBar.svelte';
   import ForwardDialog from './ForwardDialog.svelte';
   import ReactorsDialog from './ReactorsDialog.svelte';
@@ -160,6 +158,14 @@
   }
   let viewing = $state<{ items: ViewerItem[]; start: string } | null>(null);
 
+  // Камера, стикеры, просмотрщик, опрос — не в каждом разговоре: своими чанками, при первом открытии.
+  const videoNoteCapture = new Lazy(() => import('./VideoNoteCapture.svelte'));
+  const stickerPanelView = new Lazy(() => import('./StickerPanel.svelte'));
+  const viewer = new Lazy(() => import('../media/Viewer.svelte'));
+  const pollComposer = new Lazy(() => import('./PollComposer.svelte'));
+  const Viewer = $derived(viewer.when(!!viewing));
+  const PollComposer = $derived(pollComposer.when(creatingPoll));
+
   // Служебные строки — по настройкам «Чаты»: лента перекладывается сразу, без перезагрузки.
   $effect(() => {
     store?.setServiceHiding({ nameChanges: preferences.hideNameChanges, membership: preferences.hideMembershipChanges });
@@ -238,6 +244,7 @@
   const draftText = () => (context?.kind === 'edit' ? stashed : text);
 
   function oninput(value: string) {
+    void store?.prepareToSend();
     if (context?.kind !== 'edit') {
       // Скрыл «печатает…» — о наборе никому не говорим; остановку — тоже незачем.
       if (preferences.hideTyping) return;
@@ -301,6 +308,7 @@
 
   /** Один на открытый чат: камеру держит он, слой камеры — здесь, поверх комнаты. */
   const videoNote = new VideoNoteRecorder();
+  const VideoNoteCapture = $derived(videoNoteCapture.when(videoNote.open));
   let videoHolding = $state(false);
 
   /**
@@ -333,6 +341,7 @@
 
   /** Панель стикеров — у кнопки в поле, где её нажали. */
   let stickerPanel = $state<{ x: number; y: number } | null>(null);
+  const StickerPanel = $derived(stickerPanelView.when(!!stickerPanel));
 
   /** Стикер выбран: панель закрывается сразу, стикер уходит следом — с ответом, если отвечали. */
   async function sendSticker(sticker: Sticker) {
@@ -570,7 +579,7 @@
       <Timeline bind:this={timeline} {store} {session} {openAt} showSenders={room?.kind !== 'direct'} {actions} {selection} ontoggle={toggleSelected} />
     {/key}
   {/if}
-  {#if videoNote.open}
+  {#if videoNote.open && VideoNoteCapture}
     <VideoNoteCapture recorder={videoNote} holding={videoHolding} onsend={() => void finishVideoNote()} oncancel={cancelVideoNote} />
   {/if}
   <div class="below">
@@ -648,12 +657,12 @@
 </div>
 
 <Menu open={!!stickerPanel} x={stickerPanel?.x ?? 0} y={stickerPanel?.y ?? 0} sheet={!viewport.finePointer} label={t('stickers.title')} onclose={() => (stickerPanel = null)}>
-  {#if stickerPanel}
+  {#if stickerPanel && StickerPanel}
     <StickerPanel library={session.stickers} media={session.media} {roomId} onpick={(sticker) => void sendSticker(sticker)} />
   {/if}
 </Menu>
 
-{#if viewing}
+{#if viewing && Viewer}
   <Viewer items={viewing.items} start={viewing.start} media={session.media} onclose={() => (viewing = null)} />
 {/if}
 
@@ -694,14 +703,16 @@
 
 <ForwardDialog open={!!forwarding} {session} onsend={(ids, comment) => void forwardTo(ids, comment)} onclose={() => (forwarding = null)} />
 
-<PollComposer
-  open={creatingPoll}
-  onclose={() => (creatingPoll = false)}
-  onsend={(draft) => {
-    store?.sendPoll(draft);
-    creatingPoll = false;
-  }}
-/>
+{#if PollComposer}
+  <PollComposer
+    open={creatingPoll}
+    onclose={() => (creatingPoll = false)}
+    onsend={(draft) => {
+      store?.sendPoll(draft);
+      creatingPoll = false;
+    }}
+  />
+{/if}
 
 <ConfirmDialog
   open={!!endingPoll}

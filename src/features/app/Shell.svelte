@@ -6,6 +6,7 @@
   import { untrack } from 'svelte';
   import { profileRequest } from '../room/profileRequest.svelte.ts';
   import Columns from '../../design/Columns.svelte';
+  import { Lazy } from '../../design/lazy.svelte.ts';
   import Bar from '../../design/Bar.svelte';
   import SparkGlyph from '../../design/SparkGlyph.svelte';
   import IconButton from '../../design/IconButton.svelte';
@@ -28,15 +29,11 @@
   import { showBadge } from './badge.svelte.ts';
   import RoomList from '../rooms/RoomList.svelte';
   import RoomFace from '../rooms/RoomFace.svelte';
-  import QuickSwitcher from '../rooms/QuickSwitcher.svelte';
   import { roomName } from '../rooms/text';
   import RoomView from '../room/RoomView.svelte';
   import HotkeyHelp from './HotkeyHelp.svelte';
-  import NewChatDialog from '../rooms/NewChatDialog.svelte';
   import OpenLinkDialog from './OpenLinkDialog.svelte';
-  import Settings from '../settings/Settings.svelte';
   import { settingsParent, settingsTitles } from '../settings/sections';
-  import RoomPanel from '../room/RoomPanel.svelte';
   import LockedHistoryStrip from '../recovery/LockedHistoryStrip.svelte';
   import type { TimelineStore } from '../../core/timeline/timelineStore.svelte.ts';
 
@@ -49,6 +46,12 @@
   let roomTimeline: TimelineStore | undefined = $state();
 
   let panelOpen = $state(false);
+
+  // Не каждому и не сразу — своими чанками, при первом показе (`design/lazy.svelte.ts`).
+  const settingsScreen = new Lazy(() => import('../settings/Settings.svelte'));
+  const roomPanel = new Lazy(() => import('../room/RoomPanel.svelte'));
+  const quickSwitcher = new Lazy(() => import('../rooms/QuickSwitcher.svelte'));
+  const newChat = new Lazy(() => import('../rooms/NewChatDialog.svelte'));
   // Страница человека из ленты — в панели «О чате»: открыть её (и закрыть тред, если он на её месте).
   $effect(() => {
     const pending = profileRequest.pending;
@@ -57,6 +60,10 @@
     panelOpen = true;
   });
   const roomId = $derived(router.route.name === 'room' ? router.route.roomId : null);
+  const Settings = $derived(settingsScreen.when(router.route.name === 'settings'));
+  const RoomPanel = $derived(roomPanel.when(panelOpen && roomId !== null));
+  const QuickSwitcher = $derived(quickSwitcher.when(switching));
+  const NewChatDialog = $derived(newChat.when(creating));
   /** Открытый тред — на месте «О чате»: справа на широком экране, листом поверх чата на узком. */
   const threadId = $derived(router.route.name === 'room' ? router.route.thread : undefined);
   function closeThread() {
@@ -315,7 +322,7 @@
             {/if}
           {/snippet}
         </Bar>
-        <Settings {session} section={router.route.section} />
+        {#if Settings}<Settings {session} section={router.route.section} />{/if}
       </div>
     {:else}
       <!-- Чат не выбран — не надпись-инструкция, а искра: видна, но ничего не просит. Для
@@ -346,7 +353,7 @@
           <IconButton label={t('room.infoClose')} onclick={() => (panelOpen = false)}><Icon name="close" /></IconButton>
         {/snippet}
       </Bar>
-      {#if roomId}
+      {#if roomId && RoomPanel}
         {#key roomId}
           <RoomPanel
             {session}
@@ -367,9 +374,9 @@
 
 <svelte:window {onkeydown} />
 
-<QuickSwitcher {session} open={switching} onclose={() => (switching = false)} />
+{#if QuickSwitcher}<QuickSwitcher {session} open={switching} onclose={() => (switching = false)} />{/if}
 <HotkeyHelp open={helping} onclose={() => (helping = false)} />
-<NewChatDialog open={creating} {session} onclose={() => (creating = false)} />
+{#if NewChatDialog}<NewChatDialog open={creating} {session} onclose={() => (creating = false)} />{/if}
 {#if link}
   <OpenLinkDialog open={askingLink} {session} target={link.target} via={link.via} onopen={closeLink} onclose={() => closeLink()} />
 {/if}

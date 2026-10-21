@@ -32,7 +32,7 @@ import {
 import { sendAttachment, uploadClientFor, type OutgoingFile, type UploadClient } from '../media/upload';
 import { stickerContent, type Sticker } from '../stickers/imagePack';
 import { geoUri, type Place } from './location';
-import { markdownContent } from './composerMarkdown';
+import type * as Markdown from './composerMarkdown';
 import { currentMarker, rememberMovedMarker } from './readMarker';
 import { canSendPoll, pollEndContent, pollStartContent, type PollDraft } from './poll';
 import { mentionsMarkdown, rankCandidates, unlinkMentions, type ComposerMention, type RankedCandidate } from './composerMentions';
@@ -570,7 +570,10 @@ export class TimelineStore {
     const trimmed = text.trim();
     if (!trimmed) return;
     this.typingStopped();
-    const { content: words, userIds } = textContent(trimmed, mentions);
+    withMarkdown((markdown) => this.sendText(textContent(markdown, trimmed, mentions), replyTo));
+  }
+
+  private sendText({ content: words, userIds }: ReturnType<typeof textContent>, replyTo: Message | undefined): void {
     const content: Record<string, unknown> = { msgtype: 'm.text', ...words };
     const relation = this.relationFor(replyTo);
     if (relation) content['m.relates_to'] = relation;
@@ -730,7 +733,10 @@ export class TimelineStore {
     const kind = message.kind;
     if (kind.type !== 'text' && kind.type !== 'emote' && kind.type !== 'notice') return;
     this.typingStopped();
-    const { content: words, userIds } = textContent(trimmed, mentions);
+    withMarkdown((markdown) => this.sendEdit(message, kind, textContent(markdown, trimmed, mentions)));
+  }
+
+  private sendEdit(message: Message, kind: { type: 'text' | 'emote' | 'notice'; body: string }, { content: words, userIds }: ReturnType<typeof textContent>): void {
     if (words.body === kind.body) return;
     const msgtype = kind.type === 'emote' ? 'm.emote' : kind.type === 'notice' ? 'm.notice' : 'm.text';
     const before = unlinkMentions(kind.body).mentions.map((m) => m.userId);
@@ -741,7 +747,7 @@ export class TimelineStore {
       ...(words.formatted_body ? { format: words.format, formatted_body: `* ${words.formatted_body}` } : {}),
       'm.new_content': { msgtype, ...words, ...(userIds.length ? { 'm.mentions': { user_ids: userIds } } : {}) },
       ...(fresh.length ? { 'm.mentions': { user_ids: fresh } } : {}),
-      'm.relates_to': { rel_type: 'm.replace', event_id: message.eventId },
+      'm.relates_to': { rel_type: 'm.replace', event_id: message.eventId! },
     };
     this.act('editFailed', () => this.client.sendMessage(this.roomId, content as never));
   }
@@ -903,6 +909,14 @@ export class TimelineStore {
       if (message.canEdit) return message;
     }
     return undefined;
+  }
+
+  /** Человек начал набирать — Markdown понадобится; загрузить, пока он пишет. Не загрузилось — `send` справится. */
+  prepareToSend(): Promise<void> {
+    return loadMarkdown().then(
+      () => {},
+      () => {},
+    );
   }
 
   // ————— «Печатает…» —————
@@ -1072,8 +1086,36 @@ function markRead(room: Room, ownUserId: string, messages: Message[]): void {
   }
 }
 
+/**
+ * Разбор Markdown (commonmark с таблицами сущностей HTML — пятая часть стартовой сборки) нужен
+ * только тому, кто пишет: грузится с первым набранным символом (`prepareToSend`).
+ */
+let markdownModule: typeof Markdown | undefined;
+let markdownLoading: Promise<typeof Markdown> | undefined;
+
+function loadMarkdown(): Promise<typeof Markdown> {
+  markdownLoading ??= import('./composerMarkdown').then(
+    (module) => (markdownModule = module),
+    (error: unknown) => {
+      markdownLoading = undefined;
+      throw error;
+    },
+  );
+  return markdownLoading;
+}
+
+/**
+ * Отправка, когда разбор уже на месте, — сразу; иначе ждёт его. Все ждут одно обещание,
+ * поэтому порядок сообщений сохраняется. Не загрузился (сеть пропала посреди обновления) —
+ * текст уходит как набран, без разметки: потерять сообщение хуже.
+ */
+function withMarkdown(then: (markdown: typeof Markdown | undefined) => void): void {
+  if (markdownModule) return then(markdownModule);
+  loadMarkdown().then(then, () => then(undefined));
+}
+
 /** Текст и упоминания — в содержимое события: Markdown с ссылками `matrix.to` и кого звать. */
-function textContent(text: string, mentions: ComposerMention[]) {
-  const { markdown, userIds } = mentionsMarkdown(text, mentions);
-  return { content: markdownContent(markdown), userIds };
+function textContent(markdown: typeof Markdown | undefined, text: string, mentions: ComposerMention[]) {
+  const linked = mentionsMarkdown(text, mentions);
+  return { content: markdown ? markdown.markdownContent(linked.markdown) : { body: text }, userIds: linked.userIds };
 }

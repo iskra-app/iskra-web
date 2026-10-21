@@ -6,7 +6,7 @@
  * приложение от этого не должно ломаться — только забыть настройку.
  */
 import { clampListWidth, LIST_IDEAL } from '../../design/columns';
-import { RECENT_LIMIT } from '../room/emojiCatalog';
+import { RECENT_LIMIT } from '../room/recentEmoji';
 import { defaultQuickReaction } from '../room/reactions';
 import { autoDownloads, compressions, type MediaAutoDownload, type MediaCompression } from '../media/mediaSettings';
 import { i18n, locales, preferredLocale, type Locale } from '../../i18n/index.svelte.ts';

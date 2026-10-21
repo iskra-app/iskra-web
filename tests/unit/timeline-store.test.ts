@@ -86,6 +86,8 @@ describe('TimelineStore на демо-сервере', () => {
   it('отправка: local echo сразу, потом — отправлено, с тем же ключом строки', async () => {
     const { client, server } = await started();
     store = new TimelineStore(client, demoRooms.weekend);
+    // Разбор Markdown грузится, пока человек набирает текст; дальше отправка — синхронно.
+    await store.prepareToSend();
     store.send('Беру мангал');
     store.rebuild();
     const echo = store.messages.at(-1)!;

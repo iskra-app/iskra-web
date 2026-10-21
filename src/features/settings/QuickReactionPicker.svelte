@@ -13,12 +13,14 @@
   import PlainButton from '../../design/PlainButton.svelte';
   import { t } from '../../i18n/index.svelte.ts';
   import { preferences } from '../app/preferences.svelte.ts';
-  import EmojiPanel from '../room/EmojiPanel.svelte';
+  import { Lazy } from '../../design/lazy.svelte.ts';
   import { quickReactions } from '../room/reactions';
 
   let { labelledby }: { labelledby: string } = $props();
 
   let picking = $state(false);
+  const emojiPanel = new Lazy(() => import('../room/EmojiPanel.svelte'));
+  const EmojiPanel = $derived(emojiPanel.when(picking));
   const nobody: ReadonlySet<string> = new Set();
   const choices = $derived(
     (quickReactions as readonly string[]).includes(preferences.quickReaction) ? [...quickReactions] : [...quickReactions, preferences.quickReaction],
@@ -42,7 +44,7 @@
 </div>
 
 <Dialog open={picking} title={t('reactions.more')} onclose={() => (picking = false)}>
-  <EmojiPanel mine={nobody} recent={preferences.recentEmoji} onpick={pick} />
+  {#if EmojiPanel}<EmojiPanel mine={nobody} recent={preferences.recentEmoji} onpick={pick} />{/if}
   <PlainButton onclick={() => (picking = false)}>{t('common.cancel')}</PlainButton>
 </Dialog>
 
