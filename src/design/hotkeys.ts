@@ -15,7 +15,7 @@ export interface Chord {
 }
 
 export type HotkeyId =
-  | 'quickSwitch'
+  | 'search'
   | 'previousChat'
   | 'nextChat'
   | 'previousUnread'
@@ -48,7 +48,7 @@ export interface Hotkey {
 }
 
 export const hotkeys: readonly Hotkey[] = [
-  { id: 'quickSwitch', chords: [{ key: 'k', primary: true }], inInput: true },
+  { id: 'search', chords: [{ key: 'k', primary: true }], inInput: true },
   { id: 'previousChat', chords: [{ key: 'ArrowUp', alt: true }], inInput: true },
   { id: 'nextChat', chords: [{ key: 'ArrowDown', alt: true }], inInput: true },
   { id: 'previousUnread', chords: [{ key: 'ArrowUp', alt: true, shift: true }], inInput: true },

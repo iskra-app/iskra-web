@@ -81,7 +81,7 @@
   dialog {
     width: min(calc(100% - 2 * var(--space-roomy)), var(--size-sign-in-column));
     padding: var(--space-generous);
-    border: none;
+    border: var(--border-hairline) solid var(--color-dialog-edge);
     border-radius: var(--radius-card);
     background: var(--color-background);
     color: var(--color-text);

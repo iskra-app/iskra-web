@@ -231,7 +231,7 @@ test('мышь: панель по наведению; справка по кла
   await page.getByRole('log').click();
   await page.keyboard.press('?');
   const help = page.getByRole('dialog', { name: 'Сочетания клавиш' });
-  await expect(help).toContainText('Быстрый переход к чату');
+  await expect(help).toContainText('Поиск по сообщениям');
   await expect(help).toContainText('изменить последнее своё');
   await page.keyboard.press('Escape');
   await expect(help).toBeHidden();

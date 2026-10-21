@@ -28,7 +28,7 @@
   import { showBadge } from './badge.svelte.ts';
   import RoomList from '../rooms/RoomList.svelte';
   import RoomFace from '../rooms/RoomFace.svelte';
-  import QuickSwitcher from '../rooms/QuickSwitcher.svelte';
+  import MessageSearchDialog from '../rooms/MessageSearchDialog.svelte';
   import { roomName } from '../rooms/text';
   import RoomView from '../room/RoomView.svelte';
   import HotkeyHelp from './HotkeyHelp.svelte';
@@ -42,7 +42,7 @@
 
   let { session }: { session: UserSession } = $props();
   let confirmingSignOut = $state(false);
-  let switching = $state(false);
+  let searching = $state(false);
   let helping = $state(false);
   let creating = $state(false);
   let roomView: RoomView | undefined = $state();
@@ -162,8 +162,8 @@
     const action = match(event);
     if (!action) return;
     switch (action) {
-      case 'quickSwitch':
-        switching = true;
+      case 'search':
+        searching = true;
         break;
       case 'previousChat':
         step(-1, false);
@@ -252,7 +252,7 @@
     <div class="list-column">
       <Bar title={status ?? t('roomList.title')}>
         {#snippet trailing()}
-          <IconButton label={t('quickSwitch.label')} shortcut={describeHotkey('quickSwitch')} onclick={() => (switching = true)}>
+          <IconButton label={t('roomList.searchPrompt')} shortcut={describeHotkey('search')} onclick={() => (searching = true)}>
             <Icon name="search" />
           </IconButton>
           <IconButton label={t('roomList.newConversation')} onclick={() => (creating = true)}>
@@ -367,7 +367,7 @@
 
 <svelte:window {onkeydown} />
 
-<QuickSwitcher {session} open={switching} onclose={() => (switching = false)} />
+<MessageSearchDialog {session} open={searching} onclose={() => (searching = false)} />
 <HotkeyHelp open={helping} onclose={() => (helping = false)} />
 <NewChatDialog open={creating} {session} onclose={() => (creating = false)} />
 {#if link}

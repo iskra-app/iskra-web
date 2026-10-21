@@ -3,8 +3,7 @@
   появляется, когда есть что стирать. Крестик маленький на вид, но нажимается целиком —
   в него тычут не глядя.
 
-  `Esc` в непустом поле стирает запрос, в пустом — уводит фокус: дальше `Esc` значит то же,
-  что и везде.
+  `Esc` в непустом поле стирает запрос, в пустом — не его дело: закрывает окно, в котором поле.
 -->
 <script lang="ts">
   import { ICON_VIEWBOX, icons } from '../../design/icons.ts';
@@ -19,11 +18,10 @@
 
   function onkeydown(event: KeyboardEvent) {
     if (event.key === 'Enter') input?.blur();
-    if (event.key !== 'Escape') return;
+    if (event.key !== 'Escape' || !value) return;
     event.stopPropagation();
     event.preventDefault();
-    if (value) value = '';
-    else input?.blur();
+    value = '';
   }
 </script>
 

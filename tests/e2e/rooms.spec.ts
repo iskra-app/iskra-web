@@ -58,17 +58,19 @@ test('приглашение: «Войти» — и это обычный чат
   await expect(page).toHaveTitle('(2) Iskra Web');
 });
 
-test('Ctrl/⌘ K — быстрый переход по названию', async ({ page }, info) => {
+test('Ctrl/⌘ K — поиск по сообщениям', async ({ page }, info) => {
   test.skip(isPhone(info.project.name), 'клавиатура — десктоп');
   await signInToDemo(page);
   await page.keyboard.press('ControlOrMeta+k');
-  const dialog = page.getByRole('dialog', { name: 'Перейти к чату' });
+  const dialog = page.getByRole('dialog', { name: 'Поиск по сообщениям' });
   await expect(dialog).toBeVisible();
-  await page.keyboard.type('дом');
-  await expect(dialog.getByRole('option')).toHaveCount(1);
-  await page.keyboard.press('Enter');
+  await page.keyboard.type('во сколько');
+  await expect(dialog.getByRole('button', { name: /Во сколько\?/ }).first()).toBeVisible();
+  // Первый `Esc` стирает запрос, второй закрывает окно.
+  await page.keyboard.press('Escape');
+  await expect(dialog.getByRole('searchbox')).toHaveValue('');
+  await page.keyboard.press('Escape');
   await expect(dialog).toBeHidden();
-  await expect(page.getByRole('heading', { name: 'Дом 14, подъезд 2', level: 1 })).toBeVisible();
 });
 
 test('Alt ↓ — следующий чат', async ({ page }, info) => {
