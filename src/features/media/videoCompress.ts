@@ -11,10 +11,15 @@
  * короткая, не отдаёт ни одного: перекодирование встаёт навсегда. Где так, — Baseline
  * (`avcCodecString`): проверка поведения, а не имени браузера.
  *
+ * Звук AAC (а с телефона он всегда такой) переносится как есть, какой бы ни был: рядом с видео
+ * он почти ничего не весит, а AAC-кодер браузера — самое ненадёжное звено. В Firefox его нет
+ * вовсе, а у WebKit под Linux (GStreamer) последний пакет приходит со временем меньше
+ * предыдущего, и mp4 не собирается. Перекодируется только другой звук (Opus из WebM).
+ *
  * Чего браузер не умеет, того и не делаем — видео уходит как было (только без метаданных, если
- * так велят настройки): `null` вместо результата. Так в Firefox, где у WebCodecs нет AAC, а звук
- * пришлось бы перекодировать: молча уронить звук хуже, чем не сжать. И так же — если кодер
- * всё-таки замолчал (`STALL_MS`): несжатое видео лучше вечного «Сжимается…».
+ * так велят настройки): `null` вместо результата. Так, если звук не AAC, а кодировать AAC нечем:
+ * молча уронить звук хуже, чем не сжать. И так же — если кодер всё-таки замолчал (`STALL_MS`):
+ * несжатое видео лучше вечного «Сжимается…».
  */
 import type { InputAudioTrack } from './mediabunny';
 import { videoPlan, type MediaCompression } from './mediaSettings';
@@ -30,8 +35,6 @@ const isMp4 = (type: string) => /^video\/(mp4|quicktime)$/.test(type);
 
 /** Пакетов на оценку битрейта и частоты кадров — без чтения всего файла. */
 const SAMPLE_PACKETS = 300;
-/** AAC до стольких раз тяжелее ступени переносится как есть: перекодировать звук ради копеек — терять его. */
-const AUDIO_SLACK = 1.25;
 /** Столько без единого кадра — кодер завис: сдаёмся и шлём несжатое. */
 const STALL_MS = 20_000;
 /** Сколько ждать первого кадра от кодера в проверке профиля. */
@@ -177,14 +180,11 @@ export async function compressVideo(
 }
 
 /**
- * Что делать со звуком: AAC не тяжелее ступени — перенести как есть (без потерь и без
- * кодировщика), иначе — перекодировать в AAC. `null` — перекодировать нечем.
+ * Что делать со звуком: AAC — перенести как есть (без потерь и без кодировщика), другой —
+ * перекодировать в AAC по ступени. `null` — перекодировать нечем.
  */
 async function audioPlan(mb: typeof import('./mediabunny'), audio: InputAudioTrack, bitrate: number | undefined): Promise<'copy' | { bitrate: number } | null> {
-  if ((await audio.getCodec()) === 'aac') {
-    const stats = await audio.computePacketStats(SAMPLE_PACKETS);
-    if (!bitrate || stats.averageBitrate <= bitrate * AUDIO_SLACK) return 'copy';
-  }
+  if ((await audio.getCodec()) === 'aac') return 'copy';
   const target = bitrate ?? 128_000;
   if (!(await audio.canDecode())) return null;
   const numberOfChannels = await audio.getNumberOfChannels();

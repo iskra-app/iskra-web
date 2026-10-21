@@ -226,14 +226,12 @@ test('видео уходит без метаданных; где браузер
   await page.getByRole('radiogroup', { name: 'Степень сжатия' }).getByRole('radio', { name: 'Сильное (540p)' }).click();
   await openRoom(page, /^Аня/);
   expect(PHONE_VIDEO.includes(EXIF_MARK)).toBe(true);
-  // Сжимает сам браузер: H.264 и AAC — не везде (Firefox без AAC, Linux-сборки без H.264).
+  // Сжимает сам браузер, и H.264 — не везде (сборки без него). Звук AAC переносится как есть.
   const compressible = await page.evaluate(async () => {
-    if (typeof VideoEncoder === 'undefined' || typeof AudioEncoder === 'undefined') return false;
+    if (typeof VideoEncoder === 'undefined' || typeof VideoDecoder === 'undefined') return false;
     const video = await VideoEncoder.isConfigSupported({ codec: 'avc1.42001f', width: 960, height: 540 }).catch(() => ({ supported: false }));
     const decode = await VideoDecoder.isConfigSupported({ codec: 'avc1.64002a' }).catch(() => ({ supported: false }));
-    // Звук ролика (AAC, 128 кбит/с) тяжелее «Сильного» — его перекодируют, и без AAC-кодера видео уходит как есть.
-    const sound = await AudioEncoder.isConfigSupported({ codec: 'mp4a.40.2', sampleRate: 48_000, numberOfChannels: 1, bitrate: 64_000 }).catch(() => ({ supported: false }));
-    return !!(video.supported && decode.supported && sound.supported);
+    return !!(video.supported && decode.supported);
   });
 
   await page.locator('input[type=file]').setInputFiles({ name: 'IMG_0002.MOV', mimeType: 'video/quicktime', buffer: PHONE_VIDEO });
