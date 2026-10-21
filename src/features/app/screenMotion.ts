@@ -5,6 +5,11 @@
  *
  * View Transitions — там, где браузер их знает; где нет и где просили меньше движения, экран
  * просто меняется, как раньше.
+ *
+ * Свайп от края в Safari на iPhone — «назад» самого браузера, со своей анимацией: страница уже
+ * уехала под пальцем. Наша поверх неё показала бы то же второй раз. Браузер говорит об этом
+ * `hasUAVisualTransition`; где не говорит (iOS до 18), узнаём шаг по истории, начатый касанием
+ * у края экрана.
  */
 import { flushSync } from 'svelte';
 import type { Route } from '../../core/navigation/route';
@@ -21,10 +26,23 @@ interface ViewTransitionLike {
 /** Глубина экрана: список — ноль, чат и настройки — над ним. Чужая ссылка — вопрос над списком. */
 const depth = (route: Route): number => (route.name === 'home' || route.name === 'open' ? 0 : 1);
 
+/** Ширина полосы у края, откуда Safari начинает свайп «назад» и «вперёд», px. */
+const EDGE_PX = 24;
+/** Сколько после касания у края шаг по истории ещё считается свайпом, мс: жест длится, пока палец ведёт. */
+const EDGE_SWIPE_MS = 1500;
+
 export function installScreenMotion(): () => void {
-  router.transition = (apply, from, to) => {
+  let edgeTouch = -Infinity;
+  const ontouchstart = (event: TouchEvent) => {
+    const x = event.touches[0]?.clientX;
+    if (x !== undefined && (x <= EDGE_PX || x >= window.innerWidth - EDGE_PX)) edgeTouch = event.timeStamp;
+  };
+  document.addEventListener('touchstart', ontouchstart, { passive: true, capture: true });
+
+  router.transition = (apply, from, to, how) => {
     const start = (document as Document & { startViewTransition?: (update: () => void) => ViewTransitionLike }).startViewTransition;
-    if (!start || viewport.layout !== 'stack' || reducedMotion() || depth(from) === depth(to)) {
+    const swiped = how.browserAnimated || (how.traversal && performance.now() - edgeTouch < EDGE_SWIPE_MS);
+    if (!start || swiped || viewport.layout !== 'stack' || reducedMotion() || depth(from) === depth(to)) {
       apply();
       return;
     }
@@ -38,5 +56,6 @@ export function installScreenMotion(): () => void {
   };
   return () => {
     router.transition = null;
+    document.removeEventListener('touchstart', ontouchstart, { capture: true });
   };
 }

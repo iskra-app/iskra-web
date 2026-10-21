@@ -24,6 +24,17 @@ function pendingOpen(): string | null {
   }
 }
 
+/** Как сменился маршрут — чтобы не анимировать то, что браузер уже показал сам. */
+export interface Navigation {
+  /** Шаг по истории, а не переход по ссылке или `go`. */
+  traversal: boolean;
+  /**
+   * Браузер уже нарисовал смену страницы сам — свайп «назад» в Safari на iPhone
+   * (`PopStateEvent.hasUAVisualTransition`). Своя анимация поверх неё — вторая.
+   */
+  browserAnimated: boolean;
+}
+
 /**
  * Своя маршрутизация на History API — без библиотечного роутера.
  *
@@ -37,7 +48,13 @@ class Router {
    * Как показать смену маршрута — анимацией экрана, например (`features/app/screenMotion.ts`).
    * Ядро не знает, какой ширины окно и как оно движется: только даёт сменить маршрут внутри.
    */
-  transition: ((apply: () => void, from: Route, to: Route) => void) | null = null;
+  transition: ((apply: () => void, from: Route, to: Route, how: Navigation) => void) | null = null;
+
+  /**
+   * Последний `popstate` — шаг по истории («назад», «вперёд», свайп). Приходит раньше
+   * `hashchange` того же шага; тот его и забирает.
+   */
+  private traversal: (Navigation & { hash: string }) | null = null;
 
   constructor() {
     if (typeof window === 'undefined') return;
@@ -51,13 +68,20 @@ class Router {
         this.route = parseRoute(pending);
       }
     }
+    window.addEventListener('popstate', (event: PopStateEvent & { hasUAVisualTransition?: boolean }) => {
+      // Шаг без смены адреса `hashchange` не даст — запомненное узнаётся по адресу.
+      this.traversal = { traversal: true, browserAnimated: event.hasUAVisualTransition === true, hash: window.location.hash };
+    });
     window.addEventListener('hashchange', () => {
       const from = this.route;
       const to = parseRoute(window.location.hash);
+      const step = this.traversal?.hash === window.location.hash ? this.traversal : null;
+      const how = { traversal: !!step, browserAnimated: step?.browserAnimated ?? false };
+      this.traversal = null;
       if (to.name === 'open') rememberOpen(window.location.hash);
       else if (from.name === 'open') rememberOpen(null);
       const apply = () => (this.route = to);
-      if (this.transition) this.transition(apply, from, to);
+      if (this.transition) this.transition(apply, from, to, how);
       else apply();
     });
   }
@@ -80,7 +104,7 @@ class Router {
     if (from.name === 'open') rememberOpen(null);
     const to = parseRoute(hash);
     const apply = () => (this.route = to);
-    if (this.transition) this.transition(apply, from, to);
+    if (this.transition) this.transition(apply, from, to, { traversal: false, browserAnimated: false });
     else apply();
   }
 }
