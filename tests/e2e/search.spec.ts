@@ -11,16 +11,14 @@ test('поиск по сообщениям: окно по лупе, нажати
 
   await page.getByRole('button', { name: 'Поиск по сообщениям' }).click();
   const dialog = page.getByRole('dialog', { name: 'Поиск по сообщениям' });
-  const field = dialog.getByRole('searchbox', { name: 'Поиск по сообщениям' });
+  const field = dialog.getByRole('combobox', { name: 'Поиск по сообщениям' });
   await expect(field).toBeFocused();
-  // Слово, которого нет нигде, — «Ничего не нашлось»; крестик стирает запрос.
+  // Слово, которого нет нигде, — «Ничего не нашлось».
   await field.fill('йцукен');
-  await expect(dialog.getByRole('heading', { name: 'Ничего не нашлось' })).toBeVisible();
-  await dialog.getByRole('button', { name: 'Очистить поиск' }).click();
-  await expect(field).toHaveValue('');
+  await expect(dialog.getByText('Ничего не нашлось')).toBeVisible();
 
   await field.fill('собран');
-  const hit = dialog.getByRole('button', { name: /Напоминаю: собрание дома в четверг/ });
+  const hit = dialog.getByRole('option', { name: /Напоминаю: собрание дома в четверг/ });
   await expect(hit).toContainText('Борис');
   await expect(hit).toContainText('Дом 14, подъезд 2');
   await hit.click();

@@ -65,10 +65,10 @@ test('Ctrl/⌘ K — поиск по сообщениям', async ({ page }, inf
   const dialog = page.getByRole('dialog', { name: 'Поиск по сообщениям' });
   await expect(dialog).toBeVisible();
   await page.keyboard.type('во сколько');
-  await expect(dialog.getByRole('button', { name: /Во сколько\?/ }).first()).toBeVisible();
+  await expect(dialog.getByRole('option', { name: /Во сколько\?/ }).first()).toBeVisible();
   // Первый `Esc` стирает запрос, второй закрывает окно.
   await page.keyboard.press('Escape');
-  await expect(dialog.getByRole('searchbox')).toHaveValue('');
+  await expect(dialog.getByRole('combobox')).toHaveValue('');
   await page.keyboard.press('Escape');
   await expect(dialog).toBeHidden();
 });
