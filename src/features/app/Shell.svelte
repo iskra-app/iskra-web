@@ -322,7 +322,7 @@
            скринридера — те же слова, что были на экране. -->
       <div class="watermark">
         <span class="visually-hidden">{t('room.noRoomSelectedTitle')}</span>
-        <span class="spark"><SparkGlyph /></span>
+        <span class="spark"><SparkGlyph blinks /></span>
       </div>
     {/if}
   {/snippet}
