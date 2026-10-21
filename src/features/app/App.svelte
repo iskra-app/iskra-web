@@ -11,6 +11,8 @@
   import { preferences } from './preferences.svelte.ts';
   import { wallpaperPhoto } from './wallpaperPhoto.svelte.ts';
   import { installScreenMotion } from './screenMotion';
+  import { parseRoute } from '../../core/navigation/route';
+  import { router } from '../../core/navigation/router.svelte.ts';
 
   let { authCallback }: { authCallback: AuthCallback | null } = $props();
 
@@ -44,9 +46,17 @@
     document.addEventListener('visibilitychange', stop);
   }
 
+  /** Чужая ссылка, открытая в другой вкладке, — здесь: вопрос (или чат) и просьба на неё взглянуть. */
+  function openPassedLink(hash: string) {
+    const route = parseRoute(hash);
+    if (route.name !== 'open') return;
+    router.go(route);
+    answerPing();
+  }
+
   onMount(() => {
     // Возврат со страницы входа читается один раз.
-    void app.boot(authCallback, { onFocusRequested: answerPing });
+    void app.boot(authCallback, { onFocusRequested: answerPing, onLinkPassed: openPassedLink });
     const stopMotion = installScreenMotion();
     const stopPersisting = preferences.persist();
     return () => {

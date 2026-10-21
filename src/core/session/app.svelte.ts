@@ -37,6 +37,8 @@ export type Phase =
 export interface AppHooks {
   /** Другая вкладка просит показаться: окно может не дать себя сфокусировать — тогда мигнуть. */
   onFocusRequested?: () => void;
+  /** Другая вкладка получила чужую ссылку (`#/open/…`), а сессия здесь. */
+  onLinkPassed?: (hash: string) => void;
 }
 
 export class AppState {
@@ -113,6 +115,7 @@ export class AppState {
   private lockCallbacks() {
     return {
       onFocusRequested: () => this.hooks.onFocusRequested?.(),
+      onLinkPassed: (hash: string) => this.hooks.onLinkPassed?.(hash),
       onTakenOver: async () => {
         if (this.phase.name === 'signed-in') {
           const userId = this.phase.session.userId;
@@ -208,6 +211,11 @@ export class AppState {
   /** «Перейти туда». */
   focusOther(): void {
     if (this.phase.name === 'elsewhere') SessionLock.requestFocus(this.phase.userId);
+  }
+
+  /** Ссылка пришла сюда, а сессия в другой вкладке: пусть откроется там. */
+  passLink(hash: string): void {
+    if (this.phase.name === 'elsewhere') SessionLock.passLink(this.phase.userId, hash);
   }
 
   /** «Открыть здесь»: та вкладка останавливается и показывает тот же экран у себя. */

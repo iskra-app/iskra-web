@@ -38,6 +38,12 @@ export interface OutgoingFile {
    * с именем `sticker.<ext>`: `m.sticker` отдал бы картинку серверу открытой.
    */
   sticker?: { body: string };
+  /**
+   * Работа, отложенная до отправки, — сжатие видео: долгая, и лоток не должен её ждать.
+   * Отдаёт файл, который и уходит (уже без `prepare`); не вышло — исходный, а не ошибку.
+   * Бросает только отмену.
+   */
+  prepare?: (signal: AbortSignal, onProgress: (fraction: number) => void) => Promise<OutgoingFile>;
 }
 
 /** Волна в событии — целые 0…1024, как шлёт нативная Искра (`TimelineMapper.waveformScale`). */

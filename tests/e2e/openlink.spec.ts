@@ -40,3 +40,18 @@ test('ссылка до входа ждёт входа, даже если вхо
   await expect(page.getByRole('dialog')).toHaveCount(0);
   expect(new URL(page.url()).hash).toBe('#/');
 });
+
+test('ссылка во второй вкладке открывается в той, где сессия; «Открыть здесь» её не теряет', async ({ page, context }) => {
+  await signInToDemo(page);
+
+  const second = await context.newPage();
+  await openApp(second, `/#/open/${encodeURIComponent(lena)}`);
+  await expect(second.getByRole('heading', { name: 'Iskra уже открыта в другом окне' })).toBeVisible({ timeout: 20_000 });
+  await expect(second.getByText('Ссылка открылась в том окне — перейдите туда.')).toBeVisible();
+  // Там, где сессия, — тот же вопрос, что и от ссылки в этой вкладке.
+  await expect(page.getByRole('dialog').getByRole('heading', { name: 'Написать Лена?' })).toBeVisible({ timeout: 10_000 });
+  await page.getByRole('dialog').getByRole('button', { name: 'Отмена' }).click();
+
+  await second.getByRole('button', { name: 'Открыть здесь' }).click();
+  await expect(second.getByRole('dialog').getByRole('heading', { name: 'Написать Лена?' })).toBeVisible({ timeout: 20_000 });
+});

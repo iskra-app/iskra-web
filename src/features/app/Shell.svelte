@@ -46,6 +46,16 @@
   let roomTimeline: TimelineStore | undefined = $state();
 
   let panelOpen = $state(false);
+  // Узкий экран: «О чате» — лист поверх чата, а не колонка рядом, и уходит вместе с чатом. Иначе
+  // ушли системным «назад» или свайпом, минуя `closeRoom`, — и следующий чат открылся бы листом.
+  // Раньше страницы человека ниже: та открывает панель уже в новом чате.
+  let panelRoom: string | null = null;
+  $effect(() => {
+    const current = roomId;
+    if (current === panelRoom) return;
+    panelRoom = current;
+    if (untrack(() => viewport.layout) !== 'three') panelOpen = false;
+  });
 
   // Не каждому и не сразу — своими чанками, при первом показе (`design/lazy.svelte.ts`).
   const settingsScreen = new Lazy(() => import('../settings/Settings.svelte'));
@@ -215,6 +225,12 @@
     event.preventDefault();
   }
 
+  /** ⓘ, лицо чата и имя в шапке: «О чате» — открыть (вместо треда) или закрыть. */
+  function toggleInfo() {
+    if (threadId) closeThread();
+    panelOpen = threadId ? true : !panelOpen;
+  }
+
   function closeRoom() {
     panelOpen = false;
     router.go({ name: 'home' });
@@ -236,13 +252,13 @@
 </script>
 
 <!--
-  Лицо чата в шапке — рядом с именем, на любой ширине. Нажимается и оно (к «О чате»), но
-  кнопка для этого одна — ⓘ справа: лицо скринридеру не показываем, чтобы «О чате» не было
-  двумя одинаковыми кнопками подряд, и в Tab его нет.
+  Лицо чата в шапке — рядом с именем, на любой ширине. Нажимаются и оно, и имя с подписью (к
+  «О чате»), но кнопка для этого одна — ⓘ справа: лицо и имя скринридеру не показываем, чтобы
+  «О чате» не было тремя одинаковыми кнопками подряд, и в Tab их нет.
 -->
 {#snippet face()}
   {#if room}
-    <button type="button" class="room-face" aria-hidden="true" tabindex="-1" onclick={() => (panelOpen = !panelOpen)}>
+    <button type="button" class="room-face" aria-hidden="true" tabindex="-1" onclick={toggleInfo}>
       <RoomFace {room} {session} />
     </button>
   {/if}
@@ -280,7 +296,7 @@
   {#snippet main()}
     {#if roomId}
       <div class="main-column">
-      <Bar {title} {subtitle}>
+      <Bar {title} {subtitle} ontitle={toggleInfo}>
         {#snippet leading()}
           {#if viewport.layout === 'stack'}
             <IconButton label={t('room.back')} onclick={closeRoom}><Icon name="back" /></IconButton>
@@ -288,14 +304,7 @@
           {@render face()}
         {/snippet}
         {#snippet trailing()}
-          <IconButton
-            label={t('room.info')}
-            pressed={panelOpen && !threadId}
-            onclick={() => {
-              if (threadId) closeThread();
-              panelOpen = threadId ? true : !panelOpen;
-            }}
-          >
+          <IconButton label={t('room.info')} pressed={panelOpen && !threadId} onclick={toggleInfo}>
             <Icon name="info" />
           </IconButton>
         {/snippet}
