@@ -90,17 +90,28 @@ export class AppState {
     await this.finishSignIn(account);
   }
 
+  /**
+   * Новый вход — это новое устройство: прежние базы этого человека (от прошлого входа, от
+   * выхода, который не дочистил) ему не годятся, а с новым ключом криптохранилища и не
+   * откроются — и стираются. Но сначала лок: открыт этот аккаунт в другой вкладке — её базы и
+   * её запись не трогаем.
+   */
   private async finishSignIn(fresh: NewAccount): Promise<void> {
     this.recoveryStep = true;
-    // Демо стирается при каждом новом входе: своя база, ни следа прошлого запуска.
-    if (fresh.method === 'demo') await wipeUserData(fresh.userId).catch(() => {});
+    this.lock = await SessionLock.acquire(fresh.userId, this.lockCallbacks());
+    if (!this.lock) {
+      this.phase = { name: 'elsewhere', userId: fresh.userId };
+      return;
+    }
+    await wipeUserData(fresh.userId).catch(() => {});
     let account: Account;
     try {
       ({ account } = await vault.add(fresh));
     } catch (error) {
+      this.releaseLock();
       throw new SignInError('storageUnavailable', { cause: error });
     }
-    await this.open(account);
+    await this.startSession(account);
   }
 
   private async open(account: Account): Promise<void> {
