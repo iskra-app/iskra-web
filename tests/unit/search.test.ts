@@ -51,6 +51,10 @@ describe('индекс на устройстве', () => {
     expect(await index.search('четверг')).toEqual([]);
     expect((await index.search('перенес'))[0]).toMatchObject({ sender: '@v', text: 'Перенесли' });
     expect(await index.size()).toBeGreaterThan(0);
+    // Ушли из чата — всё его, и только его.
+    await index.removeRoom('!a');
+    expect(await index.search('перенес')).toEqual([]);
+    expect((await index.search('собр')).map((e) => e.eventId)).toEqual(['$2']);
     index.close();
   });
 
@@ -140,6 +144,26 @@ describe('индекс сообщений на демо-сервере', () => {
 
     await client.redactEvent(demoRooms.quiet, event_id);
     await until(async () => (await indexer.search('шлагб')).length === 0);
+  });
+
+  it('удалённое, которого нет в загруженной ленте, — тоже не находится', async () => {
+    const { client, indexer } = await started();
+    const { event_id } = await client.sendTextMessage(demoRooms.quiet, 'Код от подъезда 4512');
+    await until(async () => (await indexer.search('подъезда')).length === 1);
+    // Лента сброшена — как после долгого перерыва: самого сообщения в памяти больше нет.
+    client.getRoom(demoRooms.quiet)!.resetLiveTimeline(null, null);
+    expect(client.getRoom(demoRooms.quiet)!.findEventById(event_id)).toBeUndefined();
+    await client.redactEvent(demoRooms.quiet, event_id);
+    await until(async () => (await indexer.search('подъезда')).length === 0);
+  });
+
+  it('ушли из чата — его переписка больше не находится, чужая — на месте', async () => {
+    const { client, indexer } = await started();
+    expect((await indexer.search('собрание', demoRooms.quiet)).length).toBeGreaterThan(0);
+    const elsewhere = (await indexer.search('собрание')).filter((e) => e.roomId !== demoRooms.quiet).length;
+    await client.leave(demoRooms.quiet);
+    await until(async () => (await indexer.search('собрание', demoRooms.quiet)).length === 0);
+    expect((await indexer.search('собрание')).filter((e) => e.roomId !== demoRooms.quiet).length).toBe(elsewhere);
   });
 
   it('поиск, как его видит человек: две буквы, пауза, «ничего не нашлось»', async () => {

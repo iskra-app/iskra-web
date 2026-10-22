@@ -153,6 +153,16 @@ export class SearchIndex {
     await done(tx);
   }
 
+  /** Всё из комнаты — по её отпечатку: из неё ушли. */
+  async removeRoom(roomId: string): Promise<void> {
+    const term = await this.roomTerm(roomId);
+    const tx = this.db.transaction(DOCS, 'readwrite');
+    const store = tx.objectStore(DOCS);
+    const keys = await request(store.index('terms').getAllKeys(term) as IDBRequest<string[]>);
+    for (const id of keys) store.delete(id);
+    await done(tx);
+  }
+
   /**
    * Найти: все слова запроса, свежие первыми, не больше `limit`. Расшифровывается только
    * найденное, и только пока не набралось `limit`.
