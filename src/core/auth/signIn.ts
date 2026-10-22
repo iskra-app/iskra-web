@@ -26,7 +26,7 @@ const PENDING_KEY = 'iskra.signIn.pending';
 const CLIENTS_KEY = 'iskra.oauth.clients';
 
 type Pending =
-  | { kind: 'sso'; baseUrl: string }
+  | { kind: 'sso'; baseUrl: string; deviceId?: string }
   | {
       kind: 'oauth';
       baseUrl: string;
@@ -85,7 +85,12 @@ function randomToken(bytes = 16): string {
 
 // ————— Пароль —————
 
-export async function signInWithPassword(server: ServerInfo, username: string, password: string): Promise<NewAccount> {
+/**
+ * `deviceId` — войти снова в то же устройство после мягкого выхода (`Resume`): сервер его
+ * оставил, и ключи на нём годятся. OAuth его не получает: там выход — это отказ в обновлении
+ * токена, то есть сеанс завершён, и устройства на сервере может уже не быть.
+ */
+export async function signInWithPassword(server: ServerInfo, username: string, password: string, deviceId?: string): Promise<NewAccount> {
   const client = createClient({ baseUrl: server.baseUrl, fetchFn: fetchFor(server.demo), logger: quietLogger() });
   const user = username.trim().replace(/^@/, '');
   try {
@@ -93,7 +98,7 @@ export async function signInWithPassword(server: ServerInfo, username: string, p
       type: 'm.login.password',
       identifier: user.includes(':') ? { type: 'm.id.user', user: `@${user}` } : { type: 'm.id.user', user },
       password,
-      initial_device_display_name: deviceDisplayName(),
+      ...(deviceId ? { device_id: deviceId } : { initial_device_display_name: deviceDisplayName() }),
     });
     return {
       userId: login.user_id,
@@ -124,9 +129,9 @@ function homeserverFrom(raw: unknown): string | undefined {
 // ————— Legacy SSO —————
 
 /** Адрес, куда увести страницу. Сам уход — `location.assign` у вызывающего. */
-export function startSso(server: ServerInfo): string {
+export function startSso(server: ServerInfo, deviceId?: string): string {
   const client = createClient({ baseUrl: server.baseUrl, logger: quietLogger() });
-  savePending({ kind: 'sso', baseUrl: server.baseUrl });
+  savePending({ kind: 'sso', baseUrl: server.baseUrl, ...(deviceId ? { deviceId } : {}) });
   return client.getSsoLoginUrl(redirectUri(), 'sso');
 }
 
@@ -204,7 +209,7 @@ export async function completeSignIn(callback: AuthCallback): Promise<NewAccount
       const login = await client.loginRequest({
         type: 'm.login.token',
         token: callback.loginToken,
-        initial_device_display_name: deviceDisplayName(),
+        ...(pending.deviceId ? { device_id: pending.deviceId } : { initial_device_display_name: deviceDisplayName() }),
       });
       return {
         userId: login.user_id,

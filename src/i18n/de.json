@@ -762,6 +762,7 @@
   "servers.title": "Server wählen",
   "session.ended.message": "Ihr Server nimmt diese Sitzung nicht mehr an. Wahrscheinlich haben Sie sie auf einem anderen Gerät beendet. Melden Sie sich wieder an – keine Ihrer Unterhaltungen ist verloren.",
   "session.ended.title": "Sie sind nicht mehr angemeldet",
+  "session.signInAgain.message": "Ihr Server bittet Sie, sich erneut anzumelden. Melden Sie sich als {user} an – dann bleiben die Unterhaltungen und Schlüssel auf diesem Gerät erhalten. Wenn Sie sich bei einem anderen Konto anmelden, wird alles entfernt, was {user} hier hinterlassen hat.",
   "session.offlineMessage": "Ihre Unterhaltungen sind da, auf diesem Gerät. Wir erreichen nur gerade den Server nicht – prüfen Sie Ihr Netz.",
   "session.offlineTitle": "Keine Verbindung",
   "session.tryAgain": "Erneut versuchen",

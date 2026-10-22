@@ -753,6 +753,7 @@
   "servers.title": "选择服务器",
   "session.ended.message": "服务器不再接受这个会话。很可能是您在另一台设备上结束了它。请重新登录——您的对话一条都没少。",
   "session.ended.title": "您已不再登录",
+  "session.signInAgain.message": "服务器要求您重新登录。以 {user} 登录，这台设备上的对话和密钥都会保留。如果登录其他账号，{user} 留在这里的一切都会被删除。",
   "session.offlineMessage": "您的对话都在，就在这台设备上。我们只是暂时连不上服务器——请检查网络。",
   "session.offlineTitle": "无连接",
   "session.tryAgain": "重试",

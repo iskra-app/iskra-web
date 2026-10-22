@@ -762,6 +762,7 @@
   "servers.title": "Choose a server",
   "session.ended.message": "Your server has stopped accepting this session. You most likely ended it from another device. Sign in again — none of your conversations have gone anywhere.",
   "session.ended.title": "You are no longer signed in",
+  "session.signInAgain.message": "Your server has asked you to sign in again. Sign in as {user} and the conversations and keys on this device stay where they are. If you sign in to a different account, everything {user} left here will be removed.",
   "session.offlineMessage": "Your conversations are here, on this device. We just can’t reach the server right now — check your network.",
   "session.offlineTitle": "No connection",
   "session.tryAgain": "Try again",

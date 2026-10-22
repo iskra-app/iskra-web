@@ -764,6 +764,7 @@
   "servers.title": "Choisir un serveur",
   "session.ended.message": "Votre serveur n’accepte plus cette session. Vous l’avez sans doute fermée depuis un autre appareil. Reconnectez-vous : vos conversations n’ont pas bougé.",
   "session.ended.title": "Vous n’êtes plus connecté",
+  "session.signInAgain.message": "Votre serveur vous demande de vous reconnecter. Connectez-vous en tant que {user} : les conversations et les clés de cet appareil restent en place. Si vous vous connectez à un autre compte, tout ce que {user} a laissé ici sera supprimé.",
   "session.offlineMessage": "Vos conversations sont là, sur cet appareil. Nous n’arrivons simplement pas à joindre le serveur pour l’instant : vérifiez votre réseau.",
   "session.offlineTitle": "Pas de connexion",
   "session.tryAgain": "Réessayer",

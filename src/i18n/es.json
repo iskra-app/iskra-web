@@ -764,6 +764,7 @@
   "servers.title": "Elegir servidor",
   "session.ended.message": "Su servidor ya no acepta esta sesión. Lo más probable es que la cerrara desde otro dispositivo. Vuelva a iniciar sesión: sus conversaciones siguen ahí.",
   "session.ended.title": "Ya no tiene la sesión iniciada",
+  "session.signInAgain.message": "Su servidor le pide que vuelva a iniciar sesión. Inicie sesión como {user} y las conversaciones y claves de este dispositivo seguirán en su sitio. Si inicia sesión con otra cuenta, se eliminará todo lo que {user} dejó aquí.",
   "session.offlineMessage": "Sus conversaciones están aquí, en este dispositivo. Solo que ahora no podemos conectar con el servidor: compruebe su red.",
   "session.offlineTitle": "Sin conexión",
   "session.tryAgain": "Reintentar",

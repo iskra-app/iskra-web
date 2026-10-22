@@ -18,6 +18,7 @@ import {
   SyncState,
   TokenRefresher,
   type MatrixClient,
+  type MatrixError,
   type ValidatedAuthMetadata,
 } from 'matrix-js-sdk';
 import { AllDevicesIsolationMode } from 'matrix-js-sdk/lib/crypto-api';
@@ -54,8 +55,11 @@ export type Connection = 'connecting' | 'online' | 'offline';
 export interface SessionEvents {
   /** Токены обновились — их надо сохранить, иначе после перезагрузки вход пропадёт. */
   onTokensRefreshed: (tokens: { accessToken: string; refreshToken?: string }) => Promise<void>;
-  /** Сервер перестал принимать сеанс: его завершили с другого устройства. */
-  onLoggedOut: () => void;
+  /**
+   * Сервер перестал принимать сеанс. `soft` — он просит войти снова, а устройство оставил
+   * (`soft_logout`): ключи и переписка на нём ещё годятся, и стирать их нельзя.
+   */
+  onLoggedOut: (soft: boolean) => void;
 }
 
 export interface SessionOptions {
@@ -575,9 +579,11 @@ export class UserSession {
     this.client.on(ClientEvent.Sync, onSync);
     this.detach.push(() => this.client.off(ClientEvent.Sync, onSync));
 
-    const onLoggedOut = () => {
+    const onLoggedOut = (error: MatrixError) => {
       if (this.stopped) return;
-      events.onLoggedOut();
+      // С refresh-токеном SDK сначала пробует обновиться, и выход — это отказ в обновлении:
+      // сеанс завершён, а `soft_logout` в ответе — про прежний, просто истёкший токен.
+      events.onLoggedOut(error?.data?.['soft_logout'] === true && !this.client.getRefreshToken());
     };
     this.client.on(HttpApiEvent.SessionLoggedOut, onLoggedOut);
     this.detach.push(() => this.client.off(HttpApiEvent.SessionLoggedOut, onLoggedOut));

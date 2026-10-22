@@ -44,6 +44,12 @@ export interface Account {
   method: SignInMethod;
   oauth?: OAuthGrant;
   signedInAt: number;
+  /**
+   * Сервер попросил войти снова (`soft_logout`): токены мертвы, а устройство, его ключи и
+   * переписка на нём — нет. Сеанс не поднимается, пока человек не войдёт с тем же устройством
+   * (`resume`).
+   */
+  signedOutSoftly?: boolean;
 }
 
 /** Черновик или локальное имя: запись по чату, под ключом аккаунта. */
@@ -121,6 +127,12 @@ export const vault = {
     return { account: publicPart(stored), secrets };
   },
 
+  /** Все, кто есть на этом устройстве, — от последнего вошедшего. */
+  async all(): Promise<Account[]> {
+    const all = await withDb((db) => transact(db, ACCOUNTS, 'readonly', (s) => s.getAll() as IDBRequest<StoredAccount[]>));
+    return all.sort((a, b) => b.signedInAt - a.signedInAt).map(publicPart);
+  },
+
   /** Последний вошедший. Несколько аккаунтов — позже; пока одна вкладка — один аккаунт. */
   async current(): Promise<Account | undefined> {
     const all = await withDb((db) => transact(db, ACCOUNTS, 'readonly', (s) => s.getAll() as IDBRequest<StoredAccount[]>));
@@ -147,6 +159,35 @@ export const vault = {
     await withDb((db) =>
       update<StoredAccount>(db, ACCOUNTS, userId, (stored) => stored && { ...stored, knownDevices: [...known].sort() }),
     );
+  },
+
+  /** Сервер попросил войти снова: запись и ключи остаются, сеанс — нет. */
+  async markSignedOutSoftly(userId: string): Promise<void> {
+    await withDb((db) => update<StoredAccount>(db, ACCOUNTS, userId, (stored) => stored && { ...stored, signedOutSoftly: true }));
+  },
+
+  /**
+   * Вход снова в то же устройство после мягкого выхода: новые токены — в прежнюю запись, ключ
+   * криптохранилища — прежний, иначе Rust-крипто не откроет свою базу. Записи нет или это
+   * другое устройство — `undefined`, и вход идёт как новый.
+   */
+  async resume(fresh: NewAccount): Promise<{ account: Account; secrets: AccountSecrets } | undefined> {
+    return withDb(async (db) => {
+      const stored = await transact(db, ACCOUNTS, 'readonly', (s) => s.get(fresh.userId) as IDBRequest<StoredAccount | undefined>);
+      if (!stored?.signedOutSoftly || stored.deviceId !== fresh.deviceId) return undefined;
+      const { accessToken, refreshToken, ...rest } = fresh;
+      const old = await unseal<AccountSecrets>(stored.key, stored.sealed);
+      const secrets: AccountSecrets = { accessToken, ...(refreshToken ? { refreshToken } : {}), cryptoStorageKey: old.cryptoStorageKey };
+      const sealed = await seal(stored.key, secrets);
+      const { signedOutSoftly: _soft, oauth: _oauth, ...kept } = stored;
+      const next: StoredAccount = { ...kept, ...rest, signedInAt: Date.now(), sealed };
+      let written = false;
+      await update<StoredAccount>(db, ACCOUNTS, fresh.userId, (current) => {
+        written = current?.signedInAt === stored.signedInAt;
+        return written ? next : undefined;
+      });
+      return written ? { account: publicPart(next), secrets } : undefined;
+    });
   },
 
   /** Новые токены после обновления — под тем же ключом. */

@@ -50,6 +50,45 @@ describe('сессия против демо-сервера', () => {
   }, 30_000);
 });
 
+describe('сервер просит войти снова', () => {
+  it('мягкий выход ничего не стирает; вход тем же устройством — те же базы и ключи', async () => {
+    const server = await discoverServer('demo.iskra.invalid');
+    const fresh = await signInWithPassword(server, 'alice', 'password');
+    const { account, secrets } = await vault.add(fresh);
+    let soft: boolean | undefined;
+    session = await UserSession.start(account, secrets, { ...noop, onLoggedOut: (value) => (soft = value) });
+    await waitFor(() => session!.ready);
+
+    demoServer().askToSignInAgain();
+    session.retry();
+    await waitFor(() => soft !== undefined);
+    expect(soft).toBe(true);
+    session.stop();
+    await vault.markSignedOutSoftly(account.userId);
+    const mine = (await databases()).filter((n) => n.includes(account.userId));
+    expect(mine.some((n) => n.includes('matrix-sdk-crypto'))).toBe(true);
+    expect((await vault.current())?.signedOutSoftly).toBe(true);
+
+    // Вход снова — с тем же устройством: сервер его продолжает, запись — та же, ключ хранилища — тот же.
+    const again = await signInWithPassword(server, 'alice', 'password', account.deviceId);
+    expect(again.deviceId).toBe(account.deviceId);
+    const resumed = await vault.resume(again);
+    expect(resumed?.secrets.cryptoStorageKey).toBe(secrets.cryptoStorageKey);
+    expect(resumed?.account.signedOutSoftly).toBeUndefined();
+    session = await UserSession.start(resumed!.account, resumed!.secrets, noop);
+    await waitFor(() => session!.ready);
+    expect(session.connection).toBe('online');
+    expect(demoServer().unknown).toEqual([]);
+  }, 30_000);
+
+  it('другое устройство — не продолжение', async () => {
+    const server = await discoverServer('demo.iskra.invalid');
+    const { account } = await vault.add(await signInWithPassword(server, 'alice', 'password'));
+    await vault.markSignedOutSoftly(account.userId);
+    expect(await vault.resume(await signInWithPassword(server, 'alice', 'password'))).toBeUndefined();
+  });
+});
+
 describe('обновление токена', () => {
   const refresherFailingWith = (status: number) => {
     const oauth = {
