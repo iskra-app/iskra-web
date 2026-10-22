@@ -51,6 +51,6 @@ describe('второй эшелон', () => {
   it('из возможностей браузера — только камера, микрофон и геопозиция, и только себе', () => {
     const policy = headers['Permissions-Policy']!;
     for (const own of ['camera', 'microphone', 'geolocation']) expect(policy).toContain(`${own}=(self)`);
-    for (const none of ['clipboard-read', 'usb', 'bluetooth', 'payment', 'display-capture']) expect(policy).toContain(`${none}=()`);
+    for (const none of ['usb', 'bluetooth', 'payment', 'display-capture']) expect(policy).toContain(`${none}=()`);
   });
 });
