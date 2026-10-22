@@ -48,3 +48,15 @@ describe('Markdown в композере — как в мессенджерах'
     expect(firstLineOf('**a**\nb', '<p><strong>a</strong><br />b</p>')).toBe('a');
   });
 });
+
+describe('ссылки в разметке', () => {
+  it('javascript: и data: уходят без адреса, https — как есть', () => {
+    expect(markdownContent('[x](javascript:alert(1))').formatted_body).not.toContain('javascript');
+    expect(markdownContent('[x](data:text/html,hi)').formatted_body).not.toContain('data:');
+    expect(markdownContent('[x](https://example.org)').formatted_body).toContain('href="https://example.org"');
+  });
+
+  it('набранный тег по-прежнему уходит текстом', () => {
+    expect(markdownContent('**a** <b>x</b>').formatted_body).toContain('&lt;b&gt;x&lt;/b&gt;');
+  });
+});
