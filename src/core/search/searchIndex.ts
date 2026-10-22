@@ -153,6 +153,21 @@ export class SearchIndex {
     await done(tx);
   }
 
+  /**
+   * Удаление, пришедшее событием: стереть, только если запись из того же чата и удаляет её
+   * автор — или тот, кому в чате можно удалять чужое (`byModerator`). Иначе любой участник
+   * одного чата стирал бы из поиска сообщения другого, назвав их ID.
+   */
+  async removeRedacted(eventId: string, roomId: string, redactor: string, byModerator: boolean): Promise<void> {
+    const doc = await request(this.db.transaction(DOCS).objectStore(DOCS).get(eventId) as IDBRequest<StoredDoc | undefined>);
+    if (!doc || doc.roomId !== roomId) return;
+    if (!byModerator) {
+      const open = await unseal<{ sender: string }>(this.keys.seal, doc.sealed).catch(() => undefined);
+      if (open?.sender !== redactor) return;
+    }
+    await this.remove([eventId]);
+  }
+
   /** Всё из комнаты — по её отпечатку: из неё ушли. */
   async removeRoom(roomId: string): Promise<void> {
     const term = await this.roomTerm(roomId);

@@ -51,6 +51,17 @@ describe('индекс на устройстве', () => {
     expect(await index.search('четверг')).toEqual([]);
     expect((await index.search('перенес'))[0]).toMatchObject({ sender: '@v', text: 'Перенесли' });
     expect(await index.size()).toBeGreaterThan(0);
+    // Удаление событием — только своё и только в своём чате: ID из другого чата или чужое
+    // сообщение без права модератора не стирают.
+    await index.removeRedacted('$2', '!a', '@b', false);
+    await index.removeRedacted('$2', '!b', '@v', false);
+    expect((await index.search('жильцов')).map((e) => e.eventId)).toEqual(['$2']);
+    await index.removeRedacted('$2', '!b', '@b', false);
+    expect(await index.search('жильцов')).toEqual([]);
+    await index.put([{ eventId: '$2', roomId: '!b', ts: 2, sender: '@b', text: 'Собрание жильцов' }]);
+    await index.removeRedacted('$2', '!b', '@moderator', true);
+    expect(await index.search('жильцов')).toEqual([]);
+    await index.put([{ eventId: '$2', roomId: '!b', ts: 2, sender: '@b', text: 'Собрание жильцов' }]);
     // Ушли из чата — всё его, и только его.
     await index.removeRoom('!a');
     expect(await index.search('перенес')).toEqual([]);

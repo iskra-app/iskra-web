@@ -69,6 +69,8 @@ export class MessageIndexer {
   /** Что записать (`IndexEntry`) или стереть (`null`) — по ID события. */
   // eslint-disable-next-line svelte/prefer-svelte-reactivity -- очередь, не состояние экрана
   private readonly queue = new Map<string, IndexEntry | null>();
+  /** Удаления, пришедшие событием, — проверяются по записи при сбросе (`removeRedacted`). */
+  private redactions: Array<{ target: string; roomId: string; redactor: string; byModerator: boolean }> = [];
   /** Комнаты, из которых ушли, — их записи стереть целиком. */
   // eslint-disable-next-line svelte/prefer-svelte-reactivity -- очередь, не состояние экрана
   private readonly leftRooms = new Set<string>();
@@ -137,12 +139,17 @@ export class MessageIndexer {
     if (!id || !roomId || this.destroyed) return;
     // Удаление — сам по себе повод стереть, даже если удалённого нет в загруженной ленте:
     // SDK тогда не скажет `RoomEvent.Redaction`, а в индексе оно лежит.
+    const room = known ?? this.client.getRoom(roomId);
     if (event.isRedaction()) {
       const target = event.event.redacts ?? (event.getContent()['redacts'] as string | undefined);
-      if (target) this.enqueue(target, null);
+      const redactor = event.getSender();
+      if (target && redactor) {
+        const byModerator = !!room?.currentState.hasSufficientPowerLevelFor('redact', room.getMember(redactor)?.powerLevel ?? 0);
+        this.redactions.push({ target, roomId, redactor, byModerator });
+        this.schedule();
+      }
       return;
     }
-    const room = known ?? this.client.getRoom(roomId);
     if (room && LEFT.has(room.getMyMembership())) return;
     // Своё, ещё не ушедшее: у него временный ID, а настоящий придёт с эхом.
     if (event.status !== null && event.status !== EventStatus.SENT) return;
@@ -182,9 +189,10 @@ export class MessageIndexer {
     }
     const batch = [...this.queue];
     const left = [...this.leftRooms];
+    const redactions = this.redactions.splice(0);
     this.queue.clear();
     this.leftRooms.clear();
-    if (!batch.length && !left.length) return this.flushing;
+    if (!batch.length && !left.length && !redactions.length) return this.flushing;
     this.flushing = this.flushing.then(async () => {
       const index = await this.index;
       if (!index) return;
@@ -192,6 +200,9 @@ export class MessageIndexer {
       const removed = batch.flatMap(([id, entry]) => (entry ? [] : [id]));
       await index.put(entries).catch(() => {});
       await index.remove(removed).catch(() => {});
+      for (const { target, roomId, redactor, byModerator } of redactions) {
+        await index.removeRedacted(target, roomId, redactor, byModerator).catch(() => {});
+      }
       for (const roomId of left) await index.removeRoom(roomId).catch(() => {});
     });
     return this.flushing;
