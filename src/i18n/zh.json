@@ -892,6 +892,7 @@
   "upload.compressing": "正在压缩… {percent}%",
   "upload.progress": "正在上传… {percent}%",
   "upload.tooLarge": "“{name}”超过了服务器允许的大小（{limit}）。",
+  "upload.metadataNotRemoved": "无法删除“{name}”中的元数据，因此未发送。如需原样发送，请在设置中关闭“发送时去除元数据”。",
   "verification.asked.message": "这台设备刚刚登录了您的账户，正请求确认。如果是您本人，请同意，然后比对表情符号。如果不是，请拒绝：说明别人知道您的密码。",
   "verification.close": "关闭",
   "verification.compare": "您的另一台设备上显示着同样的七个表情符号。请检查它们是否一致，并且顺序相同。",

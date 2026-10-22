@@ -905,6 +905,7 @@
   "upload.compressing": "Compression… {percent} %",
   "upload.progress": "Envoi… {percent} %",
   "upload.tooLarge": "« {name} » dépasse ce que le serveur accepte ({limit}).",
+  "upload.metadataNotRemoved": "Impossible de retirer les métadonnées de « {name} », le fichier n’a donc pas été envoyé. Pour l’envoyer tel quel, désactivez « Envoyer sans métadonnées » dans les réglages.",
   "verification.asked.message": "Cet appareil vient de se connecter à votre compte et demande à être confirmé. Si c’était vous, acceptez, puis comparez les emoji. Sinon, refusez : quelqu’un d’autre connaît votre mot de passe.",
   "verification.close": "Fermer",
   "verification.compare": "Votre autre appareil affiche les mêmes sept emoji. Vérifiez qu’ils correspondent, et dans le même ordre.",

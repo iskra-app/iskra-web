@@ -892,6 +892,7 @@
   "upload.compressing": "圧縮中… {percent}%",
   "upload.progress": "アップロード中… {percent}%",
   "upload.tooLarge": "「{name}」はサーバーが受け付けるサイズ（{limit}）を超えています。",
+  "upload.metadataNotRemoved": "「{name}」からメタデータを削除できなかったため、送信しませんでした。そのまま送信するには、設定で「メタデータなしで送信」をオフにしてください。",
   "verification.asked.message": "このデバイスがたった今あなたのアカウントにサインインし、承認を求めています。あなたなら同意して、絵文字を照らし合わせてください。違うなら拒否してください。誰かがあなたのパスワードを知っています。",
   "verification.close": "閉じる",
   "verification.compare": "もう一方のデバイスにも同じ 7 つの絵文字が表示されています。一致しているか、並び順も同じか確認してください。",

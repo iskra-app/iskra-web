@@ -905,6 +905,7 @@
   "upload.compressing": "Comprimiendo… {percent} %",
   "upload.progress": "Subiendo… {percent} %",
   "upload.tooLarge": "«{name}» supera lo que admite el servidor ({limit}).",
+  "upload.metadataNotRemoved": "No se pudieron quitar los metadatos de «{name}», así que no se envió. Para enviarlo tal cual, desactive «Enviar sin metadatos» en Ajustes.",
   "verification.asked.message": "Este dispositivo acaba de iniciar sesión en su cuenta y pide que lo confirme. Si fue usted, acepte y luego compare los emojis. Si no, rechácelo: alguien más conoce su contraseña.",
   "verification.close": "Cerrar",
   "verification.compare": "Su otro dispositivo muestra los mismos siete emojis. Compruebe que coinciden y que están en el mismo orden.",

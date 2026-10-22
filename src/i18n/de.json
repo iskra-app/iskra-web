@@ -903,6 +903,7 @@
   "upload.compressing": "Wird komprimiert… {percent} %",
   "upload.progress": "Wird hochgeladen… {percent} %",
   "upload.tooLarge": "„{name}“ ist größer, als der Server annimmt ({limit}).",
+  "upload.metadataNotRemoved": "Die Metadaten von „{name}“ ließen sich nicht entfernen, deshalb wurde die Datei nicht gesendet. Um sie unverändert zu senden, schalten Sie „Ohne Metadaten senden“ in den Einstellungen aus.",
   "verification.asked.message": "Dieses Gerät hat sich gerade bei Ihrem Konto angemeldet und bittet um Bestätigung. Wenn Sie das waren, stimmen Sie zu – dann vergleichen Sie die Emoji. Wenn nicht, lehnen Sie ab: Dann kennt jemand anderes Ihr Passwort.",
   "verification.close": "Schließen",
   "verification.compare": "Ihr anderes Gerät zeigt dieselben sieben Emoji. Prüfen Sie, ob sie übereinstimmen – und in derselben Reihenfolge stehen.",

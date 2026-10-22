@@ -6,7 +6,7 @@
  * Ничего не отправляет: путь наверх один — `core/media/upload.ts`.
  */
 import type { OutgoingFile, OutgoingKind } from '../../core/media/upload';
-import { photoPlan, renamed, type MediaSendSettings } from './mediaSettings';
+import { photoPlan, renamed, type MediaSendSettings, type PhotoPlan } from './mediaSettings';
 import { stripMp4Metadata } from '../../core/media/mp4Metadata';
 import { isWebP, stripWebPMetadata } from '../../core/media/webpMetadata';
 import { compressVideo } from './videoCompress';
@@ -29,10 +29,29 @@ export function kindOf(type: string): OutgoingKind {
   return 'file';
 }
 
+/**
+ * «Без метаданных» включено, а снять их не вышло: такой файл не отправляется — как в нативной
+ * (`MediaPreparation.photo` → `nil`), никогда не «уйдёт оригиналом». Фото с геопозицией,
+ * ушедшее потому, что браузер не смог его перерисовать, — то, от чего настройка и обещает беречь.
+ */
+export class MetadataNotRemovedError extends Error {
+  constructor(readonly fileName: string) {
+    super('metadata could not be removed');
+    this.name = 'MetadataNotRemovedError';
+  }
+}
+
+/** Что настройки велят чистить: фото (кроме GIF — его не перерисовать, не убив анимацию) и MP4/MOV. */
+function mustStrip(mimetype: string, kind: OutgoingKind, settings: MediaSendSettings): boolean {
+  if (!settings.stripMetadata) return false;
+  return (kind === 'image' && mimetype !== 'image/gif') || /^video\/(mp4|quicktime)$/.test(mimetype);
+}
+
 export async function prepareFile(file: File, settings: MediaSendSettings): Promise<OutgoingFile> {
   const mimetype = file.type || 'application/octet-stream';
   const kind = kindOf(mimetype);
   const base: OutgoingFile = { blob: file, name: file.name || nameFor(mimetype), mimetype, kind };
+  const strip = mustStrip(mimetype, kind, settings);
   try {
     // WebP — это стикер, как у Telegram: без пузыря, своим размером, с прозрачностью (`StickerPicture` нативной).
     if (mimetype === 'image/webp') {
@@ -41,11 +60,15 @@ export async function prepareFile(file: File, settings: MediaSendSettings): Prom
     }
     if (kind === 'image') return await image(base, settings);
     if (kind === 'video') {
-      const ready: OutgoingFile = { ...(await videoWithoutMetadata(base, settings)), ...(await videoInfo(file)) };
+      const clean = await videoWithoutMetadata(base, settings);
+      const ready: OutgoingFile = { ...clean, ...(await videoInfo(file).catch(() => ({}))) };
       return settings.compress ? { ...ready, prepare: (signal, onProgress) => compressed(ready, settings, signal, onProgress) } : ready;
     }
     if (kind === 'audio') return { ...base, ...(await audioInfo(file)) };
-  } catch {
+  } catch (error) {
+    if (error instanceof MetadataNotRemovedError) throw error;
+    // Фото не разобрали — значит, и не перерисовали: метаданные на месте.
+    if (strip && kind === 'image') throw new MetadataNotRemovedError(base.name);
     // Не разобрали — отправим без размеров: получатель просто не узнает их заранее.
   }
   return base;
@@ -100,10 +123,13 @@ async function image(base: OutgoingFile, settings: MediaSendSettings): Promise<O
     let out: OutgoingFile = { ...base, width, height };
     const plan = base.mimetype === 'image/gif' ? null : photoPlan(base.mimetype, width, height, settings);
     if (plan) {
-      const blob = await draw(decoded.source, plan.width, plan.height, plan.mimetype, plan.quality);
+      const drawn = await drawWithin(decoded.source, plan);
       // Без метаданных — только перекодированным. Сжатие, которое сделало файл больше, — не сжатие.
-      if (blob && blob.type === plan.mimetype && (settings.stripMetadata || blob.size < base.blob.size)) {
-        out = { ...out, blob, mimetype: plan.mimetype, name: renamed(base.name, plan.mimetype), width: plan.width, height: plan.height };
+      if (drawn && (settings.stripMetadata || drawn.blob.size < base.blob.size)) {
+        const type = drawn.blob.type;
+        out = { ...out, blob: drawn.blob, mimetype: type, name: renamed(base.name, type), width: drawn.width, height: drawn.height };
+      } else if (settings.stripMetadata) {
+        throw new MetadataNotRemovedError(base.name);
       }
     }
     if (out.mimetype !== 'image/gif' && (out.blob.size > THUMBNAIL_WORTH_BYTES || Math.max(out.width!, out.height!) > THUMBNAIL_SIDE * 2)) {
@@ -114,6 +140,25 @@ async function image(base: OutgoingFile, settings: MediaSendSettings): Promise<O
   } finally {
     decoded.release();
   }
+}
+
+/**
+ * Холст больше, чем браузер согласен нарисовать, — пустой ответ, а не ошибка: Safari на iPhone
+ * не даёт больше ~16 Мп, и снимок в 48 Мп не перерисовывается в свой размер. Тогда — ещё раз,
+ * вписав в этот предел. Тип — какой браузер дал на самом деле: Safari пишет PNG вместо WebP,
+ * и это тоже чистые пиксели.
+ */
+const CANVAS_PIXELS = 16_000_000;
+
+async function drawWithin(source: CanvasImageSource, plan: PhotoPlan): Promise<{ blob: Blob; width: number; height: number } | null> {
+  const attempt = async (width: number, height: number) => {
+    const blob = await draw(source, width, height, plan.mimetype, plan.quality);
+    return blob && /^image\/(jpeg|png|webp)$/.test(blob.type) ? { blob, width, height } : null;
+  };
+  const full = await attempt(plan.width, plan.height);
+  if (full || plan.width * plan.height <= CANVAS_PIXELS) return full;
+  const scale = Math.sqrt(CANVAS_PIXELS / (plan.width * plan.height));
+  return attempt(Math.max(1, Math.floor(plan.width * scale)), Math.max(1, Math.floor(plan.height * scale)));
 }
 
 function draw(source: CanvasImageSource, width: number, height: number, type: string, quality: number): Promise<Blob | null> {
@@ -155,13 +200,15 @@ async function drawThumbnail(source: CanvasImageSource, width: number, height: n
 
 /**
  * Видео без метаданных, если так велят настройки: MP4 и MOV правятся на месте, без
- * перекодирования (`mp4Metadata.ts`). Другой контейнер или не разобрали — уходит как есть, как
- * и фото, которое не удалось перекодировать.
+ * перекодирования (`mp4Metadata.ts`). Не разобрали — не уходит (`MetadataNotRemovedError`).
+ * Другой контейнер (WebM — запись экрана браузером) уходит как есть: метаданных о человеке
+ * в нём нет, а разбирать его нечем.
  */
 async function videoWithoutMetadata(base: OutgoingFile, settings: MediaSendSettings): Promise<OutgoingFile> {
   if (!settings.stripMetadata || !/^video\/(mp4|quicktime)$/.test(base.mimetype)) return base;
   const stripped = stripMp4Metadata(new Uint8Array(await base.blob.arrayBuffer()));
-  return stripped ? { ...base, blob: new Blob([stripped], { type: base.mimetype }) } : base;
+  if (!stripped) throw new MetadataNotRemovedError(base.name);
+  return { ...base, blob: new Blob([stripped], { type: base.mimetype }) };
 }
 
 /**

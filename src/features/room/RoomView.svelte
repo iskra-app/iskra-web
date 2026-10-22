@@ -14,7 +14,7 @@
   import PlainButton from '../../design/PlainButton.svelte';
   import type { OutgoingFile } from '../../core/media/upload';
   import { fileSize } from '../media/files';
-  import { prepareFile, stickerFile } from '../media/prepare';
+  import { MetadataNotRemovedError, prepareFile, stickerFile } from '../media/prepare';
   import Menu from '../../design/Menu.svelte';
   import { viewport } from '../../design/viewport.svelte.ts';
   import { stickerOf, type Sticker } from '../../core/stickers/imagePack';
@@ -418,7 +418,13 @@
     });
     if (fitting.length === files.length) notice = '';
     const settings = { stripMetadata: preferences.stripMetadata, compress: preferences.compress, compression: preferences.compression };
-    const prepared = await Promise.all(fitting.map((file) => prepareFile(file, settings)));
+    const results = await Promise.allSettled(fitting.map((file) => prepareFile(file, settings)));
+    const prepared: OutgoingFile[] = [];
+    for (const result of results) {
+      if (result.status === 'fulfilled') prepared.push(result.value);
+      else if (result.reason instanceof MetadataNotRemovedError) notice = t('upload.metadataNotRemoved', { name: result.reason.fileName });
+      else throw result.reason;
+    }
     attachments = [...attachments, ...prepared];
   }
 
