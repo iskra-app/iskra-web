@@ -264,6 +264,8 @@ export class RecoveryStore {
     try {
       await this.crypto.resetEncryption(this.uia());
     } catch (error) {
+      // Сброс мог успеть создать ключ и отдать его на хранение (`cacheSecretStorageKey`).
+      this.keys.forget();
       this.working = false;
       if (!(error instanceof RecoveryCancelled)) this.failure = 'startOverFailed';
       return null;
