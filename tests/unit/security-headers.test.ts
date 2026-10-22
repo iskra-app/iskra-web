@@ -39,3 +39,18 @@ describe('CSP — главная граница', () => {
     for (const value of Object.values(securityHeaders(false))) expect(value).not.toMatch(/["$]/);
   });
 });
+
+describe('второй эшелон', () => {
+  const headers = securityHeaders(false);
+
+  it('чужие страницы не встраивают наши файлы; окно не делится собой', () => {
+    expect(headers['Cross-Origin-Resource-Policy']).toBe('same-origin');
+    expect(headers['Cross-Origin-Opener-Policy']).toBe('same-origin');
+  });
+
+  it('из возможностей браузера — только камера, микрофон и геопозиция, и только себе', () => {
+    const policy = headers['Permissions-Policy']!;
+    for (const own of ['camera', 'microphone', 'geolocation']) expect(policy).toContain(`${own}=(self)`);
+    for (const none of ['clipboard-read', 'usb', 'bluetooth', 'payment', 'display-capture']) expect(policy).toContain(`${none}=()`);
+  });
+});
