@@ -37,7 +37,9 @@ export function parseRoute(hash: string): Route {
     try {
       const target = decodeURIComponent(open[1]);
       if (isOpenTarget(target)) {
-        const via = new URLSearchParams(open[2] ?? '').getAll('via').filter(isServerName);
+        // Через какие серверы входить — их назвал тот, кто прислал ссылку. Трёх хватает
+        // (столько кладёт matrix.to); больше — это список, куда наш сервер постучится по чужой просьбе.
+        const via = [...new Set(new URLSearchParams(open[2] ?? '').getAll('via').filter(isServerName))].slice(0, MAX_VIA);
         return via.length ? { name: 'open', target, via } : { name: 'open', target };
       }
     } catch {
@@ -85,6 +87,8 @@ export function isRoomId(value: string): boolean {
 export function isOpenTarget(value: string): boolean {
   return /^[@#][^\s:/]+:[^\s/]+$/.test(value) || isRoomId(value);
 }
+
+const MAX_VIA = 3;
 
 /** Имя сервера в `via` — хост с портом, без пути и пробелов. */
 export function isServerName(value: string): boolean {
