@@ -52,3 +52,23 @@ export async function transact<T>(
   });
   return result;
 }
+
+/**
+ * Прочитать запись и записать новую — в одной транзакции, без `await` между: иначе запись,
+ * сделанная в промежутке (новые токены после обновления), молча затирается прочитанной до неё.
+ * `change` синхронна; `undefined` — ничего не писать (записи нет или менять нечего).
+ */
+export function update<T>(db: IDBDatabase, store: string, key: IDBValidKey, change: (current: T | undefined) => T | undefined): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(store, 'readwrite');
+    const objects = tx.objectStore(store);
+    const read = objects.get(key) as IDBRequest<T | undefined>;
+    read.onsuccess = () => {
+      const next = change(read.result);
+      if (next !== undefined) objects.put(next);
+    };
+    tx.oncomplete = () => resolve();
+    tx.onerror = () => reject(tx.error);
+    tx.onabort = () => reject(tx.error ?? new Error('Transaction aborted'));
+  });
+}

@@ -11,7 +11,7 @@
  * Локальные имена личных чатов («Мама» вместо `anna_1987`) — так же: по чату, под ключом
  * аккаунта, и уходят вместе с ним. Это чьи-то личные заметки о людях, с которыми он говорит.
  */
-import { deleteDatabase, openDatabase, transact } from './idb';
+import { deleteDatabase, openDatabase, transact, update } from './idb';
 import { createSealingKey, randomBase64, seal, unseal, type Sealed } from './secretBox';
 
 const DB_NAME = 'iskra-accounts';
@@ -144,11 +144,9 @@ export const vault = {
   },
 
   async setKnownDevices(userId: string, known: string[]): Promise<void> {
-    await withDb(async (db) => {
-      const stored = await transact(db, ACCOUNTS, 'readonly', (s) => s.get(userId) as IDBRequest<StoredAccount | undefined>);
-      if (!stored) return;
-      await transact(db, ACCOUNTS, 'readwrite', (s) => s.put({ ...stored, knownDevices: [...known].sort() }));
-    });
+    await withDb((db) =>
+      update<StoredAccount>(db, ACCOUNTS, userId, (stored) => stored && { ...stored, knownDevices: [...known].sort() }),
+    );
   },
 
   /** Новые токены после обновления — под тем же ключом. */
@@ -161,7 +159,9 @@ export const vault = {
       if (tokens.refreshToken) next.refreshToken = tokens.refreshToken;
       // Шифруем до транзакции: транзакция IndexedDB закрывается на первом же await.
       const sealed = await seal(stored.key, next);
-      await transact(db, ACCOUNTS, 'readwrite', (s) => s.put({ ...stored, sealed }));
+      // Пишем в то, что лежит сейчас, а не в прочитанное до шифрования: за это время могли
+      // записать `knownDevices` — или выйти, и тогда записи нет и воскрешать её нельзя.
+      await update<StoredAccount>(db, ACCOUNTS, userId, (current) => current?.signedInAt === stored.signedInAt ? { ...current, sealed } : undefined);
     });
   },
 
