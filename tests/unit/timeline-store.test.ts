@@ -153,6 +153,8 @@ describe('TimelineStore на демо-сервере', () => {
     expect(store.messages.at(-1)!.delivery.state).toBe('sending');
     await until(() => store!.messages.at(-1)!.delivery.state === 'failed', 15_000);
 
+    // Сменилась личность, а не устройство: подтверждать нечего.
+    expect(await store.devicesToTrust(failed.key)).toEqual([]);
     store.sendAnyway(failed.key);
     await until(() => store!.messages.at(-1)!.delivery.state === 'sent' && !!store!.messages.at(-1)!.eventId, 15_000);
     expect(store.failure).toBeNull();
@@ -191,7 +193,10 @@ describe('TimelineStore на демо-сервере', () => {
     const failed = store.messages.at(-1)!;
     expect(failed.delivery).toEqual({ state: 'failed', reason: 'insecureDevices' });
 
-    store.sendAnyway(failed.key);
+    // Сначала — каким устройствам придётся довериться: ровно её неподписанному телефону.
+    const devices = await store.devicesToTrust(failed.key);
+    expect(devices.map((d) => `${d.userId}/${d.deviceId}`)).toEqual([`${demoUsers.anya}/ANYAPHONE`]);
+    store.sendAnyway(failed.key, devices);
     await until(() => store!.messages.at(-1)!.delivery.state === 'sent' && !!store!.messages.at(-1)!.eventId, 15_000);
     expect(store.failure).toBeNull();
     // Это не проверка телефона — доверие как есть: подписанным владельцем он не стал.
