@@ -20,6 +20,7 @@ import type { AuthCallback } from './callback';
 import { fetchFor, SignInError, type ServerInfo } from './server';
 import type { NewAccount } from '../storage/vault';
 import { quietLogger } from '../support/logger';
+import { secureUrl } from '../support/secureUrl';
 
 const PENDING_KEY = 'iskra.signIn.pending';
 const CLIENTS_KEY = 'iskra.oauth.clients';
@@ -91,7 +92,7 @@ export async function signInWithPassword(server: ServerInfo, username: string, p
     return {
       userId: login.user_id,
       deviceId: login.device_id,
-      homeserverUrl: login.well_known?.['m.homeserver']?.base_url?.replace(/\/+$/, '') ?? server.baseUrl,
+      homeserverUrl: homeserverFrom(login.well_known?.['m.homeserver']?.base_url) ?? server.baseUrl,
       method: server.demo ? 'demo' : 'password',
       accessToken: login.access_token,
       ...(login.refresh_token ? { refreshToken: login.refresh_token } : {}),
@@ -103,6 +104,15 @@ export async function signInWithPassword(server: ServerInfo, username: string, p
     }
     throw new SignInError('unreachable', { cause: error });
   }
+}
+
+/**
+ * Адрес сервера, который вернул вход (`well_known`): дальше с токеном ходим туда. Не `https:` —
+ * не принимаем, остаёмся там, где входили.
+ */
+function homeserverFrom(raw: unknown): string | undefined {
+  const url = secureUrl(raw);
+  return url ? `${url.origin}${url.pathname.replace(/\/+$/, '')}` : undefined;
 }
 
 // ————— Legacy SSO —————

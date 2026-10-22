@@ -21,6 +21,7 @@ import { decodeRecoveryKey, type CryptoApi } from 'matrix-js-sdk/lib/crypto-api'
 import type { UIAuthCallback } from 'matrix-js-sdk';
 import type { MatrixClient } from 'matrix-js-sdk';
 import type { SecretStorageKeyHolder } from './secretStorageKey';
+import { secureUrl } from '../support/secureUrl';
 
 export type HistoryProtection = 'unknown' | 'on' | 'off' | 'keyNeeded';
 
@@ -329,7 +330,8 @@ export class RecoveryStore {
         if (stages.includes(resetStage)) {
           // MAS: сброс одобряется на странице сервера. Проверить на настоящем MAS (этап 0).
           const params = (data?.['params'] as Record<string, { url?: string }> | undefined)?.[resetStage];
-          await this.ask({ kind: 'approve', url: params?.url ?? '' });
+          // Адрес — от сервера: не `https:` — ссылки нет, остаётся «Подтвердить» после одобрения.
+          await this.ask({ kind: 'approve', url: secureUrl(params?.url)?.href ?? '' });
           await makeRequest({ type: resetStage, ...(session ? { session } : {}) } as never);
           return;
         }
