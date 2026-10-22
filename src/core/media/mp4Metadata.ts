@@ -10,6 +10,10 @@
  * - дорожки не видео и не звука (`hdlr` не `vide`/`soun`) — например, временные метаданные с
  *   координатами, кадр за кадром.
  *
+ * Остаётся только то, что в белом списке (`KEEP_*`): чего не знаем — того не оставляем, как
+ * `MetadataStripper` нативной. И как он, результат перечитывается (`isCleanMp4`): не чисто — не
+ * отправляем.
+ *
  * Перекодировать нечем без новой зависимости (WebCodecs и мультиплексор), поэтому файл
  * правится на месте: бокс метаданных становится `free` того же размера, и его содержимое
  * обнуляется; у лишней дорожки обнуляются и её данные в `mdat`. Размеры не меняются — значит,
@@ -17,8 +21,13 @@
  */
 
 const FREE = [0x66, 0x72, 0x65, 0x65]; // 'free'
-/** XMP в ISO BMFF: `uuid` be7acfcb-97a9-42e8-9c71-999491e3afac. */
-const XMP_UUID = 'be7acfcb97a942e89c71999491e3afac';
+
+/** Верхний уровень: описание формата, фильм, данные кадров, пустоты, фрагменты. */
+const KEEP_TOP = new Set(['ftyp', 'moov', 'mdat', 'free', 'skip', 'wide', 'moof', 'mfra', 'styp', 'sidx']);
+/** В `moov`: заголовок фильма, дорожки, описание фрагментов. */
+const KEEP_MOOV = new Set(['mvhd', 'trak', 'mvex', 'free', 'skip']);
+/** В дорожке: её заголовок, медиа, монтажный лист, ссылки на другие дорожки. */
+const KEEP_TRAK = new Set(['tkhd', 'mdia', 'edts', 'tref', 'free', 'skip']);
 
 interface Box {
   type: string;
@@ -125,14 +134,12 @@ export function stripMp4Metadata(source: Uint8Array): Uint8Array<ArrayBuffer> | 
     if (!top || top[0]?.type !== 'ftyp') return null;
     const moov = top.find((b) => b.type === 'moov');
     if (!moov) return null;
-    for (const box of top) {
-      if (box.type === 'meta' || box.type === 'udta') blank(bytes, box);
-      if (box.type === 'uuid' && box.body + 16 <= box.end && hex(bytes, box.body, 16) === XMP_UUID) blank(bytes, box);
-    }
+    // `meta`, `udta`, `uuid` (XMP и чей угодно ещё) — и всё, чего нет в списке.
+    for (const box of top) if (!KEEP_TOP.has(box.type)) blank(bytes, box);
     const inMoov = boxes(view, moov.body, moov.end);
     if (!inMoov) return null;
     for (const box of inMoov) {
-      if (box.type === 'udta' || box.type === 'meta' || box.type === 'uuid') blank(bytes, box);
+      if (!KEEP_MOOV.has(box.type)) blank(bytes, box);
       else if (box.type === 'mvhd') clearTimes(bytes, view, box);
       else if (box.type === 'trak') {
         const handler = handlerOf(view, box);
@@ -144,9 +151,10 @@ export function stripMp4Metadata(source: Uint8Array): Uint8Array<ArrayBuffer> | 
           blank(bytes, box);
           continue;
         }
-        const inTrak = boxes(view, box.body, box.end) ?? [];
+        const inTrak = boxes(view, box.body, box.end);
+        if (!inTrak) return null;
         for (const part of inTrak) {
-          if (part.type === 'udta' || part.type === 'meta') blank(bytes, part);
+          if (!KEEP_TRAK.has(part.type)) blank(bytes, part);
           else if (part.type === 'tkhd') clearTimes(bytes, view, part);
           else if (part.type === 'mdia') {
             const mdhd = child(view, part, 'mdhd');
@@ -155,12 +163,46 @@ export function stripMp4Metadata(source: Uint8Array): Uint8Array<ArrayBuffer> | 
         }
       }
     }
-    return bytes;
+    return isCleanMp4(bytes) ? bytes : null;
   } catch {
     return null;
   }
 }
 
-function hex(bytes: Uint8Array, from: number, length: number): string {
-  return Array.from(bytes.subarray(from, from + length), (b) => b.toString(16).padStart(2, '0')).join('');
+/**
+ * Перечитать то, что уходит: на каждом уровне — только боксы из списка (или `free`), дорожки —
+ * только картинка и звук, время съёмки — нули. `MetadataStripper.isClean` нативной.
+ */
+export function isCleanMp4(bytes: Uint8Array): boolean {
+  const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+  try {
+    const top = boxes(view, 0, bytes.length);
+    const moov = top?.find((b) => b.type === 'moov');
+    if (!top || !moov || !top.every((b) => KEEP_TOP.has(b.type))) return false;
+    const inMoov = boxes(view, moov.body, moov.end);
+    if (!inMoov?.every((b) => KEEP_MOOV.has(b.type))) return false;
+    for (const box of inMoov) {
+      if (box.type === 'mvhd' && !timesCleared(view, box)) return false;
+      if (box.type !== 'trak') continue;
+      const handler = handlerOf(view, box);
+      if (handler !== 'vide' && handler !== 'soun') return false;
+      const inTrak = boxes(view, box.body, box.end);
+      if (!inTrak?.every((b) => KEEP_TRAK.has(b.type))) return false;
+      const tkhd = inTrak.find((b) => b.type === 'tkhd');
+      const mdia = inTrak.find((b) => b.type === 'mdia');
+      const mdhd = mdia && child(view, mdia, 'mdhd');
+      if ((tkhd && !timesCleared(view, tkhd)) || (mdhd && !timesCleared(view, mdhd))) return false;
+    }
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function timesCleared(view: DataView, box: Box): boolean {
+  if (box.end - box.body < 4) return true;
+  const width = view.getUint8(box.body) === 1 ? 8 : 4;
+  const times = box.body + 4;
+  for (let at = times; at < times + 2 * width && at < box.end; at++) if (view.getUint8(at) !== 0) return false;
+  return true;
 }

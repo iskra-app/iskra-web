@@ -9,6 +9,7 @@ import type { OutgoingFile, OutgoingKind } from '../../core/media/upload';
 import { photoPlan, renamed, type MediaSendSettings, type PhotoPlan } from './mediaSettings';
 import { stripMp4Metadata } from '../../core/media/mp4Metadata';
 import { isWebP, stripWebPMetadata } from '../../core/media/webpMetadata';
+import { stripGifMetadata } from '../../core/media/gifMetadata';
 import { compressVideo } from './videoCompress';
 import { t } from '../../i18n/index.svelte.ts';
 
@@ -41,17 +42,23 @@ export class MetadataNotRemovedError extends Error {
   }
 }
 
-/** Что настройки велят чистить: фото (кроме GIF — его не перерисовать, не убив анимацию) и MP4/MOV. */
+/** Что настройки велят чистить: фото (GIF — без перерисовки, `gifMetadata.ts`) и MP4/MOV. */
 function mustStrip(mimetype: string, kind: OutgoingKind, settings: MediaSendSettings): boolean {
   if (!settings.stripMetadata) return false;
-  return (kind === 'image' && mimetype !== 'image/gif') || /^video\/(mp4|quicktime)$/.test(mimetype);
+  return kind === 'image' || /^video\/(mp4|quicktime)$/.test(mimetype);
 }
 
 export async function prepareFile(file: File, settings: MediaSendSettings): Promise<OutgoingFile> {
   const mimetype = file.type || 'application/octet-stream';
   const kind = kindOf(mimetype);
-  const base: OutgoingFile = { blob: file, name: file.name || nameFor(mimetype), mimetype, kind };
+  let base: OutgoingFile = { blob: file, name: file.name || nameFor(mimetype), mimetype, kind };
   const strip = mustStrip(mimetype, kind, settings);
+  // GIF чистится до всего, по байтам: что бы ни случилось дальше с размерами, он уже чист.
+  if (strip && mimetype === 'image/gif') {
+    const stripped = stripGifMetadata(new Uint8Array(await file.arrayBuffer()));
+    if (!stripped) throw new MetadataNotRemovedError(base.name);
+    base = { ...base, blob: new Blob([stripped], { type: 'image/gif' }) };
+  }
   try {
     // WebP — это стикер, как у Telegram: без пузыря, своим размером, с прозрачностью (`StickerPicture` нативной).
     if (mimetype === 'image/webp') {
@@ -68,7 +75,7 @@ export async function prepareFile(file: File, settings: MediaSendSettings): Prom
   } catch (error) {
     if (error instanceof MetadataNotRemovedError) throw error;
     // Фото не разобрали — значит, и не перерисовали: метаданные на месте.
-    if (strip && kind === 'image') throw new MetadataNotRemovedError(base.name);
+    if (strip && kind === 'image' && mimetype !== 'image/gif') throw new MetadataNotRemovedError(base.name);
     // Не разобрали — отправим без размеров: получатель просто не узнает их заранее.
   }
   return base;
@@ -114,7 +121,8 @@ function nameFor(type: string): string {
 
 /**
  * Фото: перекодировать, если так велят настройки (метаданные, сжатие), и посчитать
- * размеры и миниатюру. GIF не трогается — перекодирование убило бы анимацию.
+ * размеры и миниатюру. GIF не перекодируется — это убило бы анимацию: метаданные из него
+ * вырезаются по байтам.
  */
 async function image(base: OutgoingFile, settings: MediaSendSettings): Promise<OutgoingFile> {
   const decoded = await decodeImage(base.blob);
@@ -219,6 +227,13 @@ async function videoWithoutMetadata(base: OutgoingFile, settings: MediaSendSetti
 async function compressed(ready: OutgoingFile, settings: MediaSendSettings, signal: AbortSignal, onProgress: (fraction: number) => void): Promise<OutgoingFile> {
   const result = await compressVideo(ready.blob, settings.compression, settings.stripMetadata, signal, onProgress);
   if (!result) return ready;
+  if (settings.stripMetadata) {
+    // Мультиплексор пишет своё (программа, время) — то, что уходит, перечитывается так же, как
+    // несжатое. Не вышло — уходит несжатое: оно уже очищено.
+    const clean = stripMp4Metadata(new Uint8Array(await result.blob.arrayBuffer()));
+    if (!clean) return ready;
+    result.blob = new Blob([clean], { type: 'video/mp4' });
+  }
   const name = `${ready.name.replace(/\.[^./]+$/, '') || 'video'}.mp4`;
   return { ...ready, blob: result.blob, mimetype: 'video/mp4', name, width: result.width, height: result.height };
 }
