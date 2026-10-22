@@ -509,7 +509,7 @@ export class UserSession {
         { clientId: account.oauth.clientId, redirectUri: account.oauth.redirectUri, deviceId: account.deviceId },
         logger,
       );
-      const refresher = new TokenRefresher(oauth, (tokens) =>
+      const refresher = new TokenRefresher(refusalsOnly(oauth), (tokens) =>
         events.onTokensRefreshed({
           accessToken: tokens.accessToken,
           ...(tokens.refreshToken ? { refreshToken: tokens.refreshToken } : {}),
@@ -656,6 +656,29 @@ export class UserSession {
     this.stop();
     await wipeUserData(this.account.userId, this.client);
   }
+}
+
+/**
+ * Обновление токена, которому сервер сказал «нет», SDK считает выходом — на любой 4xx, и сеанс
+ * завершается со стиранием всего локального, ключей шифрования тоже. Но 429 («слишком часто»)
+ * и 408 — не отказ, а «попозже». Отказ — только ответ по RFC 6749, §5.2: 400 (`invalid_grant`)
+ * или 401. Остальное уходит наверх не `HTTPError`-ом, и SDK повторит обновление позже, как
+ * после сбоя сети.
+ */
+export function refusalsOnly(oauth: OAuth2): OAuth2 {
+  const grant = oauth.performRefreshTokenGrant.bind(oauth);
+  oauth.performRefreshTokenGrant = async (refreshToken) => {
+    try {
+      return await grant(refreshToken);
+    } catch (error) {
+      const status = (error as { httpStatus?: unknown } | null)?.httpStatus;
+      if (typeof status === 'number' && status !== 400 && status !== 401) {
+        throw new Error(`token refresh deferred (${status})`, { cause: error });
+      }
+      throw error;
+    }
+  };
+  return oauth;
 }
 
 /** Удаляет базы пользователя; с клиентом — его руками, без — по именам. */
