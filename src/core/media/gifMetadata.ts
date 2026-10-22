@@ -1,9 +1,11 @@
 /**
  * GIF без метаданных — без перерисовки: канвас оставил бы один кадр из анимации. Как у WebP
  * (`webpMetadata.ts`), файл режется до того, из чего состоит картинка, — список разрешённого:
- * кадры с их управлением и палитрами, и единственное расширение приложения, без которого
- * анимация не повторяется (`NETSCAPE2.0`). Комментарии, XMP (`XMP DataXMP`) и всё, о чём ещё
- * никто не подумал, остаются позади.
+ * кадры с палитрами и их управление (задержка, прозрачность) — только ровно своего размера, и
+ * счётчик повторов (`NETSCAPE2.0`) — собранный заново из двух его байт: в подблоках
+ * разрешённого расширения можно унести что угодно, поэтому они не копируются как есть.
+ * Комментарии, XMP (`XMP DataXMP`), текст поверх кадра и всё, о чём ещё никто не подумал,
+ * остаются позади.
  *
  * `undefined` — не GIF или не разобрался: такой с включённой очисткой не отправляется.
  */
@@ -16,7 +18,7 @@ export function isGif(bytes: Uint8Array): boolean {
 
 export function stripGifMetadata(bytes: Uint8Array): Uint8Array<ArrayBuffer> | undefined {
   if (!isGif(bytes) || bytes.length < 13) return undefined;
-  const kept: Array<[number, number]> = [];
+  const kept: Array<[number, number] | Uint8Array> = [];
   const colorTable = (flags: number) => (flags & 0x80 ? 3 * 2 ** ((flags & 0x07) + 1) : 0);
   /** Конец цепочки подблоков, начинающейся в `at`, — после нулевого. */
   const subBlocks = (at: number): number | undefined => {
@@ -50,21 +52,25 @@ export function stripGifMetadata(bytes: Uint8Array): Uint8Array<ArrayBuffer> | u
     const label = bytes[at + 1];
     const end = subBlocks(at + 2);
     if (end === undefined) return undefined;
-    // 0xF9 — управление кадром (задержка, прозрачность), 0x01 — текст поверх кадра: картинка.
-    // 0xFF — приложение: оставляем только счётчик повторов. 0xFE — комментарий: прочь.
+    // 0xF9 — управление кадром: один подблок ровно в 4 байта и конец, иначе в нём что-то лишнее.
+    if (label === 0xf9 && end === at + 8 && bytes[at + 2] === 4) kept.push([start, end]);
+    // 0xFF — приложение: из повтора берём два байта счётчика, остальное — прочь.
     const application = label === 0xff && bytes[at + 2] === 11 ? String.fromCharCode(...bytes.subarray(at + 3, at + 14)) : '';
-    if (label === 0xf9 || label === 0x01 || LOOP_APPLICATIONS.has(application)) kept.push([start, end]);
+    if (LOOP_APPLICATIONS.has(application) && bytes[at + 14] === 3 && bytes[at + 15] === 1) {
+      kept.push(new Uint8Array([0x21, 0xff, 11, ...Array.from('NETSCAPE2.0', (c) => c.charCodeAt(0)), 3, 1, bytes[at + 16]!, bytes[at + 17]!, 0]));
+    }
     at = end;
   }
   return undefined;
 }
 
-function join(bytes: Uint8Array, ranges: Array<[number, number]>): Uint8Array<ArrayBuffer> {
-  const out = new Uint8Array(ranges.reduce((sum, [from, to]) => sum + to - from, 0));
+function join(bytes: Uint8Array, parts: Array<[number, number] | Uint8Array>): Uint8Array<ArrayBuffer> {
+  const pieces = parts.map((part) => (part instanceof Uint8Array ? part : bytes.subarray(part[0], part[1])));
+  const out = new Uint8Array(pieces.reduce((sum, piece) => sum + piece.length, 0));
   let at = 0;
-  for (const [from, to] of ranges) {
-    out.set(bytes.subarray(from, to), at);
-    at += to - from;
+  for (const piece of pieces) {
+    out.set(piece, at);
+    at += piece.length;
   }
   return out;
 }

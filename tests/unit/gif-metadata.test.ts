@@ -30,4 +30,16 @@ describe('GIF без метаданных', () => {
     expect(stripGifMetadata(new Uint8Array(ascii('PNG')))).toBeUndefined();
     expect(stripGifMetadata(animation().subarray(0, 40))).toBeUndefined();
   });
+  it('в разрешённых блоках не унести: лишний подблок у повтора и у управления кадром — прочь', () => {
+    const header = [...ascii('GIF89a'), 1, 0, 1, 0, 0, 0, 0];
+    const loop = [0x21, 0xff, 11, ...ascii('NETSCAPE2.0'), 3, 1, 0, 0, 8, ...ascii('LAT=55.7'), 0];
+    const control = [0x21, 0xf9, 4, 0, 10, 0, 0, 6, ...ascii('SECRET'), 0];
+    const frame = [0x2c, 0, 0, 0, 0, 1, 0, 1, 0, 0, 2, 2, 0x4c, 0x01, 0];
+    const overlay = [0x21, 0x01, 12, ...new Array(12).fill(0), 5, ...ascii('HELLO'), 0];
+    const out = stripGifMetadata(new Uint8Array([...header, ...loop, ...control, ...overlay, ...frame, 0x3b]))!;
+    expect(text(out)).not.toContain('LAT=');
+    expect(text(out)).not.toContain('SECRET');
+    expect(text(out)).not.toContain('HELLO');
+    expect(text(out)).toContain('NETSCAPE2.0');
+  });
 });
