@@ -237,11 +237,10 @@ export class AppState {
     if (this.phase.name !== 'signed-in') return;
     const session = this.phase.session;
     this.phase = { name: 'loading' };
-    await session.signOut();
-    forgetMovedMarkers();
-    await vault.remove(session.userId).catch(() => {});
-    await wallpaperPhoto.forget();
-    this.releaseLock();
+    // Базы не стёрлись — запись аккаунта всё равно уходит (`forget`), а без её ключа
+    // криптохранилище не открыть.
+    await session.signOut().catch(() => {});
+    await this.forget(session.userId);
     this.phase = { name: 'signed-out' };
   }
 
@@ -249,11 +248,21 @@ export class AppState {
   private async sessionEnded(): Promise<void> {
     if (this.phase.name !== 'signed-in') return;
     const session = this.phase.session;
-    await session.wipe();
-    await vault.remove(session.userId).catch(() => {});
-    await wallpaperPhoto.forget();
-    this.releaseLock();
+    await session.wipe().catch(() => {});
+    await this.forget(session.userId);
     this.phase = { name: 'signed-out', ended: true };
+  }
+
+  /**
+   * Запись аккаунта (токены, ключ криптохранилища, черновики) и прочее своё — даже если
+   * базы стереть не вышло: выход, после которого токены остались на диске, а экран завис на
+   * загрузке, — худший из исходов на чужом компьютере.
+   */
+  private async forget(userId: string): Promise<void> {
+    forgetMovedMarkers();
+    await vault.remove(userId).catch(() => {});
+    await wallpaperPhoto.forget().catch(() => {});
+    this.releaseLock();
   }
 
   private releaseLock(): void {

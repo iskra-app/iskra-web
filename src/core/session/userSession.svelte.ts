@@ -637,8 +637,11 @@ export class UserSession {
         });
         const token = this.client.getAccessToken();
         const refresh = this.client.getRefreshToken();
-        if (refresh) await auth.revokeToken(refresh, 'refresh_token');
-        if (token) await auth.revokeToken(token, 'access_token');
+        // Каждый отдельно: не отозвался refresh — access всё равно отзываем.
+        await Promise.allSettled([
+          ...(refresh ? [auth.revokeToken(refresh, 'refresh_token')] : []),
+          ...(token ? [auth.revokeToken(token, 'access_token')] : []),
+        ]);
       } else {
         await this.client.logout(false);
       }
@@ -666,10 +669,13 @@ export async function wipeUserData(userId: string, client?: MatrixClient): Promi
     }
   }
   if (typeof indexedDB === 'undefined') return;
-  await Promise.all([
+  // Каждая сама по себе: одна не удалилась — остальные всё равно удаляются, а ошибка — наверх.
+  const results = await Promise.allSettled([
     deleteDatabase(`matrix-js-sdk:${names.sync}`),
     deleteDatabase(`${names.cryptoPrefix}::matrix-sdk-crypto`),
     deleteDatabase(`${names.cryptoPrefix}::matrix-sdk-crypto-meta`),
     deleteDatabase(searchDatabaseName(userId)),
   ]);
+  const failed = results.find((result) => result.status === 'rejected');
+  if (failed) throw failed.reason;
 }
