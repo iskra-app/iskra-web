@@ -168,13 +168,14 @@ export const vault = {
 
   /**
    * Вход снова в то же устройство после мягкого выхода: новые токены — в прежнюю запись, ключ
-   * криптохранилища — прежний, иначе Rust-крипто не откроет свою базу. Записи нет или это
-   * другое устройство — `undefined`, и вход идёт как новый.
+   * криптохранилища — прежний, иначе Rust-крипто не откроет свою базу. Записи нет, это
+   * другое устройство или **другой сервер** — `undefined`, и вход идёт как новый: сервер сам
+   * называет `user_id` и `device_id`, и чужой, назвавшись тем же, не должен получить чужие ключи.
    */
   async resume(fresh: NewAccount): Promise<{ account: Account; secrets: AccountSecrets } | undefined> {
     return withDb(async (db) => {
       const stored = await transact(db, ACCOUNTS, 'readonly', (s) => s.get(fresh.userId) as IDBRequest<StoredAccount | undefined>);
-      if (!stored?.signedOutSoftly || stored.deviceId !== fresh.deviceId) return undefined;
+      if (!stored?.signedOutSoftly || stored.deviceId !== fresh.deviceId || stored.homeserverUrl !== fresh.homeserverUrl) return undefined;
       const { accessToken, refreshToken, ...rest } = fresh;
       const old = await unseal<AccountSecrets>(stored.key, stored.sealed);
       const secrets: AccountSecrets = { accessToken, ...(refreshToken ? { refreshToken } : {}), cryptoStorageKey: old.cryptoStorageKey };

@@ -102,7 +102,7 @@
     if (!s) return;
     pending = create ? 'createAccount' : 'signIn';
     void run(async () => {
-      const url = s.oauth ? await startOAuth(s, { create }) : startSso(s, create ? undefined : resume?.deviceId);
+      const url = s.oauth ? await startOAuth(s, { create }) : startSso(s, create ? undefined : resumeDevice);
       window.location.assign(url);
       // Страница уходит; кнопка остаётся занятой, пока не ушла.
       await new Promise(() => {});
@@ -127,11 +127,14 @@
     const s = server;
     if (!s || !username.trim() || !password) return;
     void run(async () => {
-      const account = await signInWithPassword(s, username, password, resume?.deviceId);
+      const account = await signInWithPassword(s, username, password, resumeDevice);
       password = '';
       await app.signIn(account);
     });
   }
+
+  /** Прежнее устройство — только тому же серверу: другому его ID ни о чём не говорит. */
+  const resumeDevice = $derived(resume && server?.baseUrl === resume.homeserverUrl ? resume.deviceId : undefined);
 
   // Вход снова — сразу к кнопкам «Войти»: адрес сервера известен.
   // svelte-ignore state_referenced_locally

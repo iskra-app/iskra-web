@@ -112,3 +112,14 @@ describe('обновление токена', () => {
     }
   });
 });
+
+describe('вход снова — только на тот же сервер', () => {
+  it('тот же user_id и device_id от другого сервера ключей не получают', async () => {
+    const server = await discoverServer('demo.iskra.invalid');
+    const fresh = await signInWithPassword(server, 'alice', 'password');
+    await vault.add(fresh);
+    await vault.markSignedOutSoftly(fresh.userId);
+    expect(await vault.resume({ ...fresh, homeserverUrl: 'https://evil.example' })).toBeUndefined();
+    expect(await vault.resume(fresh)).toBeDefined();
+  });
+});
