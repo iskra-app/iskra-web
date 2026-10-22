@@ -61,16 +61,22 @@ function savePending(pending: Pending): void {
   sessionStorage.setItem(PENDING_KEY, JSON.stringify(pending));
 }
 
-/** Забирает ожидание возврата — один раз: повторный возврат с тем же кодом не пройдёт. */
-function takePending(): Pending | null {
+/**
+ * Забирает ожидание возврата — один раз: повторный возврат с тем же кодом не пройдёт. Возврат
+ * OAuth с чужим `state` ожидание не забирает: подброшенная ссылка не обрывает начатый вход.
+ */
+function takePending(callback: AuthCallback): Pending | null {
   const raw = sessionStorage.getItem(PENDING_KEY);
-  sessionStorage.removeItem(PENDING_KEY);
   if (!raw) return null;
+  let pending: Pending | null;
   try {
-    return JSON.parse(raw) as Pending;
+    pending = JSON.parse(raw) as Pending;
   } catch {
-    return null;
+    pending = null;
   }
+  const foreign = pending?.kind === 'oauth' && callback.kind !== 'sso' && callback.state !== pending.state;
+  if (!foreign) sessionStorage.removeItem(PENDING_KEY);
+  return pending;
 }
 
 function randomToken(bytes = 16): string {
@@ -189,7 +195,7 @@ export async function startOAuth(server: ServerInfo, options: { create?: boolean
 
 /** Завершает вход, начатый до редиректа. Любая неудача — «вход не завершился». */
 export async function completeSignIn(callback: AuthCallback): Promise<NewAccount> {
-  const pending = takePending();
+  const pending = takePending(callback);
   if (!pending) throw new SignInError('ssoIncomplete');
 
   if (callback.kind === 'sso' && pending.kind === 'sso') {
