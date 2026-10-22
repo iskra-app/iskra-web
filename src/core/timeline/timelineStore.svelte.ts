@@ -39,7 +39,7 @@ import { canSendPoll, pollEndContent, pollStartContent, type PollDraft } from '.
 import { mentionsMarkdown, rankCandidates, unlinkMentions, type ComposerMention, type RankedCandidate } from './composerMentions';
 import { failureOf, mapEvent, threadRootOf, type MapperContext } from './mapper';
 import { previewOf } from '../rooms/preview';
-import { trustUnsignedDevices, withdrawChangedVerifications } from '../encryption/sendAnyway';
+import { trustUnsignedDevices, unsignedDevices, withdrawChangedVerifications, type UnsignedDevice } from '../encryption/sendAnyway';
 import { isMarkedUnread, MARKED_UNREAD } from '../rooms/summarize';
 import { layout, SHOW_ALL_SERVICE, type ServiceHiding, type TimelineItem } from './layout';
 import type { Message, Reaction, ThreadSummary } from './message';
@@ -999,8 +999,11 @@ export class TimelineStore {
    * (`identityChanged`, `insecureDevices`). Сначала решение о доверии (`sendAnyway.ts`),
    * потом то же, что «Отправить заново». Не вышло — строка остаётся «не отправлено», а над
    * лентой — «всё ещё не ушло», как в нативной.
+   *
+   * Неподписанным устройствам доверяют только те, что в `devices`, — те, что человек видел в
+   * подтверждении (`devicesToTrust`).
    */
-  sendAnyway(key: string): void {
+  sendAnyway(key: string, devices: UnsignedDevice[] = []): void {
     const event = this.pendingByKey(key);
     const room = this.room;
     if (!event || !room || event.status !== EventStatus.NOT_SENT) return;
@@ -1008,9 +1011,20 @@ export class TimelineStore {
     if (reason !== 'identityChanged' && reason !== 'insecureDevices') return;
     this.act('sendAnywayFailed', async () => {
       if (reason === 'identityChanged') await withdrawChangedVerifications(this.client, room);
-      else if (!(await trustUnsignedDevices(this.client, room))) throw new Error('no olm machine');
+      else if (!(await trustUnsignedDevices(this.client, devices))) throw new Error('no olm machine');
       if (event.status === EventStatus.NOT_SENT) await this.client.resendEvent(event, room);
     });
+  }
+
+  /**
+   * Каким устройствам придётся довериться, чтобы не ушедшее ушло, — для подтверждения. Пусто —
+   * подтверждать нечего (сменилась личность, а не устройство).
+   */
+  async devicesToTrust(key: string): Promise<UnsignedDevice[]> {
+    const event = this.pendingByKey(key);
+    const room = this.room;
+    if (!event || !room || failureOf(event.error) !== 'insecureDevices') return [];
+    return unsignedDevices(this.client, room);
   }
 
   /** «Удалить» не ушедшее — оно и не уходило, удалять нечего, кроме строки. */

@@ -10,6 +10,7 @@
 <script lang="ts">
   import { untrack } from 'svelte';
   import ConfirmDialog from '../../design/ConfirmDialog.svelte';
+  import type { UnsignedDevice } from '../../core/encryption/sendAnyway';
   import Dialog from '../../design/Dialog.svelte';
   import PlainButton from '../../design/PlainButton.svelte';
   import type { OutgoingFile } from '../../core/media/upload';
@@ -408,6 +409,17 @@
 
   // ————— Вложения —————
 
+  /**
+   * «Отправить всё равно» из-за неподписанных устройств — сначала показать, каким устройствам
+   * придётся довериться: доверие навсегда, и человек должен видеть, кому именно.
+   */
+  let trusting = $state<{ key: string; devices: UnsignedDevice[] } | null>(null);
+  async function askSendAnyway(key: string) {
+    const devices = (await store?.devicesToTrust(key)) ?? [];
+    if (devices.length) trusting = { key, devices };
+    else store?.sendAnyway(key);
+  }
+
   /** Выбрали, вставили или перетащили — посчитать размеры и миниатюры и положить в лоток. */
   async function addFiles(files: File[]) {
     const limit = await session.uploadLimit();
@@ -495,7 +507,7 @@
     unpin: (message) => store?.unpin(message),
     remove: (message) => (deleting = message),
     retry: (key) => store?.retry(key),
-    sendAnyway: (key) => store?.sendAnyway(key),
+    sendAnyway: (key) => void askSendAnyway(key),
     discard: (key) => store?.discard(key),
     openMenu: (message, at, sheet) => (menu = { message, at, sheet }),
     stickerIsMine: (message) => {
@@ -683,6 +695,20 @@
 {/if}
 
 <MessageMenu message={menu?.message ?? null} at={menu?.at ?? { x: 0, y: 0 }} sheet={menu?.sheet ?? false} {actions} onclose={() => (menu = null)} />
+
+<ConfirmDialog
+  open={!!trusting}
+  title={t('sendAnyway.trustTitle')}
+  message={t('sendAnyway.trustMessage')}
+  details={trusting?.devices.map((d) => t('sendAnyway.device', { owner: d.owner, name: d.name ?? d.deviceId, id: d.deviceId })) ?? []}
+  confirmLabel={t('message.delivery.sendAnyway')}
+  cancelLabel={t('common.cancel')}
+  onclose={() => (trusting = null)}
+  onconfirm={() => {
+    if (trusting) store?.sendAnyway(trusting.key, trusting.devices);
+    trusting = null;
+  }}
+/>
 
 <ConfirmDialog
   open={!!deleting}

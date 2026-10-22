@@ -9,7 +9,9 @@
  *   есть (`LocalTrust.Ignored` в Rust-крипто), отныне.
  *
  * Сколько людей и устройств, крипто не говорит — в ошибке только текст. Поэтому обходим
- * тех, кому шифруем, и ищем то же, что ищет оно.
+ * тех, кому шифруем, и ищем то же, что ищет оно (`unsignedDevices`). Человек видит этот список
+ * до того, как согласится, и доверие получают ровно те, кого он видел: устройство, появившееся
+ * между вопросом и ответом, его не получит.
  */
 import type { MatrixClient, Room } from 'matrix-js-sdk';
 
@@ -23,8 +25,36 @@ export async function withdrawChangedVerifications(client: MatrixClient, room: R
   }
 }
 
+/** Устройство, которое его владелец — проверенный собеседник — сам не подписал. */
+export interface UnsignedDevice {
+  userId: string;
+  /** Имя владельца в этой комнате. */
+  owner: string;
+  deviceId: string;
+  /** Как владелец назвал устройство; может не быть. */
+  name?: string;
+}
+
+/** Устройства проверенных собеседников комнаты, не подписанные их владельцами. */
+export async function unsignedDevices(client: MatrixClient, room: Room): Promise<UnsignedDevice[]> {
+  const crypto = client.getCrypto();
+  if (!crypto) return [];
+  const found: UnsignedDevice[] = [];
+  for (const member of await room.getEncryptionTargetMembers()) {
+    const status = await crypto.getUserVerificationStatus(member.userId);
+    if (!status.isCrossSigningVerified()) continue;
+    const devices = (await crypto.getUserDeviceInfo([member.userId])).get(member.userId) ?? new Map();
+    for (const [deviceId, device] of devices) {
+      const trust = await crypto.getDeviceVerificationStatus(member.userId, deviceId);
+      if (trust?.signedByOwner) continue;
+      found.push({ userId: member.userId, owner: member.name || member.userId, deviceId, ...(device.displayName ? { name: device.displayName } : {}) });
+    }
+  }
+  return found;
+}
+
 /**
- * Довериться устройствам проверенных, которые их владельцы не подписали.
+ * Довериться этим устройствам — и только им.
  *
  * `setDeviceVerified` здесь не годится: «проверено вручную» строгий режим не принимает за
  * подпись владельца, и сообщение снова не уйдёт. Принимает он только «доверять как есть»
@@ -32,22 +62,15 @@ export async function withdrawChangedVerifications(client: MatrixClient, room: R
  * одного класса из WASM напрямую: `UserId` и `DeviceId` — те же конструкторы, что у её
  * собственных `userId` и `deviceId`, иначе второй экземпляр модуля их бы не узнал.
  */
-export async function trustUnsignedDevices(client: MatrixClient, room: Room): Promise<boolean> {
+export async function trustUnsignedDevices(client: MatrixClient, devices: UnsignedDevice[]): Promise<boolean> {
   const crypto = client.getCrypto();
   const machine = (crypto as unknown as { olmMachine?: OlmMachine } | undefined)?.olmMachine;
   if (!crypto || !machine) return false;
   const UserId = machine.userId.constructor as new (id: string) => unknown;
   const DeviceId = machine.deviceId.constructor as new (id: string) => unknown;
-  for (const member of await room.getEncryptionTargetMembers()) {
-    const status = await crypto.getUserVerificationStatus(member.userId);
-    if (!status.isCrossSigningVerified()) continue;
-    const devices = (await crypto.getUserDeviceInfo([member.userId])).get(member.userId) ?? new Map();
-    for (const deviceId of devices.keys()) {
-      const trust = await crypto.getDeviceVerificationStatus(member.userId, deviceId);
-      if (trust?.signedByOwner) continue;
-      const device = await machine.getDevice(new UserId(member.userId), new DeviceId(deviceId));
-      await device?.setLocalTrust(LOCAL_TRUST_IGNORED);
-    }
+  for (const { userId, deviceId } of devices) {
+    const device = await machine.getDevice(new UserId(userId), new DeviceId(deviceId));
+    await device?.setLocalTrust(LOCAL_TRUST_IGNORED);
   }
   return true;
 }
