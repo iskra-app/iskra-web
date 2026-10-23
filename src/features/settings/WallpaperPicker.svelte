@@ -2,13 +2,15 @@
   Обои — рядом плиток: ничего, шесть градиентов, своё фото (`AppearanceView` нативной Искры).
   Плитка — картинка, а не точка: обои выбирают глазами. Своё фото — по нажатию на его
   плитку, пока фото ещё нет, и кнопкой «Выбрать другое фото», когда уже есть. Затемнение —
-  только когда есть что затемнять.
+  только когда есть что затемнять; в светлой теме обои светлеют, а не темнеют, и ползунок зовётся
+  «Осветление».
 -->
 <script lang="ts">
   import { ICON_VIEWBOX, icons } from '../../design/icons.ts';
   import PlainButton from '../../design/PlainButton.svelte';
   import { t, type TextKey } from '../../i18n/index.svelte.ts';
   import { MAX_DIMMING, preferences, wallpapers, type Wallpaper } from '../app/preferences.svelte.ts';
+  import { colorScheme } from '../app/colorScheme.svelte.ts';
   import { wallpaperPhoto } from '../app/wallpaperPhoto.svelte.ts';
 
   let { labelledby }: { labelledby: string } = $props();
@@ -63,7 +65,7 @@
 
 {#if preferences.wallpaper !== 'none'}
   <label class="dimming">
-    <span>{t('appearance.wallpaperDimming')}</span>
+    <span>{colorScheme.light ? t('appearance.wallpaperLightening') : t('appearance.wallpaperDimming')}</span>
     <input
       type="range"
       min="0"

@@ -216,6 +216,8 @@
 :root {
   color-scheme: light;
   --color-background: #ffffff;
+  /* Вуаль на обоях: обои уводят к странице — в светлой к белому, в тёмной к чёрному. */
+  --wallpaper-veil: white;
   --color-surface: #f2f2f7;
   --color-text: #000000;
   --color-text-secondary: rgb(60 60 67 / 0.6);
@@ -254,6 +256,7 @@
 :root[data-theme='dark'] {
   color-scheme: dark;
   --color-background: #000000;
+  --wallpaper-veil: black;
   --color-surface: #1c1c1e;
   --color-text: #ffffff;
   --color-text-secondary: rgb(235 235 245 / 0.6);
@@ -276,6 +279,7 @@
   :root:not([data-theme='light']) {
     color-scheme: dark;
     --color-background: #000000;
+    --wallpaper-veil: black;
     --color-surface: #1c1c1e;
     --color-text: #ffffff;
     --color-text-secondary: rgb(235 235 245 / 0.6);
