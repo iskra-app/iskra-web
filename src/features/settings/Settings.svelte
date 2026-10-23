@@ -507,7 +507,10 @@
         onchange={(event) => (preferences.layout = event.currentTarget.checked ? 'compact' : 'bubbles')}
       />
     </label>
-    <h3 id="theme-title">{t('appearance.theme')}</h3>
+    <!-- Одна карточка на три ответа «в чём окрашено приложение»: светлая или тёмная, цвет и подкраска
+         (`appearance.themeAndColors` нативной). Названия строк — скринридеру. -->
+    <h3>{t('appearance.themeAndColors')}</h3>
+    <span id="theme-title" class="visually-hidden">{t('appearance.theme')}</span>
     <div class="options" role="radiogroup" aria-labelledby="theme-title">
       {#each themes as theme (theme.value)}
         <button type="button" role="radio" aria-checked={preferences.appearance === theme.value} onclick={() => (preferences.appearance = theme.value)}>
@@ -515,7 +518,7 @@
         </button>
       {/each}
     </div>
-    <h3 id="accent-title">{t('appearance.accent')}</h3>
+    <span id="accent-title" class="visually-hidden">{t('appearance.accent')}</span>
     <AccentSwatches labelledby="accent-title" />
     <label class="switch">
       <span>{t('appearance.tintInterface')}</span>

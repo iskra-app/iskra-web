@@ -366,7 +366,9 @@
           {/each}
         </div>
         <div id="tabpanel" role="tabpanel" aria-labelledby="tab-{tab}">
-          <h3 id="contents-title">
+          <!-- Название вкладки уже написано на выбранной вкладке прямо над содержимым: второй заголовок
+               был «заголовком для заголовка» (`RoomInfoView` нативной). Скринридеру он остаётся. -->
+          <h3 id="contents-title" class="visually-hidden">
             {t(tabTitle(tab))}
             {#if tab === 'members'}<span class="count">{plural('room.members', details.members.length)}</span>{/if}
           </h3>
