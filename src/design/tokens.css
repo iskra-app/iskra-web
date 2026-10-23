@@ -24,6 +24,9 @@
   --space-generous: 1.5rem; /* 24 */
   --space-between-senders: 0.75rem; /* 12 */
   --space-within-run: 0.125rem; /* 2 — не кратно 4 сознательно, см. Theme.swift */
+  /* Между сообщениями одного автора в компактном виде: у строки нет края, и при 2 px два сообщения
+     читаются как одно в две строки. */
+  --space-within-compact-run: 0.5rem; /* 8 */
 
   /* Theme.Radius */
   --radius-bubble: 1.5rem; /* 24 */

@@ -303,7 +303,7 @@
 <style>
   .forwarded {
     display: block;
-    margin-block-end: var(--space-tight);
+    margin-block-end: var(--space-close);
     font-size: var(--font-size-caption);
     font-style: italic;
     opacity: 0.8;
@@ -459,6 +459,11 @@
   /* Компактный: без пузыря, во всю ширину, лицо — сверху серии. */
   .row.compact {
     align-items: flex-start;
+  }
+  /* У строки без пузыря нет края, и при зазоре в 2 px два сообщения читались бы как одно в две
+     строки. */
+  .row.compact:not(.first) {
+    margin-block-start: var(--space-within-compact-run);
   }
   .compact .stack {
     flex: 1;
