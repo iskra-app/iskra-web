@@ -75,6 +75,27 @@ test('ответ и правка: полоса над полем, ↑ берёт
   await expect(field).toHaveValue('');
 });
 
+test('отменённая правка возвращает поле как было: слова и ответ, к которому они шли', async ({ page }) => {
+  await signInToDemo(page);
+  await openRoom(page, /^Выходные/);
+  const field = page.getByRole('textbox', { name: 'Сообщение' });
+  await field.fill('Первая реплика');
+  await page.getByRole('button', { name: 'Отправить' }).click();
+  await expect(page.getByRole('img', { name: 'Отправляется' })).toHaveCount(0, { timeout: 10_000 });
+
+  // Полунаписанный ответ — и правка поверх него.
+  await (await menuOf(page, 'Я — пирог')).getByRole('menuitem', { name: 'Ответить' }).click();
+  await field.fill('Недописанный ответ');
+  await (await menuOf(page, 'Первая реплика')).getByRole('menuitem', { name: 'Изменить' }).click();
+  await expect(page.getByText('Изменение сообщения')).toBeVisible();
+  await expect(field).toHaveValue('Первая реплика');
+
+  await field.press('Escape');
+  await expect(page.getByText('Изменение сообщения')).toBeHidden();
+  await expect(page.getByText('Ответ', { exact: true })).toBeVisible();
+  await expect(field).toHaveValue('Недописанный ответ');
+});
+
 test('удаление своего — с вопросом, и исчезает у всех', async ({ page }) => {
   await signInToDemo(page);
   await openRoom(page, /^Выходные/);

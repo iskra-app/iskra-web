@@ -87,6 +87,8 @@
   let context = $state<ComposerContext>(null);
   /** Черновик, отложенный на время правки: правка — не черновик. */
   let stashed = '';
+  /** И ответ, к которому он был: правка занимает поле, а когда кончается, поле возвращается как было. */
+  let stashedContext: ComposerContext = null;
   /** Кто стоит за `@Имя` в черновике — см. `composerMentions.ts`. */
   let mentions = $state<ComposerMention[]>([]);
   let stashedMentions: ComposerMention[] = [];
@@ -185,6 +187,7 @@
     text = '';
     context = null;
     stashed = '';
+    stashedContext = null;
     mentions = [];
     stashedMentions = [];
     selection = null;
@@ -271,18 +274,16 @@
       attachments = [];
       text = '';
       mentions = [];
+      context = null;
     } else if (context?.kind === 'edit') {
       store.edit(context.message, value, mentions);
-      text = stashed;
-      stashed = '';
-      mentions = stashedMentions;
-      stashedMentions = [];
+      endEditing();
     } else {
       store.send(value, context?.kind === 'reply' ? context.message : undefined, mentions);
       text = '';
       mentions = [];
+      context = null;
     }
-    context = null;
     clearTimeout(saveTimer);
     void session.saveDraft(draftKey, text);
   }
@@ -369,23 +370,34 @@
 
   function edit(message: Message) {
     if (!message.canEdit || !('body' in message.kind)) return;
+    // Запомнено перед *первой* правкой: от одной правки к другой слова первого сообщения
+    // не должны стать чужими «своими».
     if (context?.kind !== 'edit') {
       stashed = text;
       stashedMentions = mentions;
+      stashedContext = context;
     }
     context = { kind: 'edit', message };
     // В теле своего — Markdown, каким оно ушло: упоминания — снова `@Имя` с записью рядом.
     ({ text, mentions } = unlinkMentions(message.kind.body));
   }
 
+  /**
+   * Поле — как было до правки: слова, упоминания и ответ, к которому они шли (`endEditing`
+   * нативной). Не пустым и не с текстом правленого сообщения.
+   */
+  function endEditing() {
+    text = stashed;
+    stashed = '';
+    mentions = stashedMentions;
+    stashedMentions = [];
+    context = stashedContext;
+    stashedContext = null;
+  }
+
   function cancelContext() {
-    if (context?.kind === 'edit') {
-      text = stashed;
-      stashed = '';
-      mentions = stashedMentions;
-      stashedMentions = [];
-    }
-    context = null;
+    if (context?.kind === 'edit') endEditing();
+    else context = null;
   }
 
   // ————— «@» —————
@@ -476,7 +488,8 @@
       return !!store?.canPin;
     },
     reply: (message) => {
-      if (context?.kind === 'edit') text = stashed;
+      // Из правки — сначала наружу, чтобы слова старого сообщения не стали началом ответа.
+      if (context?.kind === 'edit') endEditing();
       context = { kind: 'reply', message };
     },
     edit,
