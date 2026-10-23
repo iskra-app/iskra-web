@@ -133,6 +133,32 @@ test('десктоп: Ctrl/⌘ Shift U открывает выбор файла;
   await expect.poll(async () => (await img.boundingBox())!.width).toBeCloseTo(before.width, 0);
 });
 
+test('десктоп: два пальца по трекпаду — вверх-вниз тянут снимок и закрывают, вбок листают', async ({ page }, info) => {
+  test.skip(isPhone(info.project.name), 'трекпад — десктоп');
+  await signInToDemo(page);
+  await openRoom(page, /^Выходные/);
+  await page.getByRole('log').getByRole('button', { name: 'Фото' }).first().click();
+  const viewer = page.getByRole('dialog', { name: 'Фото' });
+  await expect(viewer.locator('img')).toHaveAttribute('src', /^blob:/);
+  await expect(viewer.getByRole('status')).toHaveText('1 из 2');
+  await viewer.locator('img').hover();
+
+  // Вбок дальше порога — следующий снимок: мелкими шагами трекпада, не колёсиком мыши.
+  for (let i = 0; i < 5; i++) await page.mouse.wheel(20, 0);
+  await expect(viewer.getByRole('status')).toHaveText('2 из 2');
+  await page.waitForTimeout(300); // жест кончается тишиной: следующий — уже другой
+
+  // Вверх-вниз, но не до порога, — снимок возвращается и просмотрщик остаётся.
+  for (let i = 0; i < 2; i++) await page.mouse.wheel(0, 20);
+  await page.waitForTimeout(400);
+  await expect(viewer).toBeVisible();
+  await expect(viewer.getByRole('status')).toHaveText('2 из 2');
+
+  // До порога — закрывается.
+  for (let i = 0; i < 8; i++) await page.mouse.wheel(0, 20);
+  await expect(viewer).toBeHidden();
+});
+
 test('телефон: свайп вниз закрывает просмотрщик', async ({ page }, info) => {
   test.skip(!isPhone(info.project.name), 'палец');
   await signInToDemo(page);

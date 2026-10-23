@@ -5,6 +5,12 @@
   свайп вниз закрывает и гасит фон, свайп вбок листает.
   Десктоп: `←`/`→` листают, `Esc` закрывает, `Ctrl` + колесо и щипок на трекпаде (это тот
   же `wheel` с `ctrlKey`) приближают к курсору, перетаскивание двигает, `+`/`-`/`0` — масштаб.
+  Два пальца по трекпаду: приближенное — двигают снимок; в покое вверх-вниз тянут его, как флик
+  на телефоне (дальше порога просмотрщик закрывается), вбок — листают (`MacZoomableImage`).
+
+  Фон — как у Инстаграма (`GalleryBackdrop`): под снимком размытая и затемнённая страница, а не
+  чёрная. Снимок в покое чуть меньше экрана (`--size-viewer-inset`). На телефоне при приближении
+  фон чернеет — вблизи цвета вокруг ничего не дают; на десктопе остаётся размытым как есть.
 
   Оригинал скачивается (и расшифровывается) здесь и живёт ровно пока открыт: листнули или
   закрыли — `revokeObjectURL`. Пока он в пути — видна миниатюра из кэша ленты.
@@ -66,6 +72,8 @@
   let view = $state<View>(identity);
   /** Сдвиг жестом при масштабе 1: вниз — закрыть, вбок — листать. */
   let drag = $state({ x: 0, y: 0 });
+  /** Фон чернеет: приближенное на телефоне (`GalleryBackdrop`). */
+  const blackened = $derived(view.scale > 1 && !viewport.finePointer);
 
   onMount(() => {
     dialog?.showModal();
@@ -101,6 +109,7 @@
   });
 
   $effect(() => () => originals.clear());
+  $effect(() => () => clearTimeout(sweepTimer));
 
   // Текущее: миниатюра сразу, оригинал — следом; листнули — прежний оригинал отозван.
   $effect(() => {
@@ -153,7 +162,7 @@
 
   function clamped(next: View): View {
     if (!frame || !stage) return next;
-    return clampPan(next, { width: frame.offsetWidth, height: frame.offsetHeight }, { width: stage.clientWidth, height: stage.clientHeight });
+    return clampPan(next, { width: frame.offsetWidth, height: frame.offsetHeight }, { width: stage.clientWidth, height: stage.clientHeight }, viewport.finePointer);
   }
 
   function zoomTo(scale: number, at = { x: 0, y: 0 }) {
@@ -188,6 +197,25 @@
 
   // ————— Колесо и трекпад —————
 
+  /** Два пальца в покое: куда они пошли — вверх-вниз (тянут снимок) или вбок (листают). */
+  let sweep: { axis: 'flick' | 'page'; travel: number } | null = null;
+  let sweepTimer: ReturnType<typeof setTimeout> | undefined;
+  /** Тишина после последнего `wheel`, с которой двупальцевый жест считается оконченным (фаз у вебa нет). */
+  const SWEEP_END_MS = 120;
+
+  function endSweep() {
+    clearTimeout(sweepTimer);
+    const done = sweep;
+    sweep = null;
+    gesturing = false;
+    if (done?.axis === 'flick' && Math.abs(done.travel) > DISMISS) {
+      close();
+      return;
+    }
+    if (done?.axis === 'page' && Math.abs(done.travel) > SWIPE) go(done.travel < 0 ? 1 : -1);
+    drag = { x: 0, y: 0 };
+  }
+
   function onwheel(event: WheelEvent) {
     if (isVideo) return;
     event.preventDefault();
@@ -196,6 +224,18 @@
       zoomTo(view.scale * Math.exp(-event.deltaY * 0.01), fromCenter(event.clientX, event.clientY));
     } else if (view.scale > 1) {
       view = clamped({ ...view, x: view.x - event.deltaX, y: view.y - event.deltaY });
+    } else if (event.deltaMode === WheelEvent.DOM_DELTA_PIXEL && !(event.deltaX === 0 && Math.abs(event.deltaY) >= 50 && Number.isInteger(event.deltaY))) {
+      // Колесо мыши — крупными целыми шагами по вертикали, и тянуть им нечем; трекпад — мелкими.
+      if (!sweep) {
+        if (event.deltaX === 0 && event.deltaY === 0) return;
+        sweep = { axis: Math.abs(event.deltaY) > Math.abs(event.deltaX) ? 'flick' : 'page', travel: 0 };
+        gesturing = true;
+      }
+      // Пальцы вниз — отрицательный `deltaY` при естественной прокрутке: снимок идёт за пальцами.
+      sweep.travel -= sweep.axis === 'flick' ? event.deltaY : event.deltaX;
+      drag = sweep.axis === 'flick' ? { x: 0, y: sweep.travel } : { x: sweep.travel, y: 0 };
+      clearTimeout(sweepTimer);
+      sweepTimer = setTimeout(endSweep, SWEEP_END_MS);
     }
   }
 
@@ -342,7 +382,7 @@
   );
 </script>
 
-<dialog bind:this={dialog} class="viewer" aria-label={label} {onclose} {onkeydown}>
+<dialog bind:this={dialog} class="viewer" class:blackened aria-label={label} {onclose} {onkeydown}>
   <div class="bar">
     <button type="button" aria-label={t('message.media.close')} title={t('message.media.close')} onclick={close}>
       <svg viewBox={ICON_VIEWBOX} aria-hidden="true"><path d={icons.close} /></svg>
@@ -415,9 +455,14 @@
     margin: 0;
     padding: 0;
     border: none;
-    background: rgb(0 0 0 / calc(0.92 * var(--dim)));
+    /* Размытая страница под снимком, затемнённая; флик вниз гасит и то и другое (`--dim`). */
+    background: rgb(0 0 0 / calc(var(--viewer-dim) * var(--dim)));
+    backdrop-filter: blur(calc(var(--viewer-blur) * var(--dim)));
     color: white;
     overflow: hidden;
+  }
+  .viewer.blackened {
+    background: black;
   }
   .viewer::backdrop {
     background: transparent;
@@ -501,6 +546,12 @@
     object-fit: contain;
     user-select: none;
     -webkit-user-drag: none;
+  }
+  /* Снимок плавает над фоном, а не касается краёв; приближенный — снова весь экран. Видео — без отступа. */
+  img {
+    max-width: calc(100vw - 2 * var(--size-viewer-inset));
+    max-height: calc(100vh - 2 * var(--size-viewer-inset));
+    max-height: calc(100dvh - 2 * var(--size-viewer-inset));
   }
   video.round {
     max-width: min(100vw, 30rem);

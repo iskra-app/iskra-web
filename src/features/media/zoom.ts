@@ -32,9 +32,18 @@ export function zoomAt(view: View, nextScale: number, px: number, py: number): V
 /**
  * Сдвиг не дальше, чем нужно, чтобы край картинки дошёл до края сцены: за картинку не
  * утаскивается пустота. `fit` — размер картинки на масштабе 1.
+ *
+ * `toMiddle` — на десктопе (Mac нативной): дальше края окна, пока край картинки не дойдёт до
+ * середины сцены, чтобы угол приближенного снимка можно было привести к середине экрана, а не
+ * упереться им в бок; но не дальше — снимок не уносится в темноту и не теряется.
  */
-export function clampPan(view: View, fit: { width: number; height: number }, stage: { width: number; height: number }): View {
-  const maxX = Math.max(0, (fit.width * view.scale - stage.width) / 2);
-  const maxY = Math.max(0, (fit.height * view.scale - stage.height) / 2);
+export function clampPan(
+  view: View,
+  fit: { width: number; height: number },
+  stage: { width: number; height: number },
+  toMiddle = false,
+): View {
+  const maxX = Math.max(0, (fit.width * view.scale - stage.width) / 2) + (toMiddle ? stage.width / 2 : 0);
+  const maxY = Math.max(0, (fit.height * view.scale - stage.height) / 2) + (toMiddle ? stage.height / 2 : 0);
   return { scale: view.scale, x: Math.max(-maxX, Math.min(maxX, view.x)), y: Math.max(-maxY, Math.min(maxY, view.y)) };
 }
