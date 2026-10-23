@@ -150,7 +150,7 @@
         {/if}
       </span>
     {/if}
-    <div class="stack">
+    <div class="stack" data-swipe-carrier>
       {#if nameHere}
         <!-- Видимое имя — для глаз; скринридеру его говорит само сообщение, у каждого. -->
         {#if actions.openProfile}
