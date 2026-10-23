@@ -12,7 +12,7 @@ test('стикеры: панель у поля, отправка, недавни
 
   // Чужой стикер — без пузыря, картинкой.
   const log = page.getByRole('log');
-  await expect(log.getByRole('img', { name: '📶' })).toBeVisible();
+  await expect(log.getByRole('img', { name: '🔓' })).toBeVisible();
 
   await page.getByRole('button', { name: 'Стикеры' }).click();
   const panel = page.getByRole('menu', { name: 'Стикеры' });
@@ -34,10 +34,10 @@ test('стикеры: панель у поля, отправка, недавни
   await expect(panel).toBeHidden();
 
   // Стикер Бориса — себе.
-  await log.getByRole('img', { name: '📶' }).click({ button: 'right' });
+  await log.getByRole('img', { name: '🔓' }).first().click({ button: 'right' });
   const menu = page.getByRole('menu', { name: 'Ещё' });
   await menu.getByRole('menuitem', { name: 'Добавить в мои стикеры' }).click();
-  await log.getByRole('img', { name: '📶' }).click({ button: 'right' });
+  await log.getByRole('img', { name: '🔓' }).first().click({ button: 'right' });
   await expect(menu.getByRole('menuitem', { name: 'Убрать из моих стикеров' })).toBeVisible();
   await page.keyboard.press('Escape');
 

@@ -243,7 +243,7 @@ export function buildDemoWorld(now: number): { rooms: DemoRoom[]; invites: DemoI
       { type: 'm.reaction', sender: boris, content: { 'm.relates_to': { rel_type: 'm.annotation', event_id: '$weekend-6', key: '🔥' } } },
       { type: 'm.reaction', sender: boris, content: { 'm.relates_to': { rel_type: 'm.annotation', event_id: '$weekend-9', key: '❤️' } } },
       // Стикер из набора «Выходных» — у Алисы его нет, можно добавить себе.
-      { type: 'm.sticker', sender: boris, event_id: '$weekend-sticker', content: demoStickerImage('connected') },
+      { type: 'm.sticker', sender: boris, event_id: '$weekend-sticker', content: demoStickerImage('unlocked') },
       text(vera, 'Алиса, ты с нами?', {
         format: 'org.matrix.custom.html',
         formatted_body: `<a href="https://matrix.to/#/${alice}">Алиса</a>, ты с нами?`,
@@ -354,7 +354,7 @@ export function buildDemoWorld(now: number): { rooms: DemoRoom[]; invites: DemoI
             type: 'im.ponies.room_emotes',
             sender: boris,
             state_key: '',
-            content: { pack: { display_name: 'Искра', usage: ['sticker'] }, images: demoStickerPack(['connected', 'unlocked', 'surprise', 'bypass']) },
+            content: { pack: { display_name: 'Искра', usage: ['sticker'] }, images: demoStickerPack(['loading', 'unlocked', 'surprise', 'curious']) },
             event_id: `$stickers-${weekend}`,
           },
         ]),
@@ -432,7 +432,7 @@ export function buildDemoWorld(now: number): { rooms: DemoRoom[]; invites: DemoI
  */
 const STICKER_EMOJI: Record<string, string> = {
   hello: '👋', joy: '🎉', love: '❤️', curious: '🤔', surprise: '😮', sleepy: '😴',
-  sad: '😢', grumpy: '😒', loading: '⏳', unlocked: '🔓', bypass: '🏃', connected: '📶',
+  sad: '😢', grumpy: '😒', loading: '⏳', unlocked: '🔓',
 };
 
 function demoStickerImage(code: string) {
