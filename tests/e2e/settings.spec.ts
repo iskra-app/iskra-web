@@ -449,7 +449,7 @@ test('«Чаты»: отправлять по Ctrl/⌘ Enter — Enter пере�
   await expect(page.getByRole('log').getByRole('article').filter({ hasText: 'вторая' })).toBeVisible();
 });
 
-test('«Реакции»: быстрая реакция — из шести или из всего каталога; её ставят двойное касание и кнопка у пузыря', async ({ page }, info) => {
+test('«Реакции»: быстрая реакция — из пяти или из всего каталога; её ставят двойное касание и кнопка у пузыря', async ({ page }, info) => {
   const problems = watchForProblems(page);
   await signInToDemo(page);
   await openSettings(page, 'Реакции');
@@ -480,7 +480,7 @@ test('«Реакции»: быстрая реакция — из шести ил
   // Реакций в демо до этого ни у кого не было: «👍 1» — та, что поставили сейчас, и своя.
   await expect(page.getByRole('log').getByRole('list', { name: 'Реакции' }).getByRole('button', { name: '👍, 1 человек', pressed: true })).toBeVisible({ timeout: 10_000 });
 
-  // Не из шести — из каталога: встаёт в ряд последней и подсвечена.
+  // Не из пяти — из каталога: встаёт на место пятой и подсвечена.
   await openSettings(page, 'Реакции');
   await page.getByRole('button', { name: 'Больше эмодзи' }).click();
   const panel = page.getByRole('dialog', { name: 'Больше эмодзи' });
@@ -488,6 +488,9 @@ test('«Реакции»: быстрая реакция — из шести ил
   await panel.getByRole('menuitemcheckbox', { name: 'Реакция 🍕' }).click();
   await expect(panel).toBeHidden();
   await expect(quick.getByRole('radio', { name: '🍕' })).toHaveAttribute('aria-checked', 'true');
+  // На месте пятой: в ряду по-прежнему пять эмодзи, а 😢 уступила место.
+  await expect(quick.getByRole('radio')).toHaveCount(5);
+  await expect(quick.getByRole('radio', { name: '😢' })).toHaveCount(0);
   expect(problems).toEqual([]);
 });
 
