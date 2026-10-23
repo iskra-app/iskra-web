@@ -9,6 +9,7 @@ import { createClient, type ValidatedAuthMetadata } from 'matrix-js-sdk';
 import { DEMO_BASE_URL, DEMO_SERVER } from '../demo/address';
 import { errorDetail } from '../support/errorDetail';
 import { quietLogger } from '../support/logger';
+import { secureUrl } from '../support/secureUrl';
 
 export type SignInProblem =
   | 'notFound'
@@ -155,6 +156,9 @@ export async function discoverServer(input: string, allowShortDemo = false): Pro
   } catch {
     oauth = undefined;
   }
+  // SDK проверяет у метаданных только то, что это строки. Страница входа, куда уходит человек,
+  // и адреса, куда уходят код и токены, — только `https:`; иначе этот путь не предлагаем.
+  if (oauth && !secureEndpoints(oauth)) oauth = undefined;
 
   let flows: string[];
   try {
@@ -174,6 +178,11 @@ export async function discoverServer(input: string, allowShortDemo = false): Pro
   };
   if (!info.oauth && !info.sso && !info.password) throw new SignInError('unsupportedMethod');
   return info;
+}
+
+function secureEndpoints(metadata: ValidatedAuthMetadata): boolean {
+  const { issuer, authorization_endpoint, token_endpoint, registration_endpoint, revocation_endpoint } = metadata;
+  return [issuer, authorization_endpoint, token_endpoint, registration_endpoint, revocation_endpoint].every((endpoint) => secureUrl(endpoint) !== null);
 }
 
 function isNetworkFailure(error: unknown): boolean {

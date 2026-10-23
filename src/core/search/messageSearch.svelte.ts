@@ -62,11 +62,18 @@ export function searchableText(event: MatrixEvent): string | undefined {
   return undefined;
 }
 
+const LEFT = new Set(['leave', 'ban']);
+
 export class MessageIndexer {
   private index: Promise<SearchIndex | null>;
   /** Что записать (`IndexEntry`) или стереть (`null`) — по ID события. */
   // eslint-disable-next-line svelte/prefer-svelte-reactivity -- очередь, не состояние экрана
   private readonly queue = new Map<string, IndexEntry | null>();
+  /** Удаления, пришедшие событием, — проверяются по записи при сбросе (`removeRedacted`). */
+  private redactions: Array<{ target: string; roomId: string; redactor: string; byModerator: boolean }> = [];
+  /** Комнаты, из которых ушли, — их записи стереть целиком. */
+  // eslint-disable-next-line svelte/prefer-svelte-reactivity -- очередь, не состояние экрана
+  private readonly leftRooms = new Set<string>();
   private timer: ReturnType<typeof setTimeout> | undefined;
   private flushing: Promise<void> = Promise.resolve();
   private readonly detach: Array<() => void> = [];
@@ -103,6 +110,14 @@ export class MessageIndexer {
       const target = redaction.event.redacts ?? (redaction.getContent()['redacts'] as string | undefined);
       if (target) this.enqueue(target, null);
     });
+    // Ушли из комнаты (вышли, выгнали) — её переписка больше не находится: чата нет в списке, и
+    // вести в него поиску незачем.
+    this.on(RoomEvent.MyMembership, (room: Room, membership: string) => {
+      if (!LEFT.has(membership) || this.destroyed) return;
+      for (const [id, entry] of this.queue) if (entry?.roomId === room.roomId) this.queue.delete(id);
+      this.leftRooms.add(room.roomId);
+      this.schedule();
+    });
     this.on(ClientEvent.Sync, (state: SyncState) => {
       if (state === SyncState.Prepared) this.backfill();
     });
@@ -122,12 +137,25 @@ export class MessageIndexer {
     // Из `/messages` событие может прийти без `room_id` — комнату тогда знает тот, кто прислал.
     const roomId = event.getRoomId() ?? known?.roomId;
     if (!id || !roomId || this.destroyed) return;
+    // Удаление — сам по себе повод стереть, даже если удалённого нет в загруженной ленте:
+    // SDK тогда не скажет `RoomEvent.Redaction`, а в индексе оно лежит.
+    const room = known ?? this.client.getRoom(roomId);
+    if (event.isRedaction()) {
+      const target = event.event.redacts ?? (event.getContent()['redacts'] as string | undefined);
+      const redactor = event.getSender();
+      if (target && redactor) {
+        const byModerator = !!room?.currentState.hasSufficientPowerLevelFor('redact', room.getMember(redactor)?.powerLevel ?? 0);
+        this.redactions.push({ target, roomId, redactor, byModerator });
+        this.schedule();
+      }
+      return;
+    }
+    if (room && LEFT.has(room.getMyMembership())) return;
     // Своё, ещё не ушедшее: у него временный ID, а настоящий придёт с эхом.
     if (event.status !== null && event.status !== EventStatus.SENT) return;
     const relation = event.getWireContent()['m.relates_to'] as { rel_type?: string; event_id?: string } | undefined;
     if (relation?.rel_type === RelationType.Replace) {
       // Правка: переписать правленое — каким его теперь видно.
-      const room = known ?? this.client.getRoom(roomId);
       const original = relation.event_id ? room?.findEventById(relation.event_id) : undefined;
       if (original && original !== event) this.consider(original, room ?? undefined);
       return;
@@ -143,6 +171,10 @@ export class MessageIndexer {
 
   private enqueue(id: string, entry: IndexEntry | null): void {
     this.queue.set(id, entry);
+    this.schedule();
+  }
+
+  private schedule(): void {
     this.timer ??= setTimeout(() => {
       this.timer = undefined;
       void this.flush();
@@ -156,8 +188,11 @@ export class MessageIndexer {
       this.timer = undefined;
     }
     const batch = [...this.queue];
+    const left = [...this.leftRooms];
+    const redactions = this.redactions.splice(0);
     this.queue.clear();
-    if (!batch.length) return this.flushing;
+    this.leftRooms.clear();
+    if (!batch.length && !left.length && !redactions.length) return this.flushing;
     this.flushing = this.flushing.then(async () => {
       const index = await this.index;
       if (!index) return;
@@ -165,6 +200,10 @@ export class MessageIndexer {
       const removed = batch.flatMap(([id, entry]) => (entry ? [] : [id]));
       await index.put(entries).catch(() => {});
       await index.remove(removed).catch(() => {});
+      for (const { target, roomId, redactor, byModerator } of redactions) {
+        await index.removeRedacted(target, roomId, redactor, byModerator).catch(() => {});
+      }
+      for (const roomId of left) await index.removeRoom(roomId).catch(() => {});
     });
     return this.flushing;
   }

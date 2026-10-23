@@ -254,6 +254,10 @@ export class DemoHomeserver {
 
     if (this.variant === 'slow') await delay(this.slowDelayMs, init?.signal ?? undefined);
 
+    if (deviceId && this.account.devices[deviceId]?.signInAgain && !url.pathname.endsWith('/login') && !url.pathname.endsWith('/versions')) {
+      return json(401, { errcode: 'M_UNKNOWN_TOKEN', error: 'Sign in again', soft_logout: true });
+    }
+
     for (const [routeMethod, pattern, handler] of this.routes) {
       if (routeMethod !== method) continue;
       const match = pattern.exec(url.pathname);
@@ -296,6 +300,7 @@ export class DemoHomeserver {
       identifier?: { type?: string; user?: string };
       user?: string;
       token?: string;
+      device_id?: string;
     };
     const ok =
       request.type === 'm.login.password'
@@ -307,9 +312,12 @@ export class DemoHomeserver {
           : false;
     if (!ok) return json(403, { errcode: 'M_FORBIDDEN', error: 'Invalid username or password' });
     // Каждый вход — новое устройство, как у настоящего сервера: иначе второй вход после
-    // выхода столкнулся бы с ключами прошлого.
-    const deviceId = `DEMO${String(this.account.nextDevice++).padStart(3, '0')}`;
-    this.account.devices[deviceId] = { oneTimeKeys: 0 };
+    // выхода столкнулся бы с ключами прошлого. Кроме входа снова с `device_id` устройства,
+    // которое сервер оставил (`signInAgain`): оно продолжается со своими ключами.
+    const kept = request.device_id ? this.account.devices[request.device_id] : undefined;
+    const deviceId = kept ? request.device_id! : `DEMO${String(this.account.nextDevice++).padStart(3, '0')}`;
+    if (kept) delete kept.signInAgain;
+    else this.account.devices[deviceId] = { oneTimeKeys: 0 };
     this.save();
     return json(200, {
       user_id: demoUsers.alice,
@@ -317,6 +325,12 @@ export class DemoHomeserver {
       device_id: deviceId,
       well_known: { 'm.homeserver': { base_url: DEMO_BASE_URL } },
     });
+  }
+
+  /** Попросить все устройства войти снова — `soft_logout`, как сервер с истёкшим токеном. */
+  askToSignInAgain(): void {
+    for (const device of Object.values(this.account.devices)) device.signInAgain = true;
+    this.save();
   }
 
   private save(): void {

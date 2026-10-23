@@ -82,7 +82,7 @@
 {#if app.phase.name === 'loading'}
   <Loading />
 {:else if app.phase.name === 'signed-out'}
-  {#if SignIn}<SignIn problem={app.phase.problem} detail={app.phase.detail} ended={app.phase.ended} />{:else}<Loading />{/if}
+  {#if SignIn}<SignIn problem={app.phase.problem} detail={app.phase.detail} ended={app.phase.ended} resume={app.phase.resume} />{:else}<Loading />{/if}
 {:else if app.phase.name === 'elsewhere'}
   <Elsewhere />
 {:else if app.recoveryStep && app.phase.session.recovery}

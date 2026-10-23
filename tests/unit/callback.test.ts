@@ -1,5 +1,7 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { parseAuthCallback } from '../../src/core/auth/callback';
+import { SignInError } from '../../src/core/auth/server';
+import { completeSignIn } from '../../src/core/auth/signIn';
 
 describe('возврат со страницы входа', () => {
   it('OAuth во фрагменте — код забран, адрес чист', () => {
@@ -30,5 +32,31 @@ describe('возврат со страницы входа', () => {
   it('обычный адрес чата не трогается', () => {
     const href = 'https://web.iskra.test/#/room/!abc%3Amatrix.org';
     expect(parseAuthCallback(href)).toEqual({ callback: null, cleanUrl: href });
+  });
+});
+
+describe('ожидание входа', () => {
+  const storage = new Map<string, string>();
+  beforeEach(() => {
+    storage.clear();
+    vi.stubGlobal('sessionStorage', {
+      getItem: (key: string) => storage.get(key) ?? null,
+      setItem: (key: string, value: string) => void storage.set(key, value),
+      removeItem: (key: string) => void storage.delete(key),
+    });
+  });
+  afterEach(() => vi.unstubAllGlobals());
+
+  it('возврат с чужим state ожидание не забирает — начатый вход не обрывается', async () => {
+    storage.set('iskra.signIn.pending', JSON.stringify({ kind: 'oauth', state: 'mine', baseUrl: 'https://example.org' }));
+    await expect(completeSignIn({ kind: 'oauth', code: 'x', state: 'theirs' })).rejects.toBeInstanceOf(SignInError);
+    await expect(completeSignIn({ kind: 'oauth-error', error: 'access_denied', state: null })).rejects.toBeInstanceOf(SignInError);
+    expect(storage.has('iskra.signIn.pending')).toBe(true);
+  });
+
+  it('свой отказ — забирает', async () => {
+    storage.set('iskra.signIn.pending', JSON.stringify({ kind: 'oauth', state: 'mine', baseUrl: 'https://example.org' }));
+    await expect(completeSignIn({ kind: 'oauth-error', error: 'access_denied', state: 'mine' })).rejects.toBeInstanceOf(SignInError);
+    expect(storage.has('iskra.signIn.pending')).toBe(false);
   });
 });

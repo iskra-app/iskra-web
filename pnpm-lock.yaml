@@ -15,13 +15,13 @@ importers:
         specifier: 0.31.2
         version: 0.31.2
       dompurify:
-        specifier: ^3.4.16
+        specifier: 3.4.16
         version: 3.4.16
       matrix-encrypt-attachment:
-        specifier: ^1.0.3
+        specifier: 1.0.3
         version: 1.0.3
       matrix-js-sdk:
-        specifier: ^42.4.0
+        specifier: 42.4.0
         version: 42.4.0
       mediabunny:
         specifier: 1.62.0

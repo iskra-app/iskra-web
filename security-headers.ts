@@ -50,9 +50,15 @@ export function securityHeaders(dev: boolean): Record<string, string> {
     'Content-Security-Policy': csp(dev),
     'X-Content-Type-Options': 'nosniff',
     'Referrer-Policy': 'no-referrer',
+    // Камера, микрофон, геопозиция — кружочки, голосовые, «где я». Остальное — никому, и нам:
+    // мессенджеру незачем ни порты и устройства, ни датчики движения. Чтение буфера обмена не
+    // запрещаем: браузер и так спрашивает на него разрешение, а e2e им проверяют «Скопировать».
     'Permissions-Policy':
-      'camera=(self), microphone=(self), geolocation=(self), display-capture=(), payment=(), usb=()',
+      'camera=(self), microphone=(self), geolocation=(self), display-capture=(), payment=(), usb=(), ' +
+      'serial=(), hid=(), bluetooth=(), midi=(), accelerometer=(), gyroscope=(), magnetometer=(), browsing-topics=()',
     'Cross-Origin-Opener-Policy': 'same-origin',
+    // Свои файлы не встраиваются чужими страницами: ни оболочка, ни WASM.
+    'Cross-Origin-Resource-Policy': 'same-origin',
   };
 }
 
