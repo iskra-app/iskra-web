@@ -324,6 +324,28 @@ test('автозагрузка «Никогда»: чужое фото — ра�
   expect(problems).toEqual([]);
 });
 
+test('видео в демо: миниатюра и длительность в ленте; просмотрщик играет его', async ({ page }) => {
+  const problems = watchForProblems(page);
+  await signInToDemo(page);
+  await openRoom(page, /^Аня/);
+  const tile = page.getByRole('log').getByRole('button', { name: 'Видео' });
+  await expect(tile).toHaveCount(1);
+  await expect(page.getByRole('log')).toContainText('Вот оно, озеро');
+  await expect(page.getByRole('log')).toContainText('0:03');
+  await tile.click();
+  const viewer = page.getByRole('dialog', { name: 'Видео' });
+  const video = viewer.locator('video');
+  await expect(video).toHaveAttribute('src', /^blob:/);
+  // Метаданные прочитаны — значит, байты дошли и это действительно mp4, а не заглушка. Где H.264
+  // нет (Firefox на Linux без системного кодека) — только то, что байты пришли.
+  if (await video.evaluate((v: HTMLVideoElement) => v.canPlayType('video/mp4; codecs="avc1.42E01E"') !== '')) {
+    await expect.poll(() => video.evaluate((v: HTMLVideoElement) => Math.round(v.duration))).toBe(3);
+  }
+  await page.keyboard.press('Escape');
+  await expect(viewer).toBeHidden();
+  expect(problems).toEqual([]);
+});
+
 test('альбом: три фото, отправленные разом, — один пузырь с подписью; плитка открывает просмотрщик на себе', async ({ page }) => {
   const problems = watchForProblems(page);
   await signInToDemo(page);

@@ -127,6 +127,9 @@ function stamp(roomId: string, events: DemoEvent[], now: number, endsMinutesAgo:
   }));
 }
 
+/** Размер `clip.mp4` — событие говорит его заранее, как настоящее. */
+const CLIP_BYTES = 20_327;
+
 function photo(sender: string, id: string, w: number, h: number, caption?: string): DemoEvent {
   return {
     type: 'm.room.message',
@@ -164,6 +167,26 @@ export function buildDemoWorld(now: number): { rooms: DemoRoom[]; invites: DemoI
         'm.new_content': { msgtype: 'm.text', body: 'В десять у метро' },
         'm.relates_to': { rel_type: 'm.replace', event_id: `$anya-5` },
       }),
+      // Видео — со звуком и миниатюрой, как с телефона (`media.ts`, `clip.mp4`).
+      {
+        type: 'm.room.message',
+        sender: anya,
+        content: {
+          msgtype: 'm.video',
+          body: 'Вот оно, озеро',
+          filename: 'lake.mp4',
+          url: `mxc://${DEMO_SERVER}/clip`,
+          info: {
+            w: 320,
+            h: 180,
+            duration: 3000,
+            mimetype: 'video/mp4',
+            size: CLIP_BYTES,
+            thumbnail_url: `mxc://${DEMO_SERVER}/clip-frame`,
+            thumbnail_info: { w: 320, h: 180, mimetype: 'image/jpeg' },
+          },
+        },
+      },
       text(anya, 'Возьми плед, там ветрено'),
     ],
     now,
