@@ -68,6 +68,11 @@ interface DemoRequest {
 const tokenFor = (deviceId: string) => `demo-token-${deviceId}`;
 /** Сколько длинный опрос ждёт, если нового нет. SDK просит 30 секунд; демо не нужно столько. */
 const LONG_POLL_CAP_MS = 5_000;
+/**
+ * «Сеть» демо для загрузок, байт в миллисекунду — 2 МБ/с, как мобильный интернет: фото уходит
+ * за полсекунды, видео — за несколько, и полоса прогресса успевает показаться.
+ */
+const UPLINK_BYTES_PER_MS = 2_000;
 
 export class DemoHomeserver {
   readonly baseUrl = DEMO_BASE_URL;
@@ -227,6 +232,9 @@ export class DemoHomeserver {
     // микрозадачах, и цикл исходящих запросов Rust-крипто не отдавал бы очередь таймерам —
     // а на таймерах держится длинный опрос, которого ждёт, например, запись данных аккаунта.
     await new Promise((resolve) => setTimeout(resolve, 0));
+    // Загрузка потоком (`uploadClientFor`): забрать его здесь, со скоростью «сети» — отправитель
+    // видит прогресс. `Request` с потоком в теле WebKit не построит, а байты — построит.
+    if (init?.body instanceof ReadableStream) init = { ...init, body: await receive(init.body, init.signal ?? undefined) };
     const request = new Request(input, init);
     const url = new URL(request.url);
     const method = request.method.toUpperCase();
@@ -1365,6 +1373,24 @@ function json(status: number, body: unknown): Response {
 
 function unrecognized(): Response {
   return json(404, { errcode: 'M_UNRECOGNIZED', error: 'Unrecognized request' });
+}
+
+/** Тело загрузки — по кускам, с паузой на каждый, как по сети в `UPLINK_BYTES_PER_MS`. */
+async function receive(body: ReadableStream<Uint8Array>, signal: AbortSignal | undefined): Promise<Blob> {
+  const reader = body.getReader();
+  const parts: Uint8Array[] = [];
+  try {
+    for (;;) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      parts.push(value);
+      await delay(value.byteLength / UPLINK_BYTES_PER_MS, signal);
+    }
+  } catch (error) {
+    await reader.cancel(error).catch(() => {});
+    throw error;
+  }
+  return new Blob(parts as BlobPart[]);
 }
 
 function delay(ms: number, signal: AbortSignal | undefined): Promise<void> {

@@ -324,6 +324,24 @@ test('автозагрузка «Никогда»: чужое фото — ра�
   expect(problems).toEqual([]);
 });
 
+test('загрузка в демо идёт с прогрессом: полоса проходит середину, а не прыгает к концу', async ({ page }) => {
+  const problems = watchForProblems(page);
+  await signInToDemo(page);
+  await openRoom(page, /^Выходные/);
+  // Полтора мегабайта — у «сети» демо (2 МБ/с) это заметные доли секунды.
+  await page.locator('input[type=file]').setInputFiles({ name: 'отчёт.bin', mimeType: 'application/octet-stream', buffer: Buffer.alloc(1_500_000, 7) });
+  await expect(page.getByRole('listitem').filter({ hasText: 'отчёт.bin' })).toBeVisible();
+  await page.getByRole('button', { name: 'Отправить' }).click();
+  const bar = page.getByRole('progressbar').first();
+  await expect
+    .poll(async () => Number((await bar.getAttribute('aria-valuenow').catch(() => null)) ?? -1), { intervals: [50] })
+    .toBeGreaterThan(0);
+  expect(Number(await bar.getAttribute('aria-valuenow'))).toBeLessThan(100);
+  await expect(page.getByRole('log').getByRole('article').filter({ hasText: 'отчёт.bin' })).toHaveCount(1, { timeout: 20_000 });
+  await expect(page.getByRole('progressbar')).toHaveCount(0);
+  expect(problems).toEqual([]);
+});
+
 test('видео в демо: миниатюра и длительность в ленте; просмотрщик играет его', async ({ page }) => {
   const problems = watchForProblems(page);
   await signInToDemo(page);
