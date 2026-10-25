@@ -11,7 +11,7 @@
  * 4. сессия.
  */
 import type { AuthCallback } from '../auth/callback';
-import { SignInError, type SignInProblem } from '../auth/server';
+import { demoAvailable, SignInError, type SignInProblem } from '../auth/server';
 import { completeSignIn } from '../auth/signIn';
 import {
   currentEnvironment,
@@ -88,7 +88,8 @@ export class AppState {
       this.phase = { name: 'signed-out', problem: 'storageUnavailable', detail: errorDetail(error) };
       return;
     }
-    if (!account) {
+    // Демо-вход из сборки, где демо было, а в этой его нет: заходить некуда.
+    if (!account || (account.method === 'demo' && !demoAvailable)) {
       this.phase = { name: 'signed-out' };
       return;
     }

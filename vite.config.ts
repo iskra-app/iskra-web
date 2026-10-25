@@ -65,6 +65,8 @@ export default defineConfig({
   define: {
     __ISKRA_BUILD__: JSON.stringify(buildId()),
     __ISKRA_VERSION__: JSON.stringify(versionOf()),
+    // Демо-сервер в сборке — только по просьбе: e2e и ночная; боевая — без него.
+    __ISKRA_DEMO__: JSON.stringify(process.env['ISKRA_DEMO'] === '1'),
   },
   plugins: [
     svelte(),

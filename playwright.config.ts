@@ -37,6 +37,8 @@ export default defineConfig({
   },
   webServer: {
     command: 'pnpm build && pnpm preview --port 4173 --strictPort',
+    // Тесты живут на демо-сервере, а боевая сборка его не несёт.
+    env: { ISKRA_DEMO: '1' },
     url: 'http://localhost:4173',
     reuseExistingServer: !process.env['CI'],
     timeout: 120_000,
