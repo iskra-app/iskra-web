@@ -238,6 +238,27 @@ test('«кружочек»: камера поверх комнаты, кольц
   await camera.getByRole('button', { name: 'Отправить' }).click();
   await expect(camera).toBeHidden();
   await expect(notes).toHaveCount(1);
+
+  // В просмотрщике — круг без полосы управления браузера; нажатие и пробел — пауза и снова.
+  await notes.click();
+  const viewer = page.getByRole('dialog', { name: 'Видеосообщение' });
+  const round = viewer.locator('video');
+  await expect(round).toHaveAttribute('src', /^blob:/);
+  await expect(round).not.toHaveAttribute('controls');
+  // Пауза — там, где записанное здесь вообще играет: под Playwright ни Chromium (без H.264), ни
+  // WebKit кружочек с поддельной камеры не декодируют (MEDIA_ERR_SRC_NOT_SUPPORTED).
+  const state = () => round.evaluate((v: HTMLVideoElement) => (v.error ? 'broken' : v.readyState > 0 ? 'ready' : 'loading'));
+  await expect.poll(state).not.toBe('loading');
+  if ((await state()) === 'ready') {
+    const paused = () => round.evaluate((v: HTMLVideoElement) => v.paused);
+    const before = await paused();
+    await round.click();
+    await expect.poll(paused).toBe(!before);
+    await page.keyboard.press('Space');
+    await expect.poll(paused).toBe(before);
+  }
+  await page.keyboard.press('Escape');
+  await expect(viewer).toBeHidden();
 });
 
 test('«кружочек»: «Отмена» и Esc — камера закрыта, ничего не ушло', async ({ page }, info) => {

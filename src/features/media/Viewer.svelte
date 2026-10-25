@@ -139,7 +139,20 @@
     }
     return () => {
       alive = false;
-      if (created) URL.revokeObjectURL(created);
+      if (!created) return;
+      const url = created;
+      // Видео, которое ещё читает этот адрес (закрытое окно догорает с ним), — сначала отпустить
+      // его, и отозвать адрес, когда оно отпустило (`emptied`): WebKit, у которого запрос к blob уже
+      // в пути, иначе пишет в консоль ошибку отозванного адреса.
+      const reading = [...(stage?.querySelectorAll('video') ?? [])].find((video) => video.src === url);
+      // Не начинало читать — `emptied` не придёт, а держать нечего.
+      if (!reading || reading.networkState === HTMLMediaElement.NETWORK_EMPTY) {
+        URL.revokeObjectURL(url);
+        return;
+      }
+      reading.addEventListener('emptied', () => setTimeout(() => URL.revokeObjectURL(url)), { once: true });
+      reading.removeAttribute('src');
+      reading.load();
     };
   });
 
@@ -169,6 +182,16 @@
     view = clamped(zoomAt(view, scale, at.x, at.y));
   }
 
+  // ————— Кружочек —————
+
+  let note: HTMLVideoElement | undefined = $state();
+
+  function toggleNote() {
+    if (!note) return;
+    if (note.paused) void note.play().catch(() => {});
+    else note.pause();
+  }
+
   // ————— Клавиатура —————
 
   function onkeydown(event: KeyboardEvent) {
@@ -188,6 +211,10 @@
         break;
       case '0':
         view = identity;
+        break;
+      case ' ':
+        if (!note) return;
+        toggleNote();
         break;
       default:
         return;
@@ -420,8 +447,15 @@
         {#if problem}
           <p class="problem" role="alert">{problem === 'tampered' ? t('message.media.tampered') : isVideo ? t('message.media.loadFailed') : t('message.media.failed')}</p>
         {:else if isVideo && full}
-          <!-- svelte-ignore a11y_media_has_caption -->
-          <video src={full} controls autoplay playsinline class:round={item.kind === 'videoNote'}></video>
+          {#if item.kind === 'videoNote'}
+            <!-- Кружочек — без полосы управления браузера: она режет круг и закрывает лицо. Нажатие
+                 по нему и пробел — пауза и снова; закончился — нажатие играет сначала. -->
+            <!-- svelte-ignore a11y_media_has_caption, a11y_click_events_have_key_events, a11y_no_noninteractive_element_interactions -->
+            <video bind:this={note} src={full} autoplay playsinline class="round" onclick={toggleNote}></video>
+          {:else}
+            <!-- svelte-ignore a11y_media_has_caption -->
+            <video src={full} controls autoplay playsinline></video>
+          {/if}
         {:else if full || preview}
           <img bind:this={picture} src={full ?? preview} alt={item.attachment.caption ?? item.attachment.name} draggable="false" />
         {/if}
@@ -555,6 +589,7 @@
   }
   video.round {
     max-width: min(100vw, 30rem);
+    cursor: pointer;
     border-radius: var(--radius-circle);
   }
   .problem {
