@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { paintCorners, squareCrop, VIDEO_NOTE_MASK_OVERSHOOT, VIDEO_NOTE_BITRATE, VIDEO_NOTE_MAX_MS, videoNoteMimeType } from '../../src/features/media/videoNote';
+import { paintCorners, squareCrop, VIDEO_NOTE_MASK_OVERSHOOT, VIDEO_NOTE_BITRATE, VIDEO_NOTE_MAX_MS, videoNoteMimeType, videoNoteZoomLimit } from '../../src/features/media/videoNote';
 import { decibelsOf, levelFromDecibels, resampleWaveform, voiceMimeType, WAVEFORM_SAMPLES } from '../../src/features/media/voice';
 
 describe('волна голосового', () => {
@@ -73,6 +73,17 @@ describe('«кружочек»', () => {
     expect(squareCrop(1280, 720)).toEqual({ x: 280, y: 0, side: 720 });
     expect(squareCrop(720, 1280)).toEqual({ x: 0, y: 280, side: 720 });
     expect(squareCrop(480, 480)).toEqual({ x: 0, y: 0, side: 480 });
+    // Щипок: кусок вдвое меньше вокруг той же середины; меньше 1 — как 1.
+    expect(squareCrop(1280, 720, 2)).toEqual({ x: 460, y: 180, side: 360 });
+    expect(squareCrop(480, 480, 0.5)).toEqual({ x: 0, y: 0, side: 480 });
+  });
+
+  it('щипок «кружочка»: фронтальная — до 2×, задняя — до 5×, но не дальше объектива; без зума камеры — обрезкой до 2×', () => {
+    expect(videoNoteZoomLimit('user', { min: 1, max: 10 })).toBe(2);
+    expect(videoNoteZoomLimit('environment', { min: 1, max: 10 })).toBe(5);
+    expect(videoNoteZoomLimit('environment', { min: 1, max: 3 })).toBe(3);
+    expect(videoNoteZoomLimit('environment', null)).toBe(2);
+    expect(videoNoteZoomLimit('user', null)).toBe(2);
   });
 
   it('сжатие — десятая бита на пиксель: около 700 кбит/с, минута — около пяти мегабайт', () => {

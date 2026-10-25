@@ -33,11 +33,24 @@ export function videoNoteMimeType(recorder: { isTypeSupported(type: string): boo
 
 /**
  * Квадрат из середины кадра: у вебкамеры 16:9 обрезаются бока, у телефона стоймя — верх и низ.
- * Возвращает, какой кусок кадра брать.
+ * Возвращает, какой кусок кадра брать; `zoom` больше 1 — кусок меньше, вокруг той же середины.
  */
-export function squareCrop(width: number, height: number): { x: number; y: number; side: number } {
-  const side = Math.min(width, height);
+export function squareCrop(width: number, height: number, zoom = 1): { x: number; y: number; side: number } {
+  const side = Math.min(width, height) / Math.max(1, zoom);
   return { x: (width - side) / 2, y: (height - side) / 2, side };
+}
+
+/**
+ * Насколько ближе можно щипком — `maximumZoom` нативной: фронтальная — вдвое, задняя — впятеро;
+ * дальше лицо в кружке — поры, а цифровое приближение за пределом матрицы — каша. Камера,
+ * которая умеет приближать сама (`MediaTrackCapabilities.zoom`), — не дальше своего предела;
+ * не умеет — приближаем обрезкой кадра, и тут честный предел вдвое: из 640 px камеры в 480 px
+ * кружка.
+ */
+export function videoNoteZoomLimit(facing: 'user' | 'environment', lens: { min: number; max: number } | null): number {
+  const wanted = facing === 'user' ? 2 : 5;
+  if (!lens) return Math.min(wanted, 2);
+  return Math.max(1, Math.min(wanted, lens.max / lens.min));
 }
 
 /**

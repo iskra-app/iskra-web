@@ -9,6 +9,8 @@
   держит кнопку в композере, над спуском — замок: вверх — без рук.
 
   Телефон — «Перевернуть камеру», десктоп — выбор камеры из списка, если их больше одной.
+  Щипок по кружку — камера ближе (с `Ctrl` колесо — щипок трекпада), от того места, где оставил
+  прошлый щипок; второй рукой, пока первая держит кнопку, или обеими без рук.
 -->
 <script lang="ts">
   import { ICON_VIEWBOX, icons } from '../../design/icons.ts';
@@ -63,6 +65,41 @@
     oncancel();
   }
 
+  // ————— Щипок по кружку —————
+
+  // Где сейчас пальцы на кружке — рабочая память жеста, не состояние экрана.
+  // eslint-disable-next-line svelte/prefer-svelte-reactivity
+  const fingers = new Map<number, { x: number; y: number }>();
+  let pinch: { distance: number; zoom: number } | null = null;
+  const spread = () => {
+    const [a, b] = [...fingers.values()];
+    return a && b ? Math.hypot(a.x - b.x, a.y - b.y) : 0;
+  };
+
+  function onpointerdown(event: PointerEvent) {
+    if (event.pointerType !== 'touch') return;
+    fingers.set(event.pointerId, { x: event.clientX, y: event.clientY });
+    if (fingers.size === 2) pinch = { distance: spread(), zoom: recorder.zoom };
+  }
+
+  function onpointermove(event: PointerEvent) {
+    if (!fingers.has(event.pointerId)) return;
+    fingers.set(event.pointerId, { x: event.clientX, y: event.clientY });
+    if (pinch && fingers.size === 2 && pinch.distance > 0) recorder.setZoom((pinch.zoom * spread()) / pinch.distance);
+  }
+
+  function onpointerup(event: PointerEvent) {
+    fingers.delete(event.pointerId);
+    if (fingers.size < 2) pinch = null;
+  }
+
+  function onwheel(event: WheelEvent) {
+    // Щипок трекпада приходит колесом с `ctrlKey`; просто колесо — не наше.
+    if (!event.ctrlKey) return;
+    event.preventDefault();
+    recorder.setZoom(recorder.zoom * Math.exp(-event.deltaY * 0.01));
+  }
+
   function press() {
     if (recording) onsend();
     else if (ready) void recorder.start(onsend);
@@ -71,7 +108,9 @@
 
 <div class="capture" role="dialog" aria-label={t('videoNote.title')} tabindex="-1" {onkeydown}>
   <div class="stage">
-    <div class="circle" class:live={showPicture}>
+    <!-- Щипок — дополнение к записи, а не способ её вести: без него всё доступно. -->
+    <!-- svelte-ignore a11y_no_static_element_interactions -->
+    <div class="circle" class:live={showPicture} {onpointerdown} {onpointermove} {onpointerup} onpointercancel={onpointerup} {onwheel}>
       <div class="picture" use:mount></div>
       <svg class="ring" viewBox="0 0 100 100" aria-hidden="true">
         <!-- С двенадцати часов по часовой: поворот — атрибутом, числа в стилях не живут. -->
@@ -160,6 +199,8 @@
     border-radius: var(--radius-circle);
     background: var(--color-camera-plate);
     transition: transform var(--timing-arrival) var(--ease-menu-open);
+    /* Два пальца на кружке — щипок камеры, а не приближение страницы. */
+    touch-action: none;
   }
   @starting-style {
     .circle {
