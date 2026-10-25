@@ -26,6 +26,7 @@
   import { isPersisted, requestPersistence } from '../../core/storage/persistence';
   import { i18n, t, type TextKey } from '../../i18n/index.svelte.ts';
   import { faceModes, fonts, preferences, type Appearance, type FaceMode, type Font, threadPlaces, type ThreadPlace } from '../app/preferences.svelte.ts';
+  import AvatarCropper from '../media/AvatarCropper.svelte';
   import { fileSize } from '../media/files';
   import RecoveryCode from '../recovery/RecoveryCode.svelte';
   import AccentSwatches from './AccentSwatches.svelte';
@@ -95,19 +96,22 @@
     }
   }
 
-  async function setPhoto(file: File | null) {
+  async function setPhoto(photo: Blob | null) {
     profileProblem = null;
     try {
-      await session.setPhoto(file ? { blob: file, name: file.name, type: file.type } : null);
+      await session.setPhoto(photo ? { blob: photo, name: 'avatar.jpg', type: photo.type } : null);
     } catch {
       profileProblem = 'picture';
     }
   }
 
+  /** Выбранный снимок, который ещё обрезают — уходит только квадрат из обрезки. */
+  let cropping = $state<File | null>(null);
+
   function picked() {
     const file = picker?.files?.[0];
     if (picker) picker.value = '';
-    if (file?.type.startsWith('image/')) void setPhoto(file);
+    if (file?.type.startsWith('image/')) cropping = file;
   }
 
   // ————— Уведомления —————
@@ -368,6 +372,14 @@
       </div>
       <input bind:this={picker} type="file" accept="image/*" hidden onchange={picked} />
     </div>
+    <AvatarCropper
+      file={cropping}
+      oncancel={() => (cropping = null)}
+      ondone={(photo) => {
+        cropping = null;
+        void setPhoto(photo);
+      }}
+    />
     <section aria-labelledby="name-title">
       <h3 id="name-title">{t('account.nameHeader')}</h3>
       <form class="stack" onsubmit={saveName}>

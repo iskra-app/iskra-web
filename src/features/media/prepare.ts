@@ -181,7 +181,7 @@ function draw(source: CanvasImageSource, width: number, height: number, type: st
 }
 
 /** `createImageBitmap`, а где он не справился (старый Safari) — `<img>`. */
-async function decodeImage(file: Blob): Promise<{ source: CanvasImageSource; width: number; height: number; release: () => void }> {
+export async function decodeImage(file: Blob): Promise<{ source: CanvasImageSource; width: number; height: number; release: () => void }> {
   if (typeof createImageBitmap === 'function') {
     try {
       // Поворот из EXIF — в пиксели: метаданные со стиранием уходят, а фото не должно лечь набок.

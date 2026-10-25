@@ -139,6 +139,12 @@
   --viewer-dim: 0.65;
   --viewer-blur: 1.25rem; /* 20 — как ultraThinMaterial: радиус нативной не выбирается, здесь выбран */
   --size-viewer-inset: 1rem; /* 16 — `Theme.Size.galleryInset`: снимок плавает над фоном, а не касается краёв */
+  /* Обрезка фото профиля (`AvatarCropper` нативной): снаружи будущего круга снимок остаётся под
+     вуалью — видно, что не войдёт и куда сдвинуть, чтобы вошло. */
+  --color-crop-veil: rgb(0 0 0 / 0.55);
+  --color-crop-outline: rgb(255 255 255 / 0.8);
+  --size-crop-veil-spread: 100vmax; /* тень дыры — дальше любого края окна */
+  --size-avatar-cropper: 30rem; /* 480 — `Theme.Size.avatarCropper` */
   --timing-arrival: 240ms;
   --timing-reaction: 180ms;
   --timing-deletion: 220ms;

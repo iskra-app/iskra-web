@@ -140,6 +140,48 @@ test('новая комната и новый чат — создаются и �
   await expect(page.getByRole('log')).toContainText('Возьми плед, там ветрено', { timeout: 10_000 });
 });
 
+test('фото профиля — через обрезку: масштаб, «Готово» — уходит квадрат; «Отмена» — ничего', async ({ page }) => {
+  await signInToDemo(page);
+  await openSettings(page);
+  await page.getByRole('button', { name: 'Изменить' }).click();
+  await expect(page.getByRole('heading', { name: 'Ваш профиль', level: 1 })).toBeVisible();
+  // Снимок вдвое шире, чем высок, — чтобы было что обрезать.
+  const png = Buffer.from(
+    await page.evaluate(() => {
+      const canvas = document.createElement('canvas');
+      canvas.width = 400;
+      canvas.height = 200;
+      const context = canvas.getContext('2d')!;
+      context.fillStyle = '#c33';
+      context.fillRect(0, 0, 200, 200);
+      context.fillStyle = '#36c';
+      context.fillRect(200, 0, 200, 200);
+      return canvas.toDataURL('image/png').split(',')[1]!;
+    }),
+    'base64',
+  );
+  const picker = page.locator('input[type=file]');
+  const cropper = page.getByRole('dialog', { name: 'Переместите и приблизьте' });
+
+  await picker.setInputFiles({ name: 'широкий.png', mimeType: 'image/png', buffer: png });
+  await expect(cropper).toBeVisible();
+  await cropper.getByRole('button', { name: 'Отмена' }).click();
+  await expect(cropper).toBeHidden();
+  await expect(page.getByRole('button', { name: 'Удалить фото' })).toBeHidden();
+
+  await picker.setInputFiles({ name: 'широкий.png', mimeType: 'image/png', buffer: png });
+  const zoom = cropper.getByRole('slider', { name: 'Масштаб' });
+  await expect(zoom).toHaveValue('1');
+  await zoom.fill('2');
+  await expect(zoom).toHaveValue('2');
+  await cropper.getByRole('button', { name: 'Готово' }).click();
+  await expect(cropper).toBeHidden();
+  await expect(page.getByRole('button', { name: 'Удалить фото' })).toBeVisible({ timeout: 10_000 });
+  // Ушёл квадрат, а не полоса 400×200.
+  const face = page.locator('.profile-header img').first();
+  await expect.poll(() => face.evaluate((img: HTMLImageElement) => img.naturalWidth > 0 && img.naturalWidth === img.naturalHeight)).toBe(true);
+});
+
 test('настройки по разделам: имя, язык, тема, шрифт; устройство и хранилище видны', async ({ page }, info) => {
   await signInToDemo(page);
   await openSettings(page);
