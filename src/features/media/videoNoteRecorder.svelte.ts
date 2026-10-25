@@ -11,7 +11,7 @@
  * снимающий себя, смотрит в зеркало, и получатель должен увидеть то же, что видел он, а не
  * часы на другой руке. Задняя — не зеркалится.
  */
-import { squareCrop, VIDEO_NOTE_BITRATE, VIDEO_NOTE_FPS, VIDEO_NOTE_MAX_MS, VIDEO_NOTE_SIDE, videoNoteMimeType } from './videoNote';
+import { paintCorners, squareCrop, VIDEO_NOTE_BITRATE, VIDEO_NOTE_FPS, VIDEO_NOTE_MAX_MS, VIDEO_NOTE_SIDE, videoNoteMimeType } from './videoNote';
 
 export type VideoNoteState = 'idle' | 'preparing' | 'ready' | 'recording' | 'finishing' | 'denied' | 'unavailable' | 'failed';
 
@@ -162,7 +162,7 @@ export class VideoNoteRecorder {
     }
   }
 
-  /** Кадр камеры — в квадрат канваса, обрезкой середины; фронтальная — зеркально. */
+  /** Кадр камеры — в квадрат канваса, обрезкой середины; фронтальная — зеркально; углы — чёрные. */
   private startDrawing(): void {
     const context = this.canvas.getContext('2d');
     if (!context) return;
@@ -180,6 +180,8 @@ export class VideoNoteRecorder {
       }
       context.drawImage(this.video, crop.x, crop.y, crop.side, crop.side, 0, 0, VIDEO_NOTE_SIDE, VIDEO_NOTE_SIDE);
       context.restore();
+      // Что за кругом — в файл не уходит: другие клиенты показывают квадрат целиком.
+      paintCorners(context, VIDEO_NOTE_SIDE);
     }, 1000 / VIDEO_NOTE_FPS);
   }
 

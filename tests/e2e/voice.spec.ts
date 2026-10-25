@@ -221,6 +221,16 @@ test('«кружочек»: камера поверх комнаты, кольц
   // В кружке — тот самый канвас, который пишется: квадрат.
   const box = (await camera.locator('canvas').boundingBox())!;
   expect(Math.abs(box.width - box.height)).toBeLessThan(2);
+  // Углы — в самих пикселях чёрные, как `SquareVideoExporter` нативной: другие клиенты покажут
+  // квадрат целиком, а за кругом — комната, которую человек не видел. Середина — кадр камеры.
+  const pixels = await camera.locator('canvas').evaluate((canvas: HTMLCanvasElement) => {
+    const context = canvas.getContext('2d')!;
+    const at = (x: number, y: number) => [...context.getImageData(x, y, 1, 1).data.slice(0, 3)];
+    const s = canvas.width;
+    return { corners: [at(2, 2), at(s - 3, 2), at(2, s - 3), at(s - 3, s - 3)], middle: at(s / 2, s / 2) };
+  });
+  for (const corner of pixels.corners) expect(corner).toEqual([0, 0, 0]);
+  expect(pixels.middle.some((c) => c > 16)).toBe(true);
 
   // Увёл вверх — без рук, отправка кнопкой.
   await page.mouse.move(spot.x + spot.width / 2, spot.y - 100, { steps: 5 });

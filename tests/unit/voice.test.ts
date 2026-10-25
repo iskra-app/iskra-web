@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { squareCrop, VIDEO_NOTE_BITRATE, VIDEO_NOTE_MAX_MS, videoNoteMimeType } from '../../src/features/media/videoNote';
+import { paintCorners, squareCrop, VIDEO_NOTE_MASK_OVERSHOOT, VIDEO_NOTE_BITRATE, VIDEO_NOTE_MAX_MS, videoNoteMimeType } from '../../src/features/media/videoNote';
 import { decibelsOf, levelFromDecibels, resampleWaveform, voiceMimeType, WAVEFORM_SAMPLES } from '../../src/features/media/voice';
 
 describe('волна голосового', () => {
@@ -51,6 +51,22 @@ describe('формат записи', () => {
 });
 
 describe('«кружочек»', () => {
+  it('углы кадра — чёрные: квадрат с дырой чуть шире круга, even-odd; углы снаружи дыры', () => {
+    const calls: unknown[][] = [];
+    const context = {
+      fillStyle: '',
+      beginPath: () => calls.push(['beginPath']),
+      rect: (...a: number[]) => calls.push(['rect', ...a]),
+      arc: (...a: number[]) => calls.push(['arc', ...a]),
+      fill: (rule?: string) => calls.push(['fill', rule]),
+    };
+    paintCorners(context as never, 480);
+    expect(context.fillStyle).toBe('black');
+    expect(calls).toEqual([['beginPath'], ['rect', 0, 0, 480, 480], ['arc', 240, 240, 240 * VIDEO_NOTE_MASK_OVERSHOOT, 0, Math.PI * 2], ['fill', 'evenodd']]);
+    // Угол — в 0,707 стороны от центра: дыра его не достаёт, а свой круг в ленте (0,5) — внутри дыры.
+    expect(Math.hypot(240, 240)).toBeGreaterThan(240 * VIDEO_NOTE_MASK_OVERSHOOT);
+  });
+
   afterEach(() => vi.unstubAllGlobals());
 
   it('квадрат — из середины кадра: у вебкамеры обрезаются бока, у телефона — верх и низ', () => {

@@ -39,3 +39,25 @@ export function squareCrop(width: number, height: number): { x: number; y: numbe
   const side = Math.min(width, height);
   return { x: (width - side) / 2, y: (height - side) / 2, side };
 }
+
+/**
+ * Круг, снаружи которого углы кадра закрашиваются чёрным, — `SquareVideoExporter` нативной.
+ *
+ * Круг в ленте — маска на плеере: пиксели за ним остаются в файле, и любой другой клиент Matrix
+ * их покажет. А там — комната, в которой человек сидел и которую не видел: видоискатель был
+ * круглым. Поэтому углы уходят в файл чёрными — прозрачности у H.264 в mp4 нет.
+ *
+ * Круг чуть шире кадра (`1.04`, как в нативной): иначе на краю нашей же маски в ленте сглаживание
+ * двух кругов дало бы тёмную кайму. Углы кадра — в 0,707 стороны от центра, радиуса 0,52 им хватает.
+ */
+export const VIDEO_NOTE_MASK_OVERSHOOT = 1.04;
+
+/** Закрасить углы квадрата `side` чёрным: квадрат с круглой дырой, заливка even-odd. */
+export function paintCorners(context: Pick<CanvasRenderingContext2D, 'beginPath' | 'rect' | 'arc' | 'fill' | 'fillStyle'>, side: number): void {
+  const r = (side * VIDEO_NOTE_MASK_OVERSHOOT) / 2;
+  context.beginPath();
+  context.rect(0, 0, side, side);
+  context.arc(side / 2, side / 2, r, 0, Math.PI * 2);
+  context.fillStyle = 'black';
+  context.fill('evenodd');
+}
