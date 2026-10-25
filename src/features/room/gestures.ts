@@ -6,9 +6,6 @@
  *   возвращается; вертикальная прокрутка ленты не перехватывается (`touch-action: pan-y`
  *   у пузыря). Едет не один пузырь, а всё, что под `[data-swipe-carrier]`: реакции висят на
  *   его ножке, и пузырь, вытянутый из-под них, оставлял их в воздухе.
- * - **Два пальца по трекпаду** — то же самое мышью: сообщение под указателем тянется вбок
- *   `wheel`-событиями (`trackpadSwipe`, `swipeToReply` нативной на Mac). Вертикаль остаётся
- *   прокрутке ленты.
  * - **Долгое нажатие** — меню. Android присылает на него `contextmenu` сам, iOS — нет;
  *   поэтому свой таймер, а `contextmenu` сразу после него гасится (`suppressContextMenu`),
  *   чтобы меню не открылось дважды.
@@ -18,8 +15,6 @@ const DOUBLE_TAP_MS = 300;
 const TAP_SLOP_PX = 10;
 const SWIPE_PX = 64;
 const LONG_PRESS_MS = 500;
-/** Тишина после последнего `wheel`, с которой двупальцевый свайп считается оконченным. */
-const WHEEL_END_MS = 120;
 
 export interface GestureHandlers {
   ondoubletap: () => void;
@@ -103,61 +98,18 @@ export function touchGestures(node: HTMLElement, handlers: GestureHandlers) {
     reset();
   };
 
-  // ————— Два пальца по трекпаду —————
-
-  /** Сколько вправо протянуто в свайпе, который идёт; `null` — решение ещё не принято. */
-  let swipe: { travel: number; ours: boolean } | null = null;
-  let wheelTimer: ReturnType<typeof setTimeout> | undefined;
-
-  const finishWheel = () => {
-    clearTimeout(wheelTimer);
-    const done = swipe;
-    swipe = null;
-    if (done?.ours && done.travel >= SWIPE_PX) current.onswipe();
-    const moving = carrier();
-    moving.style.transition = '';
-    moving.style.transform = '';
-  };
-
-  const wheel = (event: WheelEvent) => {
-    // Колесо мыши и прокрутка страницами — не жест: у них нет двух пальцев.
-    if (event.ctrlKey || event.deltaMode !== WheelEvent.DOM_DELTA_PIXEL) return;
-    if (!swipe) {
-      if (event.deltaX === 0 && event.deltaY === 0) return;
-      // Первое движение решает всё, как у пальца: вбок — наше, вверх-вниз — прокрутке ленты.
-      swipe = { travel: 0, ours: Math.abs(event.deltaX) > Math.abs(event.deltaY) };
-    }
-    if (!swipe.ours) {
-      clearTimeout(wheelTimer);
-      wheelTimer = setTimeout(() => (swipe = null), WHEEL_END_MS);
-      return;
-    }
-    event.preventDefault();
-    // Пальцы вправо — отрицательный `deltaX` (естественная прокрутка) — тянут сообщение вправо.
-    swipe.travel = Math.max(0, Math.min(swipe.travel - event.deltaX, SWIPE_PX * 1.25));
-    const moving = carrier();
-    moving.style.transition = 'none';
-    moving.style.transform = `translateX(${swipe.travel}px)`;
-    clearTimeout(wheelTimer);
-    wheelTimer = setTimeout(finishWheel, WHEEL_END_MS);
-  };
-
   // Раньше обработчика строки: захват, чтобы погасить `contextmenu` до него.
   node.addEventListener('contextmenu', contextmenu, { capture: true });
   node.addEventListener('pointerdown', down);
   node.addEventListener('pointermove', move);
   node.addEventListener('pointerup', up);
   node.addEventListener('pointercancel', reset);
-  // Не пассивный: свайп вбок гасит и историю браузера «назад», которую тот же жест иначе листает.
-  node.addEventListener('wheel', wheel, { passive: false });
   return {
     update(next: GestureHandlers) {
       current = next;
     },
     destroy() {
       clearTimeout(pressTimer);
-      clearTimeout(wheelTimer);
-      node.removeEventListener('wheel', wheel);
       node.removeEventListener('contextmenu', contextmenu, { capture: true });
       node.removeEventListener('pointerdown', down);
       node.removeEventListener('pointermove', move);

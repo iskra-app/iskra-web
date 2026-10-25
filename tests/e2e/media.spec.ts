@@ -1,5 +1,5 @@
 import { readFileSync } from 'node:fs';
-import { expect, test, type Page } from '@playwright/test';
+import { expect, test, type Locator, type Page } from '@playwright/test';
 import { consoleOf, isPhone, openRoom, signInToDemo, watchForProblems } from './helpers';
 
 // Упал — показать консоль: падения в Firefox воспроизводятся только в CI.
@@ -133,6 +133,22 @@ test('десктоп: Ctrl/⌘ Shift U открывает выбор файла;
   await expect.poll(async () => (await img.boundingBox())!.width).toBeCloseTo(before.width, 0);
 });
 
+/**
+ * Два пальца по трекпаду: `steps` мелких `wheel` пикселями — одной задачей, без пауз между ними.
+ * Конец жеста просмотрщик узнаёт по тишине (120 мс); `mouse.wheel` по одному на медленной
+ * машине (WebKit в CI) делит жест на куски, и ни один не дотягивает до порога.
+ */
+async function trackpad(target: Locator, steps: number, deltaX: number, deltaY: number) {
+  await target.evaluate(
+    (node, { steps, deltaX, deltaY }) => {
+      for (let i = 0; i < steps; i++) {
+        node.dispatchEvent(new WheelEvent('wheel', { deltaX, deltaY, deltaMode: 0, bubbles: true, cancelable: true }));
+      }
+    },
+    { steps, deltaX, deltaY },
+  );
+}
+
 test('десктоп: два пальца по трекпаду — вверх-вниз тянут снимок и закрывают, вбок листают', async ({ page }, info) => {
   test.skip(isPhone(info.project.name), 'трекпад — десктоп');
   await signInToDemo(page);
@@ -141,21 +157,20 @@ test('десктоп: два пальца по трекпаду — вверх-�
   const viewer = page.getByRole('dialog', { name: 'Фото' });
   await expect(viewer.locator('img')).toHaveAttribute('src', /^blob:/);
   await expect(viewer.getByRole('status')).toHaveText('1 из 2');
-  await viewer.locator('img').hover();
 
   // Вбок дальше порога — следующий снимок: мелкими шагами трекпада, не колёсиком мыши.
-  for (let i = 0; i < 5; i++) await page.mouse.wheel(20, 0);
+  await trackpad(viewer.locator('img'), 5, 20, 0);
   await expect(viewer.getByRole('status')).toHaveText('2 из 2');
   await page.waitForTimeout(300); // жест кончается тишиной: следующий — уже другой
 
   // Вверх-вниз, но не до порога, — снимок возвращается и просмотрщик остаётся.
-  for (let i = 0; i < 2; i++) await page.mouse.wheel(0, 20);
+  await trackpad(viewer.locator('img'), 2, 0, 20);
   await page.waitForTimeout(400);
   await expect(viewer).toBeVisible();
   await expect(viewer.getByRole('status')).toHaveText('2 из 2');
 
   // До порога — закрывается.
-  for (let i = 0; i < 8; i++) await page.mouse.wheel(0, 20);
+  await trackpad(viewer.locator('img'), 8, 0, 20);
   await expect(viewer).toBeHidden();
 });
 
