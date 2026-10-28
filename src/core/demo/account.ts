@@ -19,8 +19,11 @@ export interface DemoBackup {
 }
 
 export interface DemoAccountState {
-  /** deviceId → загруженные ключи устройства. */
-  devices: Record<string, { keys?: Record<string, unknown>; oneTimeKeys: number }>;
+  /**
+   * deviceId → загруженные ключи устройства. `signInAgain` — сервер попросил войти снова
+   * (`soft_logout`): токен не принимается, пока не войдут с этим же устройством.
+   */
+  devices: Record<string, { keys?: Record<string, unknown>; oneTimeKeys: number; signInAgain?: boolean }>;
   /** Ключи кросс-подписи: `master_key`, `self_signing_key`, `user_signing_key`. */
   crossSigning: Record<string, Record<string, unknown>>;
   accountData: Record<string, unknown>;

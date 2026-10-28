@@ -3,10 +3,13 @@
   возвращает его, когда закрыт, и закрывается по `Esc`.
 -->
 <script lang="ts">
+  import { backdropClose } from './backdropClose';
   interface Props {
     open: boolean;
     title: string;
     message: string;
+    /** Перечень того, о чём спрашиваем, — под текстом, по строке на пункт. */
+    details?: string[];
     confirmLabel: string;
     cancelLabel: string;
     /** Действие разрушительное: кнопка подтверждения — красная, а не акцентная. */
@@ -14,7 +17,7 @@
     onconfirm: () => void;
     onclose: () => void;
   }
-  let { open, title, message, confirmLabel, cancelLabel, destructive = false, onconfirm, onclose }: Props = $props();
+  let { open, title, message, details = [], confirmLabel, cancelLabel, destructive = false, onconfirm, onclose }: Props = $props();
 
   let dialog: HTMLDialogElement | undefined = $state();
   const id = $props.id();
@@ -26,9 +29,14 @@
   });
 </script>
 
-<dialog bind:this={dialog} data-motion="pop" aria-labelledby="{id}-title" aria-describedby="{id}-message" {onclose}>
+<dialog bind:this={dialog} use:backdropClose={onclose} data-motion="pop" aria-labelledby="{id}-title" aria-describedby="{id}-message" {onclose}>
   <h2 id="{id}-title">{title}</h2>
   <p id="{id}-message">{message}</p>
+  {#if details.length}
+    <ul class="details">
+      {#each details as line, index (index)}<li>{line}</li>{/each}
+    </ul>
+  {/if}
   <div class="actions">
     <!-- Ни одна из двух не выделена как «правильная»: фокус — на отмене. -->
     <button type="button" class="cancel" onclick={onclose}>{cancelLabel}</button>
@@ -40,7 +48,7 @@
   dialog {
     width: min(calc(100% - 2 * var(--space-roomy)), var(--size-sign-in-column));
     padding: var(--space-generous);
-    border: none;
+    border: var(--border-hairline) solid var(--color-dialog-edge);
     border-radius: var(--radius-card);
     background: var(--color-background);
     color: var(--color-text);
@@ -56,6 +64,11 @@
   p {
     margin: 0 0 var(--space-generous);
     color: var(--color-text-secondary);
+  }
+  .details {
+    margin: calc(-1 * var(--space-close)) 0 var(--space-generous);
+    padding-inline-start: var(--space-roomy);
+    overflow-wrap: anywhere;
   }
   .actions {
     display: flex;

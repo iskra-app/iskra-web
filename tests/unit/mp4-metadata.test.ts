@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { stripMp4Metadata } from '../../src/core/media/mp4Metadata';
+import { isCleanMp4, stripMp4Metadata } from '../../src/core/media/mp4Metadata';
 
 const ascii = (s: string) => Array.from(s, (c) => c.charCodeAt(0));
 const u32 = (n: number) => [(n >>> 24) & 255, (n >>> 16) & 255, (n >>> 8) & 255, n & 255];
@@ -56,5 +56,41 @@ describe('видео без метаданных', () => {
   it('не MP4 — не разбираем, решает вызывающий', () => {
     expect(stripMp4Metadata(new Uint8Array([0x1a, 0x45, 0xdf, 0xa3, 1, 2, 3, 4]))).toBeNull();
     expect(stripMp4Metadata(new Uint8Array(box('ftyp', ascii('isom'))))).toBeNull();
+  });
+  it('чего нет в белом списке — не остаётся: чужой uuid с координатами, незнакомый бокс в moov и в дорожке', () => {
+    const secret = 'LAT=55.7558';
+    const ftyp = box('ftyp', ascii('isom'), u32(0), ascii('isom'));
+    const vendor = box('uuid', new Array(16).fill(7), ascii(secret));
+    const video = box('trak', full('tkhd', [...u32(0), ...u32(0)], u32(1)), box('mdia', full('mdhd', [...u32(0), ...u32(0)]), hdlr('vide')), box('loci', ascii(secret)));
+    const moov = box('moov', full('mvhd', [...u32(0), ...u32(0)], u32(600)), box('ainf', ascii(secret)), video);
+    const bytes = new Uint8Array([...ftyp, ...vendor, ...moov, ...box('mdat', ascii('FRAMES'))]);
+    expect(isCleanMp4(bytes)).toBe(false);
+    const out = stripMp4Metadata(bytes)!;
+    expect(text(out)).not.toContain(secret);
+    expect(text(out)).toContain('FRAMES');
+    expect(isCleanMp4(out)).toBe(true);
+  });
+  it('глубже дорожки — тоже белый список: незнакомое в mdia и stbl стирается, файл чист', () => {
+    const secret = 'GPS=55.7';
+    const zero = [...u32(0), ...u32(0)];
+    const stbl = box('stbl', full('stsz', u32(0), u32(0)), box('gps ', ascii(secret)));
+    const video = box('trak', full('tkhd', zero, u32(1)), box('mdia', full('mdhd', zero), hdlr('vide'), box('meta', ascii(secret)), box('minf', stbl)));
+    const bytes = new Uint8Array([...box('ftyp', ascii('isom')), ...box('moov', full('mvhd', zero), video), ...box('mdat', ascii('FRAMES'))]);
+    const out = stripMp4Metadata(bytes)!;
+    expect(out).not.toBeNull();
+    expect(text(out)).not.toContain(secret);
+    expect(isCleanMp4(out)).toBe(true);
+  });
+
+  it('фрагментированный файл с дорожкой не картинки и не звука — не чистим: её данные описаны в moof', () => {
+    const zero = [...u32(0), ...u32(0)];
+    const located = box('trak', full('tkhd', zero, u32(2)), box('mdia', full('mdhd', zero), hdlr('meta')));
+    const bytes = new Uint8Array([
+      ...box('ftyp', ascii('iso5')),
+      ...box('moov', full('mvhd', zero), located, box('mvex', full('trex', u32(2)))),
+      ...box('moof', full('mfhd', u32(1)), box('traf', full('tfhd', u32(2)))),
+      ...box('mdat', ascii('LAT=55.7')),
+    ]);
+    expect(stripMp4Metadata(bytes)).toBeNull();
   });
 });

@@ -28,9 +28,11 @@ export function commonMark(text: string): string {
 
 const parser = new Parser();
 // Перевод строки остаётся переводом: в переписке Enter — это новая строка, а не пробел.
-const renderer = new HtmlRenderer({ softbreak: '<br />' });
+// `safe` — ссылка `[текст](javascript:…)` уходит без адреса: у нас её вычистит `html.ts`, а у
+// получателя в другом клиенте — неизвестно.
+const renderer = new HtmlRenderer({ softbreak: '<br />', safe: true });
 // Человек пишет слова, а не разметку: набранное `<b>` уходит текстом `<b>`, а не тегом — и
-// не исчезает, как в режиме `safe`, который заменяет его комментарием.
+// не исчезает, как в режиме `safe`, который заменяет его комментарием: оба переопределены.
 type Literal = { literal: string | null };
 type Writer = { lit(text: string): void; esc(text: string): string; cr(): void };
 const asText = function (this: Writer, node: Literal) {

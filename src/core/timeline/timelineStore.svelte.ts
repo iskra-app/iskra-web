@@ -32,13 +32,14 @@ import {
 import { sendAttachment, uploadClientFor, type OutgoingFile, type UploadClient } from '../media/upload';
 import { stickerContent, type Sticker } from '../stickers/imagePack';
 import { geoUri, type Place } from './location';
-import { markdownContent } from './composerMarkdown';
+import type * as Markdown from './composerMarkdown';
 import { currentMarker, rememberMovedMarker } from './readMarker';
+import { reuse } from './reuse';
 import { canSendPoll, pollEndContent, pollStartContent, type PollDraft } from './poll';
 import { mentionsMarkdown, rankCandidates, unlinkMentions, type ComposerMention, type RankedCandidate } from './composerMentions';
 import { failureOf, mapEvent, threadRootOf, type MapperContext } from './mapper';
 import { previewOf } from '../rooms/preview';
-import { trustUnsignedDevices, withdrawChangedVerifications } from '../encryption/sendAnyway';
+import { trustUnsignedDevices, unsignedDevices, withdrawChangedVerifications, type UnsignedDevice } from '../encryption/sendAnyway';
 import { isMarkedUnread, MARKED_UNREAD } from '../rooms/summarize';
 import { layout, SHOW_ALL_SERVICE, type ServiceHiding, type TimelineItem } from './layout';
 import type { Message, Reaction, ThreadSummary } from './message';
@@ -54,9 +55,11 @@ export interface Upload {
   replyTo?: { eventId: string; senderId: string; own: boolean };
   /** Связь события целиком — у ответа в треде: `m.thread` и подпорка `m.in_reply_to`. */
   relatesTo?: Record<string, unknown>;
-  /** 0…1 */
+  /** 0…1 — того, что идёт сейчас: подготовки, пока `preparing`, потом загрузки. */
   progress: number;
   state: 'uploading' | 'failed';
+  /** Ещё готовится к отправке (`OutgoingFile.prepare` — сжатие видео). */
+  preparing?: boolean;
 }
 
 /** Что не получилось — ключи текстов нативной Искры (`timeline.*Failed`; `sendAnywayFailed` — из `message.delivery.*`). */
@@ -99,6 +102,7 @@ export class TimelineStore {
   items = $state.raw<TimelineItem[]>([]);
   /** Какие служебные строки спрятать — решают настройки устройства, наверху. */
   private hiding: ServiceHiding = SHOW_ALL_SERVICE;
+  private showsAllEvents = false;
   private unreadFrom: string | undefined;
   messages = $state.raw<Message[]>([]);
   /** Дошли до начала комнаты — больше просить нечего. */
@@ -246,7 +250,21 @@ export class TimelineStore {
   setServiceHiding(hiding: ServiceHiding): void {
     if (hiding.nameChanges === this.hiding.nameChanges && hiding.membership === this.hiding.membership) return;
     this.hiding = { ...hiding };
-    this.items = layout(this.messages, this.unreadFrom, this.hiding);
+    this.items = reuse(this.items, layout(this.messages, this.unreadFrom, this.hiding));
+  }
+
+  /** «Все события в чате» (бета-функции): нужна новая сборка — какие события строки, решает маппер. */
+  setShowsAllEvents(on: boolean): void {
+    if (on === this.showsAllEvents) return;
+    this.showsAllEvents = on;
+    this.schedule();
+  }
+
+  /** «Просмотреть JSON»: событие, как есть в SDK (расшифрованное — если оно зашифровано). Нет события на сервере — `undefined`. */
+  sourceJSON(message: Message): string | undefined {
+    const id = message.eventId;
+    const event = id ? this.room?.findEventById(id) : undefined;
+    return event ? JSON.stringify(event.getEffectiveEvent(), null, 2) : undefined;
   }
 
   /** Треды в этой комнате — по настройкам и её размеру (см. `ThreadSettings` нативной). */
@@ -291,9 +309,10 @@ export class TimelineStore {
       if (message) messages.push(message);
     }
     markRead(room, this.ownUserId, messages);
-    this.messages = messages;
+    // Не изменившееся — прежними объектами: экран перерисует только то, что правда другое.
+    this.messages = reuse(this.messages, messages);
     this.unreadFrom = unreadFrom;
-    this.items = layout(messages, unreadFrom, this.hiding);
+    this.items = reuse(this.items, layout(this.messages, unreadFrom, this.hiding));
     this.readPinnedMessage(room, context);
     if (!this.threadRootId && this.atStart === false && room.getLiveTimeline().getPaginationToken(Direction.Backward) === null) {
       this.atStart = true;
@@ -428,6 +447,7 @@ export class TimelineStore {
       isBlocked: (userId) => blocked.has(userId),
       ...(this.threads.enabled && !this.threadRootId ? { threadOf: this.threadSummaries(room, live, pending) } : {}),
       threaded: this.threads.enabled || !!this.threadRootId,
+      ...(this.showsAllEvents ? { showsAllEvents: true } : {}),
       keyOf: (event) => {
         let key = this.keys.get(event);
         if (!key) {
@@ -570,7 +590,10 @@ export class TimelineStore {
     const trimmed = text.trim();
     if (!trimmed) return;
     this.typingStopped();
-    const { content: words, userIds } = textContent(trimmed, mentions);
+    withMarkdown((markdown) => this.sendText(textContent(markdown, trimmed, mentions), replyTo));
+  }
+
+  private sendText({ content: words, userIds }: ReturnType<typeof textContent>, replyTo: Message | undefined): void {
     const content: Record<string, unknown> = { msgtype: 'm.text', ...words };
     const relation = this.relationFor(replyTo);
     if (relation) content['m.relates_to'] = relation;
@@ -677,7 +700,7 @@ export class TimelineStore {
   }
 
   retryUpload(id: string): void {
-    this.patchUpload(id, { state: 'uploading', progress: 0 });
+    this.patchUpload(id, { state: 'uploading', progress: 0, preparing: false });
     this.enqueue(id);
   }
 
@@ -699,7 +722,14 @@ export class TimelineStore {
     const abort = new AbortController();
     this.aborts.set(id, abort);
     try {
-      await sendAttachment(this.uploader, this.roomId, upload.file, {
+      let file = upload.file;
+      if (file.prepare) {
+        this.patchUpload(id, { preparing: true, progress: 0 });
+        file = await file.prepare(abort.signal, (progress) => this.patchUpload(id, { progress }));
+        // Подготовленное — и для «Отправить заново»: второй раз не сжимаем.
+        this.patchUpload(id, { file, preparing: false, progress: 0 });
+      }
+      await sendAttachment(this.uploader, this.roomId, file, {
         ...(upload.caption ? { caption: upload.caption } : {}),
         ...(upload.replyTo ? { replyTo: upload.replyTo } : {}),
         ...(upload.relatesTo ? { relatesTo: upload.relatesTo } : {}),
@@ -730,7 +760,10 @@ export class TimelineStore {
     const kind = message.kind;
     if (kind.type !== 'text' && kind.type !== 'emote' && kind.type !== 'notice') return;
     this.typingStopped();
-    const { content: words, userIds } = textContent(trimmed, mentions);
+    withMarkdown((markdown) => this.sendEdit(message, kind, textContent(markdown, trimmed, mentions)));
+  }
+
+  private sendEdit(message: Message, kind: { type: 'text' | 'emote' | 'notice'; body: string }, { content: words, userIds }: ReturnType<typeof textContent>): void {
     if (words.body === kind.body) return;
     const msgtype = kind.type === 'emote' ? 'm.emote' : kind.type === 'notice' ? 'm.notice' : 'm.text';
     const before = unlinkMentions(kind.body).mentions.map((m) => m.userId);
@@ -741,7 +774,7 @@ export class TimelineStore {
       ...(words.formatted_body ? { format: words.format, formatted_body: `* ${words.formatted_body}` } : {}),
       'm.new_content': { msgtype, ...words, ...(userIds.length ? { 'm.mentions': { user_ids: userIds } } : {}) },
       ...(fresh.length ? { 'm.mentions': { user_ids: fresh } } : {}),
-      'm.relates_to': { rel_type: 'm.replace', event_id: message.eventId },
+      'm.relates_to': { rel_type: 'm.replace', event_id: message.eventId! },
     };
     this.act('editFailed', () => this.client.sendMessage(this.roomId, content as never));
   }
@@ -905,6 +938,14 @@ export class TimelineStore {
     return undefined;
   }
 
+  /** Человек начал набирать — Markdown понадобится; загрузить, пока он пишет. Не загрузилось — `send` справится. */
+  prepareToSend(): Promise<void> {
+    return loadMarkdown().then(
+      () => {},
+      () => {},
+    );
+  }
+
   // ————— «Печатает…» —————
 
   /** Человек набирает текст. Повторяем не чаще раза в 20 секунд: сервер держит 30. */
@@ -958,8 +999,11 @@ export class TimelineStore {
    * (`identityChanged`, `insecureDevices`). Сначала решение о доверии (`sendAnyway.ts`),
    * потом то же, что «Отправить заново». Не вышло — строка остаётся «не отправлено», а над
    * лентой — «всё ещё не ушло», как в нативной.
+   *
+   * Неподписанным устройствам доверяют только те, что в `devices`, — те, что человек видел в
+   * подтверждении (`devicesToTrust`).
    */
-  sendAnyway(key: string): void {
+  sendAnyway(key: string, devices: UnsignedDevice[] = []): void {
     const event = this.pendingByKey(key);
     const room = this.room;
     if (!event || !room || event.status !== EventStatus.NOT_SENT) return;
@@ -967,9 +1011,20 @@ export class TimelineStore {
     if (reason !== 'identityChanged' && reason !== 'insecureDevices') return;
     this.act('sendAnywayFailed', async () => {
       if (reason === 'identityChanged') await withdrawChangedVerifications(this.client, room);
-      else if (!(await trustUnsignedDevices(this.client, room))) throw new Error('no olm machine');
+      else if (!(await trustUnsignedDevices(this.client, devices))) throw new Error('no olm machine');
       if (event.status === EventStatus.NOT_SENT) await this.client.resendEvent(event, room);
     });
+  }
+
+  /**
+   * Каким устройствам придётся довериться, чтобы не ушедшее ушло, — для подтверждения. Пусто —
+   * подтверждать нечего (сменилась личность, а не устройство).
+   */
+  async devicesToTrust(key: string): Promise<UnsignedDevice[]> {
+    const event = this.pendingByKey(key);
+    const room = this.room;
+    if (!event || !room || failureOf(event.error) !== 'insecureDevices') return [];
+    return unsignedDevices(this.client, room);
   }
 
   /** «Удалить» не ушедшее — оно и не уходило, удалять нечего, кроме строки. */
@@ -1072,8 +1127,36 @@ function markRead(room: Room, ownUserId: string, messages: Message[]): void {
   }
 }
 
+/**
+ * Разбор Markdown (commonmark с таблицами сущностей HTML — пятая часть стартовой сборки) нужен
+ * только тому, кто пишет: грузится с первым набранным символом (`prepareToSend`).
+ */
+let markdownModule: typeof Markdown | undefined;
+let markdownLoading: Promise<typeof Markdown> | undefined;
+
+function loadMarkdown(): Promise<typeof Markdown> {
+  markdownLoading ??= import('./composerMarkdown').then(
+    (module) => (markdownModule = module),
+    (error: unknown) => {
+      markdownLoading = undefined;
+      throw error;
+    },
+  );
+  return markdownLoading;
+}
+
+/**
+ * Отправка, когда разбор уже на месте, — сразу; иначе ждёт его. Все ждут одно обещание,
+ * поэтому порядок сообщений сохраняется. Не загрузился (сеть пропала посреди обновления) —
+ * текст уходит как набран, без разметки: потерять сообщение хуже.
+ */
+function withMarkdown(then: (markdown: typeof Markdown | undefined) => void): void {
+  if (markdownModule) return then(markdownModule);
+  loadMarkdown().then(then, () => then(undefined));
+}
+
 /** Текст и упоминания — в содержимое события: Markdown с ссылками `matrix.to` и кого звать. */
-function textContent(text: string, mentions: ComposerMention[]) {
-  const { markdown, userIds } = mentionsMarkdown(text, mentions);
-  return { content: markdownContent(markdown), userIds };
+function textContent(markdown: typeof Markdown | undefined, text: string, mentions: ComposerMention[]) {
+  const linked = mentionsMarkdown(text, mentions);
+  return { content: markdown ? markdown.markdownContent(linked.markdown) : { body: text }, userIds: linked.userIds };
 }

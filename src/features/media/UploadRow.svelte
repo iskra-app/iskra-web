@@ -30,6 +30,8 @@
   });
 
   const percent = $derived(Math.round(upload.progress * 100));
+  // Сначала видео сжимается (в этом браузере, долго), потом загружается — шкала у каждого шага своя.
+  const status = $derived(t(upload.preparing ? 'upload.compressing' : 'upload.progress', { percent }));
 </script>
 
 <div class="row">
@@ -41,11 +43,11 @@
     {/if}
     {#if upload.caption}<span class="caption">{upload.caption}</span>{/if}
     {#if upload.state === 'uploading'}
-      <span class="progress" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow={percent} aria-label={t('upload.progress', { percent })}>
+      <span class="progress" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow={percent} aria-label={status}>
         <span class="bar" use:aspect={upload.progress}></span>
       </span>
       <span class="status">
-        {t('upload.progress', { percent })}
+        {status}
         <button type="button" onclick={oncancel}>{t('upload.cancel')}</button>
       </span>
     {/if}

@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { signInToDemo } from './helpers';
+import { isPhone, signInToDemo } from './helpers';
 
 test('«Бета-функции» — тремя щелчками по значку в «Об Iskra»; мордочки — там, а не во «Внешнем виде»; Esc — как «Назад»', async ({ page }) => {
   await signInToDemo(page);
@@ -22,9 +22,33 @@ test('«Бета-функции» — тремя щелчками по знач�
   await faces.getByRole('radio', { name: /^Мордочки/ }).click();
   await expect(faces.getByRole('radio', { name: /^Мордочки/ })).toHaveAttribute('aria-checked', 'true');
 
+  // «Для разработчиков»: адрес сервера и два переключателя, выключенные по умолчанию.
+  await expect(page.getByRole('heading', { name: 'Для разработчиков' })).toBeVisible();
+  const source = page.getByRole('switch', { name: 'JSON сообщения в меню' });
+  await expect(source).not.toBeChecked();
+  await source.check();
+  await expect(page.getByRole('switch', { name: 'Все события в чате' })).not.toBeChecked();
+
   // Esc — назад туда, откуда пришли: в «Об Iskra», потом к списку.
   await page.keyboard.press('Escape');
   await expect(page).toHaveURL(/#\/settings\/about$/);
   await page.keyboard.press('Escape');
   await expect(page).toHaveURL(/#\/settings$/);
+});
+
+test('телефон: «Бета-функции» — тремя касаниями по значку, а два касания — ничего', async ({ page }, info) => {
+  test.skip(!isPhone(info.project.name), 'только телефон');
+  await signInToDemo(page);
+  await page.goto('/#/settings/about');
+  const icon = page.locator('.app-icon');
+  await icon.tap();
+  await icon.tap();
+  await page.waitForTimeout(700);
+  await icon.tap();
+  await expect(page).toHaveURL(/#\/settings\/about$/);
+  await page.waitForTimeout(700);
+  await icon.tap();
+  await icon.tap();
+  await icon.tap();
+  await expect(page).toHaveURL(/#\/settings\/beta$/);
 });

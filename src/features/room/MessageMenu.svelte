@@ -1,6 +1,6 @@
 <!--
   Меню сообщения — одно на ленту: правый щелчок, «ещё» по наведению, долгое нажатие.
-  Сверху — шесть быстрых реакций и «+» — за ним все остальные (`EmojiPanel`): меню
+  Сверху — пять быстрых реакций и «+» — за ним все остальные (`EmojiPanel`): меню
   раскрывается в панель на том же месте. Под реакциями — действия, внизу — когда отправлено.
 -->
 <script lang="ts">
@@ -11,8 +11,8 @@
   import { i18n, plural, t } from '../../i18n/index.svelte.ts';
   import type { MessageActions } from './actions';
   import { quickReactions } from './reactions';
-  import EmojiPanel from './EmojiPanel.svelte';
-  import { addRecent } from './emojiCatalog';
+  import { Lazy } from '../../design/lazy.svelte.ts';
+  import { addRecent } from './recentEmoji';
   import { preferences } from '../app/preferences.svelte.ts';
   import { isSelectable } from '../../core/timeline/selection';
   import { canForward } from '../../core/timeline/forward';
@@ -45,6 +45,9 @@
 
   /** Открыта панель всех эмодзи вместо действий. Закрыли меню — в следующий раз снова ряд. */
   let picking = $state(false);
+  // Каталог — несколько тысяч эмодзи; нужен тем, кому мало шести быстрых.
+  const emojiPanel = new Lazy(() => import('./EmojiPanel.svelte'));
+  const EmojiPanel = $derived(emojiPanel.when(picking));
   $effect(() => {
     if (!current) picking = false;
   });
@@ -67,7 +70,7 @@
 
 <Menu open={!!current} x={at.x} y={at.y} {sheet} label={t('message.menu.more')} {onclose}>
   {#if message && picking}
-    <EmojiPanel {mine} recent={preferences.recentEmoji} onpick={react} />
+    {#if EmojiPanel}<EmojiPanel {mine} recent={preferences.recentEmoji} onpick={react} />{/if}
   {:else if message && message.kind.type === 'deleted'}
     <!-- Удалённое: действий нет, а когда отправили и когда удалили — спрашивают именно у него. -->
     <p class="fact">{t('message.menu.sentAt', { time: exactly(message.ts) })}</p>
@@ -159,6 +162,10 @@
         <!-- Чужое, ушедшее: жалоба указывает на событие на сервере. -->
         <button type="button" role="menuitem" class="danger" onclick={() => run(actions.report)}>{t('message.menu.report')}</button>
       {/if}
+    {/if}
+    {#if actions.viewSource}
+      {@const view = actions.viewSource}
+      <button type="button" role="menuitem" onclick={() => run(view)}>{t('beta.viewSource')}</button>
     {/if}
     <!-- Точно, с датой и секундами: время у пузыря — только часы, а здесь — всё остальное. -->
     <div class="rule" role="separator"></div>

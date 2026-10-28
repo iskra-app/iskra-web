@@ -140,6 +140,48 @@ test('новая комната и новый чат — создаются и �
   await expect(page.getByRole('log')).toContainText('Возьми плед, там ветрено', { timeout: 10_000 });
 });
 
+test('фото профиля — через обрезку: масштаб, «Готово» — уходит квадрат; «Отмена» — ничего', async ({ page }) => {
+  await signInToDemo(page);
+  await openSettings(page);
+  await page.getByRole('button', { name: 'Изменить' }).click();
+  await expect(page.getByRole('heading', { name: 'Ваш профиль', level: 1 })).toBeVisible();
+  // Снимок вдвое шире, чем высок, — чтобы было что обрезать.
+  const png = Buffer.from(
+    await page.evaluate(() => {
+      const canvas = document.createElement('canvas');
+      canvas.width = 400;
+      canvas.height = 200;
+      const context = canvas.getContext('2d')!;
+      context.fillStyle = '#c33';
+      context.fillRect(0, 0, 200, 200);
+      context.fillStyle = '#36c';
+      context.fillRect(200, 0, 200, 200);
+      return canvas.toDataURL('image/png').split(',')[1]!;
+    }),
+    'base64',
+  );
+  const picker = page.locator('input[type=file]');
+  const cropper = page.getByRole('dialog', { name: 'Переместите и приблизьте' });
+
+  await picker.setInputFiles({ name: 'широкий.png', mimeType: 'image/png', buffer: png });
+  await expect(cropper).toBeVisible();
+  await cropper.getByRole('button', { name: 'Отмена' }).click();
+  await expect(cropper).toBeHidden();
+  await expect(page.getByRole('button', { name: 'Удалить фото' })).toBeHidden();
+
+  await picker.setInputFiles({ name: 'широкий.png', mimeType: 'image/png', buffer: png });
+  const zoom = cropper.getByRole('slider', { name: 'Масштаб' });
+  await expect(zoom).toHaveValue('1');
+  await zoom.fill('2');
+  await expect(zoom).toHaveValue('2');
+  await cropper.getByRole('button', { name: 'Готово' }).click();
+  await expect(cropper).toBeHidden();
+  await expect(page.getByRole('button', { name: 'Удалить фото' })).toBeVisible({ timeout: 10_000 });
+  // Ушёл квадрат, а не полоса 400×200.
+  const face = page.locator('.profile-header img').first();
+  await expect.poll(() => face.evaluate((img: HTMLImageElement) => img.naturalWidth > 0 && img.naturalWidth === img.naturalHeight)).toBe(true);
+});
+
 test('настройки по разделам: имя, язык, тема, шрифт; устройство и хранилище видны', async ({ page }, info) => {
   await signInToDemo(page);
   await openSettings(page);
@@ -182,13 +224,18 @@ test('настройки по разделам: имя, язык, тема, шр
   await tint.uncheck();
   await expect(page.locator('html')).not.toHaveAttribute('data-tint');
   // Inter — по умолчанию и из своих файлов под боевой CSP: кириллица и латиница загрузились.
+  // Файл один, вариативный, на все алфавиты (Inter 4.1) — значит, и начертание одно.
   await expect(page.getByRole('radio', { name: 'Inter' })).toHaveAttribute('aria-checked', 'true');
   const bodyFont = () => page.evaluate(() => getComputedStyle(document.body).fontFamily);
   expect(await bodyFont()).toMatch(/^"?Inter"?,/);
-  expect(await page.evaluate(async () => (await document.fonts.load('1rem Inter', 'Привет, hello')).length)).toBeGreaterThan(1);
+  expect(await page.evaluate(async () => (await document.fonts.load('1rem Inter', 'Привет, hello')).length)).toBeGreaterThan(0);
+  expect(await page.evaluate(() => document.fonts.check('1rem Inter', 'Привет, hello'))).toBe(true);
+  // Фичи Inter (перечёркнутый ноль…) — только у него; у системного их нет.
+  expect(await page.evaluate(() => getComputedStyle(document.body).fontFeatureSettings)).toContain('"zero"');
   await page.getByRole('radio', { name: 'Системный' }).click();
   await expect(page.locator('html')).toHaveAttribute('data-font', 'system');
   expect(await bodyFont()).toMatch(/^system-ui,/);
+  expect(await page.evaluate(() => getComputedStyle(document.body).fontFeatureSettings)).toBe('normal');
   await page.getByRole('radio', { name: 'Inter' }).click();
   await expect(page.locator('html')).not.toHaveAttribute('data-font');
 
@@ -444,7 +491,7 @@ test('«Чаты»: отправлять по Ctrl/⌘ Enter — Enter пере�
   await expect(page.getByRole('log').getByRole('article').filter({ hasText: 'вторая' })).toBeVisible();
 });
 
-test('«Реакции»: быстрая реакция — из шести или из всего каталога; её ставят двойное касание и кнопка у пузыря', async ({ page }, info) => {
+test('«Реакции»: быстрая реакция — из пяти или из всего каталога; её ставят двойное касание и кнопка у пузыря', async ({ page }, info) => {
   const problems = watchForProblems(page);
   await signInToDemo(page);
   await openSettings(page, 'Реакции');
@@ -475,7 +522,7 @@ test('«Реакции»: быстрая реакция — из шести ил
   // Реакций в демо до этого ни у кого не было: «👍 1» — та, что поставили сейчас, и своя.
   await expect(page.getByRole('log').getByRole('list', { name: 'Реакции' }).getByRole('button', { name: '👍, 1 человек', pressed: true })).toBeVisible({ timeout: 10_000 });
 
-  // Не из шести — из каталога: встаёт в ряд последней и подсвечена.
+  // Не из пяти — из каталога: встаёт на место пятой и подсвечена.
   await openSettings(page, 'Реакции');
   await page.getByRole('button', { name: 'Больше эмодзи' }).click();
   const panel = page.getByRole('dialog', { name: 'Больше эмодзи' });
@@ -483,6 +530,9 @@ test('«Реакции»: быстрая реакция — из шести ил
   await panel.getByRole('menuitemcheckbox', { name: 'Реакция 🍕' }).click();
   await expect(panel).toBeHidden();
   await expect(quick.getByRole('radio', { name: '🍕' })).toHaveAttribute('aria-checked', 'true');
+  // На месте пятой: в ряду по-прежнему пять эмодзи, а 😢 уступила место.
+  await expect(quick.getByRole('radio')).toHaveCount(5);
+  await expect(quick.getByRole('radio', { name: '😢' })).toHaveCount(0);
   expect(problems).toEqual([]);
 });
 

@@ -291,7 +291,10 @@
     press = null;
     swallowClick = true;
     if (!started) {
-      if (canVoice && canVideo) mode = mode === 'voice' ? 'video' : 'voice';
+      // Мышью короткий щелчок сразу начинает запись без рук (отправка — той же кнопкой, отмена — Esc);
+      // голосовое и «кружочек» переключаются правой кнопкой. Пальцем — как в нативной: нажатие переключает.
+      if (viewport.finePointer) begin(kind, false);
+      else if (canVoice && canVideo) mode = mode === 'voice' ? 'video' : 'voice';
       return;
     }
     if (releaseOf(event.timeStamp - at) === 'send') finish(kind);
@@ -305,6 +308,14 @@
     else {
       clearTimeout(arming);
       press = null;
+    }
+  }
+
+  /** Мышью правая кнопка переключает голосовое и «кружочек»; пальцу долгое нажатие — запись. */
+  function recordContext(event: MouseEvent) {
+    event.preventDefault();
+    if (viewport.finePointer && !recording && !filming && !press && canVoice && canVideo) {
+      mode = mode === 'voice' ? 'video' : 'voice';
     }
   }
 
@@ -572,13 +583,13 @@
           class="send voice"
           class:held={press?.kind === kind && press.started}
           aria-label={recordLabel(kind)}
-          title={recording ? recordLabel(kind) : t('recording.hint')}
+          title={recording ? recordLabel(kind) : t(viewport.finePointer ? 'recording.hintPointer' : 'recording.hint')}
           onpointerdown={(event) => recordDown(event, kind)}
           onpointermove={recordMove}
           onpointerup={recordUp}
           onpointercancel={recordLost}
           onclick={(event) => recordClick(event, kind)}
-          oncontextmenu={(event) => event.preventDefault()}
+          oncontextmenu={recordContext}
         >
           <svg viewBox={ICON_VIEWBOX} aria-hidden="true">
             {#if recording && !press}<path d={icons.send} />{:else if kind === 'video'}<path d={icons.video} />{:else}<path d={icons.mic} />{/if}

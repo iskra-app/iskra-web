@@ -1,24 +1,29 @@
 <!--
-  Быстрый переход — `Ctrl/⌘ K`. На десктопе это главный способ попасть в чат: поиск по
-  названиям — фильтр по памяти, запрос на сервер не уходит.
+  «Поиск по сообщениям» — лупа над списком и `Ctrl/⌘ K`: поле и найденное во всех чатах.
+  Строка — как в списке чатов: лицо чата, его название, под ним отправитель и отрывок.
+  Нажатие закрывает окно и ведёт к сообщению.
 
-  Нативный `<dialog>`: фокус ловит сам и возвращает, когда закрыт; `Esc` закрывает.
-  ↑/↓ — по результатам, `Enter` — открыть.
+  Вид — бывшего быстрого перехода: окно без заголовка, поле сверху, список под ним.
+  ↑/↓ — по найденному, `Enter` — открыть. `Esc` в непустом поле стирает запрос, в пустом —
+  закрывает окно.
+
+  Тот же индекс на устройстве, что и у «Поиска в чате», только без чата в условии.
 -->
 <script lang="ts">
-  import { searchRooms } from '../../core/rooms/organize';
+  import type { SearchHit } from '../../core/search/messageSearch.svelte.ts';
   import type { UserSession } from '../../core/session/userSession.svelte.ts';
-  import { router } from '../../core/navigation/router.svelte.ts';
+  import { backdropClose } from '../../design/backdropClose';
   import { t } from '../../i18n/index.svelte.ts';
+  import { revealRequest } from '../app/revealRequest.svelte.ts';
   import RoomFace from './RoomFace.svelte';
-  import { previewText, roomName } from './text';
+  import { roomName } from './text';
 
   interface Props {
-    session: UserSession;
     open: boolean;
+    session: UserSession;
     onclose: () => void;
   }
-  let { session, open, onclose }: Props = $props();
+  let { open, session, onclose }: Props = $props();
 
   let dialog: HTMLDialogElement | undefined = $state();
   let input: HTMLInputElement | undefined = $state();
@@ -26,7 +31,8 @@
   let active = $state(0);
   const id = $props.id();
 
-  const results = $derived(searchRooms(session.rooms.rooms, query, roomName).slice(0, 50));
+  const search = $derived(session.search);
+  const hits = $derived(search.hits);
 
   $effect(() => {
     if (!dialog) return;
@@ -39,66 +45,79 @@
     if (!open && dialog.open) dialog.close();
   });
 
+  $effect(() => search.search(open ? query : ''));
+
   $effect(() => {
-    void query;
+    void hits;
     active = 0;
   });
 
-  function choose(index: number) {
-    const room = results[index];
-    if (!room) return;
+  function roomOf(roomId: string) {
+    return session.rooms.rooms.find((r) => r.id === roomId);
+  }
+
+  function choose(hit: SearchHit | undefined) {
+    if (!hit) return;
     onclose();
-    router.go({ name: 'room', roomId: room.id });
+    revealRequest.open(hit.roomId, hit.id);
   }
 
   function onkeydown(event: KeyboardEvent) {
     if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
       event.preventDefault();
       const step = event.key === 'ArrowDown' ? 1 : -1;
-      active = Math.max(0, Math.min(results.length - 1, active + step));
+      active = Math.max(0, Math.min(hits.length - 1, active + step));
       document.getElementById(`${id}-option-${active}`)?.scrollIntoView({ block: 'nearest' });
     } else if (event.key === 'Enter') {
       event.preventDefault();
-      choose(active);
+      choose(hits[active]);
+    } else if (event.key === 'Escape' && query) {
+      event.preventDefault();
+      event.stopPropagation();
+      query = '';
     }
   }
 </script>
 
-<dialog bind:this={dialog} data-motion="pop" class="switcher" aria-label={t('quickSwitch.label')} {onclose}>
+<dialog bind:this={dialog} use:backdropClose={onclose} data-motion="pop" class="switcher" aria-label={t('roomList.searchPrompt')} {onclose}>
   <input
     bind:this={input}
     bind:value={query}
     type="text"
     role="combobox"
-    aria-expanded="true"
+    aria-expanded={hits.length > 0}
     aria-controls="{id}-results"
-    aria-activedescendant={results.length ? `${id}-option-${active}` : undefined}
-    aria-label={t('quickSwitch.label')}
-    placeholder={t('quickSwitch.placeholder')}
+    aria-activedescendant={hits.length ? `${id}-option-${active}` : undefined}
+    aria-label={t('roomList.searchPrompt')}
+    placeholder={t('roomList.searchPrompt')}
     autocomplete="off"
+    enterkeyhint="search"
     spellcheck="false"
     {onkeydown}
   />
-  <ul id="{id}-results" role="listbox" aria-label={t('quickSwitch.label')}>
-    {#each results as room, index (room.id)}
-      <li
-        id="{id}-option-{index}"
-        role="option"
-        aria-selected={index === active}
-        onclick={() => choose(index)}
-        onkeydown={() => {}}
-        onpointermove={() => (active = index)}
-      >
-        <RoomFace {room} {session} />
-        <span class="text">
-          <span class="name">{roomName(room)}</span>
-          <span class="preview">{previewText(room.preview)}</span>
-        </span>
-      </li>
-    {:else}
-      <li class="empty" role="presentation">{t('quickSwitch.empty')}</li>
-    {/each}
-  </ul>
+  {#if hits.length || search.foundNothing}
+    <ul id="{id}-results" role="listbox" aria-label={t('roomList.searchPrompt')}>
+      {#each hits as hit, index (hit.id)}
+        {@const room = roomOf(hit.roomId)}
+        <li
+          id="{id}-option-{index}"
+          role="option"
+          aria-selected={index === active}
+          onclick={() => choose(hit)}
+          onkeydown={() => {}}
+          onpointermove={() => (active = index)}
+        >
+          {#if room}<RoomFace {room} {session} />{/if}
+          <span class="text">
+            {#if room}<span class="name">{roomName(room)}</span>{/if}
+            <span class="preview"><span class="sender">{hit.senderName}</span> {hit.excerpt}</span>
+          </span>
+        </li>
+      {:else}
+        <li class="empty" role="presentation">{t('room.searchEmptyTitle')}</li>
+      {/each}
+    </ul>
+  {/if}
 </dialog>
 
 <style>
@@ -107,7 +126,7 @@
     max-height: min(70vh, 40rem);
     margin-block-start: 12vh;
     padding: 0;
-    border: none;
+    border: var(--border-hairline) solid var(--color-dialog-edge);
     border-radius: var(--radius-card);
     background: var(--color-background);
     color: var(--color-text);
@@ -134,7 +153,7 @@
     font-size: var(--font-size-body);
   }
   input:focus-visible {
-    outline: 2px solid var(--accent);
+    outline: var(--border-thick) solid var(--accent);
     outline-offset: 0;
   }
   ul {
@@ -142,6 +161,7 @@
     padding: 0 var(--space-close) var(--space-close);
     list-style: none;
     overflow-y: auto;
+    overscroll-behavior: contain;
   }
   li {
     --size-room-avatar: var(--size-avatar-toolbar);
@@ -172,6 +192,9 @@
     overflow: hidden;
     white-space: nowrap;
     text-overflow: ellipsis;
+  }
+  .sender {
+    color: var(--color-text);
   }
   .empty {
     justify-content: center;

@@ -1,4 +1,5 @@
-import { expect, test, type Page } from '@playwright/test';
+import { readFileSync } from 'node:fs';
+import { expect, test, type Locator, type Page } from '@playwright/test';
 import { consoleOf, isPhone, openRoom, signInToDemo, watchForProblems } from './helpers';
 
 // Упал — показать консоль: падения в Firefox воспроизводятся только в CI.
@@ -132,6 +133,47 @@ test('десктоп: Ctrl/⌘ Shift U открывает выбор файла;
   await expect.poll(async () => (await img.boundingBox())!.width).toBeCloseTo(before.width, 0);
 });
 
+/**
+ * Два пальца по трекпаду: `steps` мелких `wheel` пикселями — одной задачей, без пауз между ними.
+ * Конец жеста просмотрщик узнаёт по тишине (120 мс); `mouse.wheel` по одному на медленной
+ * машине (WebKit в CI) делит жест на куски, и ни один не дотягивает до порога.
+ */
+async function trackpad(target: Locator, steps: number, deltaX: number, deltaY: number) {
+  await target.evaluate(
+    (node, { steps, deltaX, deltaY }) => {
+      for (let i = 0; i < steps; i++) {
+        node.dispatchEvent(new WheelEvent('wheel', { deltaX, deltaY, deltaMode: 0, bubbles: true, cancelable: true }));
+      }
+    },
+    { steps, deltaX, deltaY },
+  );
+}
+
+test('десктоп: два пальца по трекпаду — вверх-вниз тянут снимок и закрывают, вбок листают', async ({ page }, info) => {
+  test.skip(isPhone(info.project.name), 'трекпад — десктоп');
+  await signInToDemo(page);
+  await openRoom(page, /^Выходные/);
+  await page.getByRole('log').getByRole('button', { name: 'Фото' }).first().click();
+  const viewer = page.getByRole('dialog', { name: 'Фото' });
+  await expect(viewer.locator('img')).toHaveAttribute('src', /^blob:/);
+  await expect(viewer.getByRole('status')).toHaveText('1 из 2');
+
+  // Вбок дальше порога — следующий снимок: мелкими шагами трекпада, не колёсиком мыши.
+  await trackpad(viewer.locator('img'), 5, 20, 0);
+  await expect(viewer.getByRole('status')).toHaveText('2 из 2');
+  await page.waitForTimeout(300); // жест кончается тишиной: следующий — уже другой
+
+  // Вверх-вниз, но не до порога, — снимок возвращается и просмотрщик остаётся.
+  await trackpad(viewer.locator('img'), 2, 0, 20);
+  await page.waitForTimeout(400);
+  await expect(viewer).toBeVisible();
+  await expect(viewer.getByRole('status')).toHaveText('2 из 2');
+
+  // До порога — закрывается.
+  await trackpad(viewer.locator('img'), 8, 0, 20);
+  await expect(viewer).toBeHidden();
+});
+
 test('телефон: свайп вниз закрывает просмотрщик', async ({ page }, info) => {
   test.skip(!isPhone(info.project.name), 'палец');
   await signInToDemo(page);
@@ -203,11 +245,64 @@ test('фото уходит без метаданных; выключили — 
   await page.getByRole('button', { name: 'Настройки' }).click();
   await page.getByRole('navigation', { name: 'Настройки' }).getByRole('link', { name: 'Фото и видео' }).click();
   await page.getByRole('switch', { name: 'Отправлять без метаданных' }).uncheck();
-  await page.getByRole('switch', { name: 'Сжимать фото' }).uncheck();
+  await page.getByRole('switch', { name: 'Сжимать фото и видео' }).uncheck();
   await expect(page.getByRole('radiogroup', { name: 'Степень сжатия' })).toHaveCount(0);
   await openRoom(page, /^Аня/);
   const asIs = await sendAndDownload(page, jpeg, 'Как есть');
   expect(asIs.bytes.equals(jpeg)).toBe(true);
+});
+
+/**
+ * Видео с телефона, как оно есть: 1080p, 60 кадров, H.264 + AAC, с меткой в `udta`
+ * (`tests/e2e/fixtures/phone-video.mp4`, сделано ffmpeg'ом — видео не нарисуешь).
+ */
+const PHONE_VIDEO = readFileSync(new URL('./fixtures/phone-video.mp4', import.meta.url));
+
+test('видео уходит без метаданных; где браузер умеет — сжатым в mp4 по ступени', async ({ page }) => {
+  await signInToDemo(page);
+  // «Сильное»: на ролике в полсекунды регулятор битрейта WebKit не успевает сойтись, и на
+  // «Среднем» сжатое выходит больше исходника — тогда уходит исходник, и проверять нечего.
+  await page.getByRole('button', { name: 'Настройки' }).click();
+  await page.getByRole('navigation', { name: 'Настройки' }).getByRole('link', { name: 'Фото и видео' }).click();
+  await page.getByRole('radiogroup', { name: 'Степень сжатия' }).getByRole('radio', { name: 'Сильное (540p)' }).click();
+  await openRoom(page, /^Аня/);
+  expect(PHONE_VIDEO.includes(EXIF_MARK)).toBe(true);
+  // Сжимает сам браузер, и H.264 — не везде (сборки без него). Звук AAC переносится как есть.
+  const compressible = await page.evaluate(async () => {
+    if (typeof VideoEncoder === 'undefined' || typeof VideoDecoder === 'undefined') return false;
+    const video = await VideoEncoder.isConfigSupported({ codec: 'avc1.42001f', width: 960, height: 540 }).catch(() => ({ supported: false }));
+    const decode = await VideoDecoder.isConfigSupported({ codec: 'avc1.64002a' }).catch(() => ({ supported: false }));
+    return !!(video.supported && decode.supported);
+  });
+
+  await page.locator('input[type=file]').setInputFiles({ name: 'IMG_0002.MOV', mimeType: 'video/quicktime', buffer: PHONE_VIDEO });
+  await expect(page.getByRole('img', { name: 'Видео к сообщению' }).or(page.getByText('IMG_0002.MOV'))).toBeVisible({ timeout: 10_000 });
+  await page.getByRole('textbox', { name: 'Сообщение' }).fill('Видео без метаданных');
+  await page.getByRole('button', { name: 'Отправить' }).click();
+  const sent = page.getByRole('log').getByRole('article').filter({ hasText: 'Видео без метаданных' });
+  const viewer = page.getByRole('dialog', { name: 'Видео' });
+  await expect(async () => {
+    await sent.getByRole('button', { name: 'Видео' }).click();
+    await expect(viewer).toBeVisible({ timeout: 2_000 });
+  }).toPass({ timeout: 60_000 });
+  const download = page.waitForEvent('download');
+  await viewer.getByRole('button', { name: 'Сохранить' }).click();
+  const file = await download;
+  const bytes = await (await import('node:fs/promises')).readFile((await file.path())!);
+
+  expect(bytes.includes(EXIF_MARK)).toBe(false);
+  if (compressible) {
+    expect(file.suggestedFilename()).toBe('IMG_0002.mp4');
+    expect(bytes.length).toBeLessThan(PHONE_VIDEO.length);
+    // `tkhd` хранит ширину и высоту в 16.16, в конце (у версии 1 — дальше: времена 64-битные).
+    // У дорожки звука они нули; у видео — 960×540, рамка «Сильного».
+    const frames: number[][] = [];
+    for (let at = bytes.indexOf('tkhd'); at >= 0; at = bytes.indexOf('tkhd', at + 4)) {
+      const sizes = bytes[at + 4] === 1 ? at + 92 : at + 80;
+      frames.push([bytes.readUInt32BE(sizes) / 65536, bytes.readUInt32BE(sizes + 4) / 65536]);
+    }
+    expect(frames.filter(([width]) => (width ?? 0) > 0)).toEqual([[960, 540]]);
+  }
 });
 
 test('автозагрузка «Никогда»: чужое фото — рамкой с «Загрузить», нажатие загружает', async ({ page }) => {
@@ -226,6 +321,46 @@ test('автозагрузка «Никогда»: чужое фото — ра�
   const photos = page.getByRole('log').getByRole('button', { name: 'Фото', exact: true });
   await expect(photos.first().locator('img')).toHaveAttribute('src', /^blob:/);
   await expect(waiting).toHaveCount(1);
+  expect(problems).toEqual([]);
+});
+
+test('загрузка в демо идёт с прогрессом: полоса проходит середину, а не прыгает к концу', async ({ page }) => {
+  const problems = watchForProblems(page);
+  await signInToDemo(page);
+  await openRoom(page, /^Выходные/);
+  // Полтора мегабайта — у «сети» демо (2 МБ/с) это заметные доли секунды.
+  await page.locator('input[type=file]').setInputFiles({ name: 'отчёт.bin', mimeType: 'application/octet-stream', buffer: Buffer.alloc(1_500_000, 7) });
+  await expect(page.getByRole('listitem').filter({ hasText: 'отчёт.bin' })).toBeVisible();
+  await page.getByRole('button', { name: 'Отправить' }).click();
+  const bar = page.getByRole('progressbar').first();
+  await expect
+    .poll(async () => Number((await bar.getAttribute('aria-valuenow').catch(() => null)) ?? -1), { intervals: [50] })
+    .toBeGreaterThan(0);
+  expect(Number(await bar.getAttribute('aria-valuenow'))).toBeLessThan(100);
+  await expect(page.getByRole('log').getByRole('article').filter({ hasText: 'отчёт.bin' })).toHaveCount(1, { timeout: 20_000 });
+  await expect(page.getByRole('progressbar')).toHaveCount(0);
+  expect(problems).toEqual([]);
+});
+
+test('видео в демо: миниатюра и длительность в ленте; просмотрщик играет его', async ({ page }) => {
+  const problems = watchForProblems(page);
+  await signInToDemo(page);
+  await openRoom(page, /^Аня/);
+  const tile = page.getByRole('log').getByRole('button', { name: 'Видео' });
+  await expect(tile).toHaveCount(1);
+  await expect(page.getByRole('log')).toContainText('Вот оно, озеро');
+  await expect(page.getByRole('log')).toContainText('0:03');
+  await tile.click();
+  const viewer = page.getByRole('dialog', { name: 'Видео' });
+  const video = viewer.locator('video');
+  await expect(video).toHaveAttribute('src', /^blob:/);
+  // Метаданные прочитаны — значит, байты дошли и это действительно mp4, а не заглушка. Где H.264
+  // нет (Firefox на Linux без системного кодека) — только то, что байты пришли.
+  if (await video.evaluate((v: HTMLVideoElement) => v.canPlayType('video/mp4; codecs="avc1.42E01E"') !== '')) {
+    await expect.poll(() => video.evaluate((v: HTMLVideoElement) => Math.round(v.duration))).toBe(3);
+  }
+  await page.keyboard.press('Escape');
+  await expect(viewer).toBeHidden();
   expect(problems).toEqual([]);
 });
 

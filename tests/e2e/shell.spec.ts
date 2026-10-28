@@ -31,6 +31,32 @@ test('правая панель на широком экране сдвигае�
   expect(after).toBeLessThan(before);
 });
 
+test('имя и подпись в шапке чата открывают «О чате» и закрывают её', async ({ page }) => {
+  await signInToDemo(page);
+  await page.getByRole('link', { name: /^Выходные/ }).click();
+  await expect(page.getByRole('heading', { name: 'Выходные', level: 1 })).toBeVisible();
+  // Кнопка поверх имени — для пальца и мыши; скринридеру хватает ⓘ.
+  const title = page.locator('.main-column .title-press');
+  await title.click();
+  await expect(page.locator('aside.panel')).toBeVisible();
+  await expect(page.getByRole('button', { name: 'О чате' })).toHaveAttribute('aria-pressed', 'true');
+  await page.locator('aside.panel').getByRole('button', { name: 'Закрыть' }).click();
+  await expect(page.getByRole('button', { name: 'О чате' })).toHaveAttribute('aria-pressed', 'false');
+});
+
+test('телефон: «О чате» уходит вместе с чатом — и после системного «назад»', async ({ page }, info) => {
+  test.skip(!isPhone(info.project.name), 'только телефон');
+  await signInToDemo(page);
+  await page.getByRole('link', { name: /^Выходные/ }).click();
+  await page.getByRole('button', { name: 'О чате' }).click();
+  await expect(page.locator('aside.panel')).toBeVisible();
+  await page.goBack();
+  await expect(page.getByRole('heading', { name: 'Чаты', level: 1 })).toBeVisible();
+  await page.getByRole('link', { name: /^Аня/ }).click();
+  await expect(page.getByRole('heading', { name: /^Аня/, level: 1 })).toBeVisible();
+  await expect(page.locator('aside.panel')).toBeHidden();
+});
+
 test('ширину списка можно менять с клавиатуры, и она запоминается', async ({ page }, info) => {
   test.skip(isPhone(info.project.name), 'только десктоп');
   await signInToDemo(page);

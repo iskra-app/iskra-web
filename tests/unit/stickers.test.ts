@@ -171,6 +171,26 @@ describe('стикеры аккаунта на демо-сервере', () => {
     expect(server.unknown).toEqual([]);
   });
 
+  it('осиротевшая запись «Искорок» (убранный из набора стикер) — не в панели и не пропадает при дозаписи', async () => {
+    const { library, client } = await started();
+    await library.load(null, all, art);
+    await until(() => !!client.getAccountData('moscow.swag.iskra.builtin_stickers' as never));
+    const stored = client.getAccountData('moscow.swag.iskra.builtin_stickers' as never)!.getContent() as { images: Record<string, unknown> };
+    const orphan = { url: 'mxc://demo.iskra.invalid/art-old', body: '🏃', usage: ['sticker'], info: { w: 512, h: 512, mimetype: 'image/png', size: 1 } };
+    await client.setAccountData('moscow.swag.iskra.builtin_stickers' as never, { ...stored, images: { ...stored.images, bypass: orphan } } as never);
+    await until(() => 'bypass' in ((client.getAccountData('moscow.swag.iskra.builtin_stickers' as never)!.getContent() as { images: object }).images));
+
+    // Другое устройство, в наборе приложения появилась ещё одна картинка: дозапись идёт поверх прежней.
+    const more = [...art, { code: 'love', emoji: '❤️', load: art[0]!.load }];
+    const again = new StickerLibrary(client, async () => 'mxc://demo.iskra.invalid/art-new');
+    await again.load(null, all, more);
+    expect(again.packs.find((p) => p.origin.kind === 'builtIn')!.stickers.map((s) => s.shortcode)).toEqual(['hello', 'joy', 'love']);
+    await until(() => 'love' in ((client.getAccountData('moscow.swag.iskra.builtin_stickers' as never)!.getContent() as { images: object }).images));
+    const written = client.getAccountData('moscow.swag.iskra.builtin_stickers' as never)!.getContent() as { images: Record<string, unknown> };
+    expect(Object.keys(written.images).sort()).toEqual(['bypass', 'hello', 'joy', 'love']);
+    again.destroy();
+  });
+
   it('выключенные в настройках — не в панели; свой набор всё равно известен', async () => {
     const { library } = await started();
     await library.load(demoRooms.weekend, { builtIn: false, roomPack: false, mine: false }, art);

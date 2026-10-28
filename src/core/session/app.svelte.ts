@@ -11,7 +11,7 @@
  * 4. сессия.
  */
 import type { AuthCallback } from '../auth/callback';
-import { SignInError, type SignInProblem } from '../auth/server';
+import { demoAvailable, SignInError, type SignInProblem } from '../auth/server';
 import { completeSignIn } from '../auth/signIn';
 import {
   currentEnvironment,
@@ -22,20 +22,33 @@ import {
 } from '../storage/persistence';
 import { vault, type Account, type AccountSecrets, type NewAccount } from '../storage/vault';
 import { errorDetail } from '../support/errorDetail';
+import { isWasmMimeError, refreshWasm } from '../support/wasmCache';
 import { SessionLock } from './lock';
 import { wallpaperPhoto } from '../storage/wallpaper';
 import { UserSession, wipeUserData } from './userSession.svelte.ts';
 import { forgetMovedMarkers } from '../timeline/readMarker';
 
+/**
+ * Кто на этом устройстве ждёт, чтобы в него вошли снова после мягкого выхода, — и с каким
+ * устройством: вход с ним же оставляет ключи и переписку на месте.
+ */
+export interface Resume {
+  userId: string;
+  deviceId: string;
+  homeserverUrl: string;
+}
+
 export type Phase =
   | { name: 'loading' }
-  | { name: 'signed-out'; problem?: SignInProblem; detail?: string; ended?: boolean }
+  | { name: 'signed-out'; problem?: SignInProblem; detail?: string; ended?: boolean; resume?: Resume }
   | { name: 'elsewhere'; userId: string }
   | { name: 'signed-in'; session: UserSession };
 
 export interface AppHooks {
   /** Другая вкладка просит показаться: окно может не дать себя сфокусировать — тогда мигнуть. */
   onFocusRequested?: () => void;
+  /** Другая вкладка получила чужую ссылку (`#/open/…`), а сессия здесь. */
+  onLinkPassed?: (hash: string) => void;
 }
 
 export class AppState {
@@ -75,7 +88,8 @@ export class AppState {
       this.phase = { name: 'signed-out', problem: 'storageUnavailable', detail: errorDetail(error) };
       return;
     }
-    if (!account) {
+    // Демо-вход из сборки, где демо было, а в этой его нет: заходить некуда.
+    if (!account || (account.method === 'demo' && !demoAvailable)) {
       this.phase = { name: 'signed-out' };
       return;
     }
@@ -87,17 +101,55 @@ export class AppState {
     await this.finishSignIn(account);
   }
 
+  /**
+   * Сначала лок: открыт этот аккаунт в другой вкладке — её базы и её запись не трогаем.
+   *
+   * Вход снова в то же устройство после мягкого выхода — продолжение: базы и ключ
+   * криптохранилища прежние, восстанавливать переписку не нужно.
+   *
+   * Иначе это новое устройство: прежние базы этого человека (от прошлого входа, от выхода,
+   * который не дочистил) ему не годятся, а с новым ключом криптохранилища и не откроются — и
+   * стираются. Аккаунт на устройстве один: кто был здесь до него, уходит со всем своим — иначе
+   * после выхода второго в браузере молча открывался бы первый (экран входа об этом
+   * предупреждает). Кроме демо: оно на время и чужого не трогает.
+   */
   private async finishSignIn(fresh: NewAccount): Promise<void> {
-    this.recoveryStep = true;
-    // Демо стирается при каждом новом входе: своя база, ни следа прошлого запуска.
-    if (fresh.method === 'demo') await wipeUserData(fresh.userId).catch(() => {});
+    this.lock = await SessionLock.acquire(fresh.userId, this.lockCallbacks());
+    if (!this.lock) {
+      this.phase = { name: 'elsewhere', userId: fresh.userId };
+      return;
+    }
     let account: Account;
     try {
-      ({ account } = await vault.add(fresh));
+      const resumed = await vault.resume(fresh);
+      this.recoveryStep = !resumed;
+      if (resumed) {
+        ({ account } = resumed);
+      } else {
+        if (fresh.method !== 'demo') await this.forgetOthers(fresh.userId);
+        await wipeUserData(fresh.userId).catch(() => {});
+        ({ account } = await vault.add(fresh));
+      }
     } catch (error) {
+      this.releaseLock();
       throw new SignInError('storageUnavailable', { cause: error });
     }
-    await this.open(account);
+    await this.startSession(account);
+  }
+
+  /** Все прочие аккаунты устройства — кроме открытых в другой вкладке: тот, чей лок занят, жив. */
+  private async forgetOthers(userId: string): Promise<void> {
+    for (const other of await vault.all()) {
+      if (other.userId === userId) continue;
+      const lock = await SessionLock.acquire(other.userId);
+      if (!lock) continue;
+      try {
+        await wipeUserData(other.userId).catch(() => {});
+        await vault.remove(other.userId).catch(() => {});
+      } finally {
+        lock.release();
+      }
+    }
   }
 
   private async open(account: Account): Promise<void> {
@@ -112,6 +164,7 @@ export class AppState {
   private lockCallbacks() {
     return {
       onFocusRequested: () => this.hooks.onFocusRequested?.(),
+      onLinkPassed: (hash: string) => this.hooks.onLinkPassed?.(hash),
       onTakenOver: async () => {
         if (this.phase.name === 'signed-in') {
           const userId = this.phase.session.userId;
@@ -124,6 +177,11 @@ export class AppState {
   }
 
   private async startSession(account: Account): Promise<void> {
+    if (account.signedOutSoftly) {
+      this.releaseLock();
+      this.phase = { name: 'signed-out', ended: true, resume: resumeOf(account) };
+      return;
+    }
     let secrets: AccountSecrets | undefined;
     let secretsError: unknown;
     try {
@@ -147,7 +205,7 @@ export class AppState {
       try {
         session = await UserSession.start(account, secrets, {
           onTokensRefreshed: (tokens) => vault.updateTokens(account.userId, tokens),
-          onLoggedOut: () => void this.sessionEnded(),
+          onLoggedOut: (soft) => void (soft ? this.sessionPaused(account) : this.sessionEnded()),
         });
       } catch (error) {
         failure = error;
@@ -158,6 +216,9 @@ export class AppState {
       // следующая попытка может пройти, а удалить ключи — необратимо.
       // Загрузку WASM SDK запоминает вместе с неудачей и в этой вкладке не повторит —
       // значит, один раз перезагружаем страницу (не больше: вечного цикла быть не должно).
+      // Если причина — испорченный кеш WASM (сервер когда-то отдал его с чужим типом), сперва
+      // заменяем запись: иначе перезагрузка возьмёт из кеша то же самое.
+      if (isWasmMimeError(failure) && !hasReloaded()) await refreshWasm();
       if (reloadOnce()) return;
       this.releaseLock();
       this.phase = { name: 'signed-out', problem: 'storageUnavailable', detail: errorDetail(failure) };
@@ -206,6 +267,11 @@ export class AppState {
     if (this.phase.name === 'elsewhere') SessionLock.requestFocus(this.phase.userId);
   }
 
+  /** Ссылка пришла сюда, а сессия в другой вкладке: пусть откроется там. */
+  passLink(hash: string): void {
+    if (this.phase.name === 'elsewhere') SessionLock.passLink(this.phase.userId, hash);
+  }
+
   /** «Открыть здесь»: та вкладка останавливается и показывает тот же экран у себя. */
   async takeOver(): Promise<void> {
     if (this.phase.name !== 'elsewhere') return;
@@ -225,11 +291,10 @@ export class AppState {
     if (this.phase.name !== 'signed-in') return;
     const session = this.phase.session;
     this.phase = { name: 'loading' };
-    await session.signOut();
-    forgetMovedMarkers();
-    await vault.remove(session.userId).catch(() => {});
-    await wallpaperPhoto.forget();
-    this.releaseLock();
+    // Базы не стёрлись — запись аккаунта всё равно уходит (`forget`), а без её ключа
+    // криптохранилище не открыть.
+    await session.signOut().catch(() => {});
+    await this.forget(session.userId);
     this.phase = { name: 'signed-out' };
   }
 
@@ -237,11 +302,34 @@ export class AppState {
   private async sessionEnded(): Promise<void> {
     if (this.phase.name !== 'signed-in') return;
     const session = this.phase.session;
-    await session.wipe();
-    await vault.remove(session.userId).catch(() => {});
-    await wallpaperPhoto.forget();
-    this.releaseLock();
+    await session.wipe().catch(() => {});
+    await this.forget(session.userId);
     this.phase = { name: 'signed-out', ended: true };
+  }
+
+  /**
+   * Сервер просит войти снова, а устройство оставил: клиент — стоп, ключи и переписка — на
+   * месте, запись помечена. Экран входа предложит войти снова тем же человеком и с тем же
+   * устройством. Нативная в этом случае не стирает ничего тоже.
+   */
+  private async sessionPaused(account: Account): Promise<void> {
+    if (this.phase.name !== 'signed-in') return;
+    this.phase.session.stop();
+    await vault.markSignedOutSoftly(account.userId).catch(() => {});
+    this.releaseLock();
+    this.phase = { name: 'signed-out', ended: true, resume: resumeOf(account) };
+  }
+
+  /**
+   * Запись аккаунта (токены, ключ криптохранилища, черновики) и прочее своё — даже если
+   * базы стереть не вышло: выход, после которого токены остались на диске, а экран завис на
+   * загрузке, — худший из исходов на чужом компьютере.
+   */
+  private async forget(userId: string): Promise<void> {
+    forgetMovedMarkers();
+    await vault.remove(userId).catch(() => {});
+    await wallpaperPhoto.forget().catch(() => {});
+    this.releaseLock();
   }
 
   private releaseLock(): void {
@@ -250,10 +338,22 @@ export class AppState {
   }
 }
 
+function resumeOf({ userId, deviceId, homeserverUrl }: Account): Resume {
+  return { userId, deviceId, homeserverUrl };
+}
+
 /** Сколько раз пробуем поднять сессию, прежде чем сдаться, и пауза между попытками. */
 const START_ATTEMPTS = 2;
 const START_RETRY_DELAY_MS = 1000;
 const RELOAD_MARK = 'iskra-start-reloaded';
+
+function hasReloaded(): boolean {
+  try {
+    return !!sessionStorage.getItem(RELOAD_MARK);
+  } catch {
+    return true;
+  }
+}
 
 /** Перезагружает страницу, если ещё не перезагружали после сбоя. `true` — перезагрузка пошла. */
 function reloadOnce(): boolean {

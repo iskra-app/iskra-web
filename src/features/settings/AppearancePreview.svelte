@@ -11,13 +11,18 @@
 <script lang="ts">
   import { t } from '../../i18n/index.svelte.ts';
   import { preferences } from '../app/preferences.svelte.ts';
+  import Avatar from '../../design/Avatar.svelte';
   import WallpaperBackdrop from '../room/WallpaperBackdrop.svelte';
 
+  /* Сиды лиц выдуманы и постоянны: лица не меняются от захода к заходу, и это не чей-то Matrix ID. */
+  const SENDER_SEED = '@preview-sender:iskra.wtf';
+  const OWN_SEED = '@preview-you:iskra.wtf';
+
   const lines = $derived([
-    { text: t('appearance.previewAsk'), own: false, sender: t('appearance.previewSender') },
-    { text: t('appearance.previewAnswer'), own: true, sender: t('message.spoken.you') },
-    { text: t('appearance.previewReply'), own: false, sender: t('appearance.previewSender') },
-    { text: t('appearance.previewFollowUp'), own: false, sender: undefined },
+    { text: t('appearance.previewAsk'), own: false, sender: t('appearance.previewSender'), seed: SENDER_SEED },
+    { text: t('appearance.previewAnswer'), own: true, sender: t('message.spoken.you'), seed: OWN_SEED },
+    { text: t('appearance.previewReply'), own: false, sender: t('appearance.previewSender'), seed: SENDER_SEED },
+    { text: t('appearance.previewFollowUp'), own: false, sender: undefined, seed: undefined },
   ]);
 </script>
 
@@ -32,8 +37,14 @@
   {#each lines as line (line.text)}
     {#if preferences.layout === 'compact'}
       <span class="line">
-        {#if line.sender}<span class="sender">{line.sender}</span>{/if}
-        <span>{line.text}</span>
+        <!-- Без имени — пустая колонка ширины лица: серия выстраивается, как в комнате. -->
+        <span class="face">
+          {#if line.sender && line.seed}<Avatar name={line.sender} seed={line.seed} />{/if}
+        </span>
+        <span class="words">
+          {#if line.sender}<span class="sender">{line.sender}</span>{/if}
+          <span>{line.text}</span>
+        </span>
       </span>
     {:else}
       <span class="bubble" class:own={line.own}>{line.text}</span>
@@ -66,7 +77,18 @@
     background: var(--bubble-own);
     color: var(--on-bubble-own);
   }
+  /* Зазор между строками (--space-close) равен --space-within-compact-run: серия в превью стоит так же, как в ленте. */
   .line {
+    display: flex;
+    align-items: flex-start;
+    gap: var(--space-close);
+  }
+  .face {
+    flex: none;
+    width: var(--size-message-avatar);
+    --avatar-size: var(--size-message-avatar);
+  }
+  .words {
     display: flex;
     flex-direction: column;
     gap: var(--space-tight);

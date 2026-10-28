@@ -4,7 +4,8 @@
  * - **Двойное касание** — быстрая реакция, как в нативной Искре.
  * - **Свайп вправо** — ответить. Пузырь едет за пальцем (не дальше порога) и
  *   возвращается; вертикальная прокрутка ленты не перехватывается (`touch-action: pan-y`
- *   у пузыря).
+ *   у пузыря). Едет не один пузырь, а всё, что под `[data-swipe-carrier]`: реакции висят на
+ *   его ножке, и пузырь, вытянутый из-под них, оставлял их в воздухе.
  * - **Долгое нажатие** — меню. Android присылает на него `contextmenu` сам, iOS — нет;
  *   поэтому свой таймер, а `contextmenu` сразу после него гасится (`suppressContextMenu`),
  *   чтобы меню не открылось дважды.
@@ -35,10 +36,14 @@ export function touchGestures(node: HTMLElement, handlers: GestureHandlers) {
    */
   let pressedAt = Number.NEGATIVE_INFINITY;
 
+  /** Что едет за жестом: всё сообщение с реакциями, а без обёртки — сам пузырь. */
+  const carrier = () => node.closest<HTMLElement>('[data-swipe-carrier]') ?? node;
+
   const reset = () => {
     clearTimeout(pressTimer);
-    node.style.transform = '';
-    node.style.transition = '';
+    const moving = carrier();
+    moving.style.transform = '';
+    moving.style.transition = '';
     start = null;
     dx = 0;
     horizontal = false;
@@ -72,8 +77,9 @@ export function touchGestures(node: HTMLElement, handlers: GestureHandlers) {
     if (!horizontal && Math.abs(x) > TAP_SLOP_PX && Math.abs(x) > Math.abs(y) * 2 && x > 0) horizontal = true;
     if (!horizontal) return;
     dx = Math.max(0, Math.min(x, SWIPE_PX * 1.25));
-    node.style.transition = 'none';
-    node.style.transform = `translateX(${dx}px)`;
+    const moving = carrier();
+    moving.style.transition = 'none';
+    moving.style.transform = `translateX(${dx}px)`;
   };
   const up = (event: PointerEvent) => {
     clearTimeout(pressTimer);

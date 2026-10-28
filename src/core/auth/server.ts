@@ -9,6 +9,7 @@ import { createClient, type ValidatedAuthMetadata } from 'matrix-js-sdk';
 import { DEMO_BASE_URL, DEMO_SERVER } from '../demo/address';
 import { errorDetail } from '../support/errorDetail';
 import { quietLogger } from '../support/logger';
+import { secureUrl } from '../support/secureUrl';
 
 export type SignInProblem =
   | 'notFound'
@@ -50,15 +51,25 @@ export interface ServerInfo {
 }
 
 /**
+ * Есть ли в этой сборке демо-сервер: в `pnpm dev` — всегда, в сборке — только с `ISKRA_DEMO=1`
+ * (e2e и ночная). Боевая обходится без него, как iOS-релиз без `#if DEBUG`: чанк `core/demo`
+ * выпадает из `dist`, а `demo.iskra.invalid` для неё — обычный адрес, которого нет.
+ */
+export const demoAvailable: boolean = import.meta.env.DEV || __ISKRA_DEMO__;
+
+/**
  * Чем ходить в сеть. Демо — свой сервер в странице; он и его мир грузятся при первом запросе
  * к нему, а не в каждой сборке, которая его никогда не увидит.
  */
 export function fetchFor(demo: boolean): typeof globalThis.fetch {
-  if (!demo) return globalThis.fetch.bind(globalThis);
-  return async (input, init) => {
-    const { demoServer } = await import('../demo/instance');
-    return demoServer().fetch(input, init);
-  };
+  // Условие — константами сборки, а не `demoAvailable`: так Rollup выбрасывает импорт вместе с веткой.
+  if ((import.meta.env.DEV || __ISKRA_DEMO__) && demo) {
+    return async (input, init) => {
+      const { demoServer } = await import('../demo/instance');
+      return demoServer().fetch(input, init);
+    };
+  }
+  return globalThis.fetch.bind(globalThis);
 }
 
 export interface ParsedAddress {
@@ -78,7 +89,7 @@ export function parseAddress(input: string, allowShortDemo = false): ParsedAddre
   let text = input.trim();
   if (!text) return null;
 
-  if (text === DEMO_SERVER || text === DEMO_BASE_URL || (allowShortDemo && text.toLowerCase() === 'demo')) {
+  if (demoAvailable && (text === DEMO_SERVER || text === DEMO_BASE_URL || (allowShortDemo && text.toLowerCase() === 'demo'))) {
     return { baseUrl: DEMO_BASE_URL, demo: true };
   }
 
@@ -155,6 +166,9 @@ export async function discoverServer(input: string, allowShortDemo = false): Pro
   } catch {
     oauth = undefined;
   }
+  // SDK проверяет у метаданных только то, что это строки. Страница входа, куда уходит человек,
+  // и адреса, куда уходят код и токены, — только `https:`; иначе этот путь не предлагаем.
+  if (oauth && !secureEndpoints(oauth)) oauth = undefined;
 
   let flows: string[];
   try {
@@ -174,6 +188,11 @@ export async function discoverServer(input: string, allowShortDemo = false): Pro
   };
   if (!info.oauth && !info.sso && !info.password) throw new SignInError('unsupportedMethod');
   return info;
+}
+
+function secureEndpoints(metadata: ValidatedAuthMetadata): boolean {
+  const { issuer, authorization_endpoint, token_endpoint, registration_endpoint, revocation_endpoint } = metadata;
+  return [issuer, authorization_endpoint, token_endpoint, registration_endpoint, revocation_endpoint].every((endpoint) => secureUrl(endpoint) !== null);
 }
 
 function isNetworkFailure(error: unknown): boolean {

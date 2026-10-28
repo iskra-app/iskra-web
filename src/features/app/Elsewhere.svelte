@@ -1,18 +1,29 @@
 <!--
   «Iskra уже открыта в другом окне». Две кнопки, ни одна не выделена как правильная:
   какая из вкладок главная, решает человек, а не мы.
+
+  Пришли сюда по чужой ссылке (`#/open/…`) — она уходит в ту вкладку сразу: там сессия, там
+  и вопрос «Написать?» или чат. «Открыть здесь» её не теряет: адрес остаётся.
 -->
 <script lang="ts">
   import { asset } from '../../design/asset';
   import QuietButton from '../../design/QuietButton.svelte';
   import { app } from '../../core/session/app.svelte.ts';
+  import { router } from '../../core/navigation/router.svelte.ts';
   import { t } from '../../i18n/index.svelte.ts';
+
+  let passed = $state(false);
+  $effect(() => {
+    if (router.route.name !== 'open') return;
+    app.passLink(window.location.hash);
+    passed = true;
+  });
 </script>
 
 <main class="elsewhere">
   <img src={asset('icons/icon.svg')} alt="" width="56" height="56" />
   <h1>{t('elsewhere.title')}</h1>
-  <p>{t('elsewhere.message')}</p>
+  <p>{t(passed ? 'elsewhere.linkPassed' : 'elsewhere.message')}</p>
   <div class="actions">
     <QuietButton onclick={() => app.focusOther()}>{t('elsewhere.goThere')}</QuietButton>
     <QuietButton onclick={() => void app.takeOver()}>{t('elsewhere.openHere')}</QuietButton>

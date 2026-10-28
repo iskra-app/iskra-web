@@ -24,6 +24,9 @@
   --space-generous: 1.5rem; /* 24 */
   --space-between-senders: 0.75rem; /* 12 */
   --space-within-run: 0.125rem; /* 2 — не кратно 4 сознательно, см. Theme.swift */
+  /* Между сообщениями одного автора в компактном виде: у строки нет края, и при 2 px два сообщения
+     читаются как одно в две строки. */
+  --space-within-compact-run: 0.5rem; /* 8 */
 
   /* Theme.Radius */
   --radius-bubble: 1.5rem; /* 24 */
@@ -49,10 +52,13 @@
   --tint-mono: 4%;
   /* Лист тонировки — над всем, что нарисовано страницей (окна `<dialog>` — в своём слое выше). */
   --z-tint: 100;
-  /* Затемнение за диалогом и листом — серое, не чёрное: в тёмной теме чёрное по чёрному не
-     видно, и диалог висел в пустоте. Серый `systemGray` поверх белого серит, поверх чёрного —
-     высветляет, — одно значение на обе темы. */
+  /* Затемнение за диалогом и листом. В светлой — серый `systemGray`: серит белое. В тёмной —
+     чёрный (ниже): серый там высветлял ленту, и окно не отделялось от неё; от чёрного фона
+     окно отделяет своя заливка `--color-surface`. */
   --color-scrim: rgb(120 120 128 / 0.4);
+  /* Край окна над затемнением: в светлой его видно и так, в тёмной чёрное окно на почти чёрном
+     затемнении держится только этой линией. */
+  --color-dialog-edge: transparent;
   /* Кружок тумблера — белый в обеих темах, как у UISwitch, с лёгкой тенью от дорожки. */
   --color-on-switch: #ffffff;
   --shadow-switch-knob: 0 1px 4px rgb(0 0 0 / 0.2);
@@ -109,7 +115,7 @@
   --size-sticker-cell: 4.5rem; /* 72 — Theme.Size.stickerCell: стикер в панели, четыре в ряд на телефоне */
   --size-search-results: 20rem; /* 320 — найденное в «Поиске в чате»: окно не прыгает, пока ищут */
   --size-sticker-tab: 2rem; /* 32 — Theme.Size.stickerTab: картинка набора на вкладке */
-  --emoji-recent-columns: 6; /* недавние — по шесть, под ряд быстрых реакций */
+  --emoji-recent-columns: 6; /* недавние — по шесть, по ячейкам ряда быстрых реакций: пять и «+» */
   --size-video-note: 12.5rem; /* 200 — «кружочек» */
   --size-attachment-tile: 4.5rem; /* 72 — вложение в лотке над полем */
   --size-wallpaper-tile-width: 3.5rem; /* 56 — плитка обоев: вытянута, как экран */
@@ -128,6 +134,17 @@
   /* Время. Начинали с `Theme.Timing` нативной; в вебе всё на четверть быстрее — в браузере
      то же движение кажется медленнее, чем под пальцем на iPhone. */
   --timing-chrome: 150ms;
+  /* Просмотрщик фото: под снимком размытая и затемнённая переписка, а не чёрная страница
+     (`Theme.Backdrop.viewer` нативной). Затемнение — чтобы белая шапка читалась на любых цветах. */
+  --viewer-dim: 0.65;
+  --viewer-blur: 1.25rem; /* 20 — как ultraThinMaterial: радиус нативной не выбирается, здесь выбран */
+  --size-viewer-inset: 1rem; /* 16 — `Theme.Size.galleryInset`: снимок плавает над фоном, а не касается краёв */
+  /* Обрезка фото профиля (`AvatarCropper` нативной): снаружи будущего круга снимок остаётся под
+     вуалью — видно, что не войдёт и куда сдвинуть, чтобы вошло. */
+  --color-crop-veil: rgb(0 0 0 / 0.55);
+  --color-crop-outline: rgb(255 255 255 / 0.8);
+  --size-crop-veil-spread: 100vmax; /* тень дыры — дальше любого края окна */
+  --size-avatar-cropper: 30rem; /* 480 — `Theme.Size.avatarCropper` */
   --timing-arrival: 240ms;
   --timing-reaction: 180ms;
   --timing-deletion: 220ms;
@@ -166,6 +183,8 @@
     'Helvetica Neue', Arial, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji', 'Noto Color Emoji';
   /* Inter — перед системным: чего в нём нет (эмодзи), берётся из системных. */
   --font-body: 'Inter', var(--font-system);
+  /* Фичи Inter: зачёркнутый ноль, ss02, ss07 — только для него, не для системного. */
+  --font-features: 'zero', 'ss02', 'ss07';
   /* Код восстановления: моноширинный, чтобы «0» и «O», «l» и «1» не спорили. */
   --font-code: ui-monospace, 'SF Mono', Menlo, Consolas, 'Liberation Mono', monospace;
   --font-size-body: 1rem;
@@ -208,6 +227,8 @@
 :root {
   color-scheme: light;
   --color-background: #ffffff;
+  /* Вуаль на обоях: обои уводят к странице — в светлой к белому, в тёмной к чёрному. */
+  --wallpaper-veil: white;
   --color-surface: #f2f2f7;
   --color-text: #000000;
   --color-text-secondary: rgb(60 60 67 / 0.6);
@@ -246,6 +267,7 @@
 :root[data-theme='dark'] {
   color-scheme: dark;
   --color-background: #000000;
+  --wallpaper-veil: black;
   --color-surface: #1c1c1e;
   --color-text: #ffffff;
   --color-text-secondary: rgb(235 235 245 / 0.6);
@@ -260,12 +282,15 @@
   --color-watermark: rgb(255 255 255 / 0.07);
   --color-incoming-bubble-on-wallpaper: #2b2b2b;
   --color-mono-bubble-on-wallpaper: #4d4d4d;
+  --color-scrim: rgb(0 0 0 / 0.6);
+  --color-dialog-edge: rgb(84 84 88 / 0.6);
 }
 
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme='light']) {
     color-scheme: dark;
     --color-background: #000000;
+    --wallpaper-veil: black;
     --color-surface: #1c1c1e;
     --color-text: #ffffff;
     --color-text-secondary: rgb(235 235 245 / 0.6);
@@ -280,9 +305,12 @@
     --color-watermark: rgb(255 255 255 / 0.07);
     --color-incoming-bubble-on-wallpaper: #2b2b2b;
     --color-mono-bubble-on-wallpaper: #4d4d4d;
+    --color-scrim: rgb(0 0 0 / 0.6);
+    --color-dialog-edge: rgb(84 84 88 / 0.6);
   }
 }
 
 :root[data-font='system'] {
   --font-body: var(--font-system);
+  --font-features: normal;
 }

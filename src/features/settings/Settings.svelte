@@ -26,6 +26,7 @@
   import { isPersisted, requestPersistence } from '../../core/storage/persistence';
   import { i18n, t, type TextKey } from '../../i18n/index.svelte.ts';
   import { faceModes, fonts, preferences, type Appearance, type FaceMode, type Font, threadPlaces, type ThreadPlace } from '../app/preferences.svelte.ts';
+  import AvatarCropper from '../media/AvatarCropper.svelte';
   import { fileSize } from '../media/files';
   import RecoveryCode from '../recovery/RecoveryCode.svelte';
   import AccentSwatches from './AccentSwatches.svelte';
@@ -42,6 +43,7 @@
   import { isMac } from '../../design/hotkeys';
   import { viewport } from '../../design/viewport.svelte.ts';
   import { autoDownloads, compressions, type MediaAutoDownload } from '../media/mediaSettings';
+  import { canCompressVideo } from '../media/videoCompress';
   import { Photo, pixelsFor } from '../rooms/faces.svelte.ts';
 
   let { session, section }: { session: UserSession; section?: SettingsSection } = $props();
@@ -94,19 +96,22 @@
     }
   }
 
-  async function setPhoto(file: File | null) {
+  async function setPhoto(photo: Blob | null) {
     profileProblem = null;
     try {
-      await session.setPhoto(file ? { blob: file, name: file.name, type: file.type } : null);
+      await session.setPhoto(photo ? { blob: photo, name: 'avatar.jpg', type: photo.type } : null);
     } catch {
       profileProblem = 'picture';
     }
   }
 
+  /** Выбранный снимок, который ещё обрезают — уходит только квадрат из обрезки. */
+  let cropping = $state<File | null>(null);
+
   function picked() {
     const file = picker?.files?.[0];
     if (picker) picker.value = '';
-    if (file?.type.startsWith('image/')) void setPhoto(file);
+    if (file?.type.startsWith('image/')) cropping = file;
   }
 
   // ————— Уведомления —————
@@ -261,10 +266,28 @@
     reading = { licence, text: await licence.text() };
   }
 
-  /** Тройной щелчок — `detail` считает щелчки подряд, как `onTapGesture(count: 3)`. */
-  function openBeta(event: MouseEvent) {
-    if (event.detail === 3) router.go({ name: 'settings', section: 'beta' });
+  /**
+   * Три касания или щелчка подряд, как `onTapGesture(count: 3)`. Считаем сами: `detail` у
+   * `click` копит щелчки мыши, но не касания — iOS и на третье касание пишет 1.
+   */
+  const TAP_GAP_MS = 500;
+  let taps = 0;
+  let lastTap = -Infinity;
+  function openBeta(event: PointerEvent) {
+    if (!event.isPrimary) return;
+    taps = event.timeStamp - lastTap < TAP_GAP_MS ? taps + 1 : 1;
+    lastTap = event.timeStamp;
+    if (taps < 3) return;
+    taps = 0;
+    router.go({ name: 'settings', section: 'beta' });
   }
+
+  /** Умеет ли браузер сжимать видео — спрашивается, когда открыли «Фото и видео»; `undefined` — ещё не знаем. */
+  let videoCompressible = $state<boolean | undefined>();
+  $effect(() => {
+    if (section !== 'media' || videoCompressible !== undefined) return;
+    void canCompressVideo().then((can) => (videoCompressible = can));
+  });
 
   let confirmingSignOut = $state(false);
   let showingCode = $state(false);
@@ -349,6 +372,14 @@
       </div>
       <input bind:this={picker} type="file" accept="image/*" hidden onchange={picked} />
     </div>
+    <AvatarCropper
+      file={cropping}
+      oncancel={() => (cropping = null)}
+      ondone={(photo) => {
+        cropping = null;
+        void setPhoto(photo);
+      }}
+    />
     <section aria-labelledby="name-title">
       <h3 id="name-title">{t('account.nameHeader')}</h3>
       <form class="stack" onsubmit={saveName}>
@@ -488,7 +519,10 @@
         onchange={(event) => (preferences.layout = event.currentTarget.checked ? 'compact' : 'bubbles')}
       />
     </label>
-    <h3 id="theme-title">{t('appearance.theme')}</h3>
+    <!-- Одна карточка на три ответа «в чём окрашено приложение»: светлая или тёмная, цвет и подкраска
+         (`appearance.themeAndColors` нативной). Названия строк — скринридеру. -->
+    <h3>{t('appearance.themeAndColors')}</h3>
+    <span id="theme-title" class="visually-hidden">{t('appearance.theme')}</span>
     <div class="options" role="radiogroup" aria-labelledby="theme-title">
       {#each themes as theme (theme.value)}
         <button type="button" role="radio" aria-checked={preferences.appearance === theme.value} onclick={() => (preferences.appearance = theme.value)}>
@@ -496,7 +530,7 @@
         </button>
       {/each}
     </div>
-    <h3 id="accent-title">{t('appearance.accent')}</h3>
+    <span id="accent-title" class="visually-hidden">{t('appearance.accent')}</span>
     <AccentSwatches labelledby="accent-title" />
     <label class="switch">
       <span>{t('appearance.tintInterface')}</span>
@@ -598,7 +632,7 @@
       <input type="checkbox" role="switch" bind:checked={preferences.stripMetadata} />
     </label>
     <label class="switch">
-      <span>{t('media.compressPhotos')}</span>
+      <span>{t('media.compress')}</span>
       <input type="checkbox" role="switch" bind:checked={preferences.compress} />
     </label>
     <!-- Появляется вместе с переключателем, от которого зависит, — а не стоит серым. -->
@@ -607,12 +641,13 @@
       <div class="options" role="radiogroup" aria-labelledby="compression-title">
         {#each compressions as level (level)}
           <button type="button" role="radio" aria-checked={preferences.compression === level} onclick={() => (preferences.compression = level)}>
-            {t(`media.compressionPhoto.${level}`)}
+            {t(`media.compression.${level}`)}
           </button>
         {/each}
       </div>
+      <!-- Видео сжимает сам браузер (WebCodecs); где он не умеет — сказать, а не обещать. -->
+      {#if videoCompressible === false}<p class="secondary">{t('media.videoUncompressedWeb')}</p>{/if}
     {/if}
-    <p class="secondary">{t('media.videoAsIsWeb')}</p>
   {:else if section === 'storage'}
     <!-- `StorageView` нативной: сначала — сколько всего, потом что с этим сделать. -->
     <dl>
@@ -643,10 +678,9 @@
     <!-- `AboutView` нативной, строка в строку: значок, имя и строка о себе; версия, сборка,
          устройство; сайт, исходный код и лицензии; внизу — чьё это и на каких условиях. -->
     <div class="profile-header">
-      <!-- Три щелчка по значку — «Бета-функции», как в нативной: строки к ним нет, их находит тот,
+      <!-- Три щелчка или касания по значку — «Бета-функции», как в нативной: строки к ним нет, их находит тот,
            кто ищет. -->
-      <!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_noninteractive_element_interactions -->
-      <img class="app-icon" src={asset('icons/icon-192.png')} alt="" onclick={openBeta} />
+      <img class="app-icon" src={asset('icons/icon-192.png')} alt="" draggable="false" onpointerup={openBeta} />
       <strong class="profile-name">{t('about.appNameWeb')}</strong>
       <span class="secondary">{t('about.webTagline')}</span>
     </div>
@@ -690,6 +724,22 @@
         </button>
       {/each}
     </div>
+    <!-- «Для разработчиков» нативной: что веб может из этого — адрес сервера, JSON в меню, все события. -->
+    <h3>{t('beta.developers')}</h3>
+    <ul class="rows">
+      <li class="pair"><span>{t('beta.homeserver')}</span><span class="secondary selectable">{session.homeserver}</span></li>
+    </ul>
+    <p class="secondary">{t('beta.homeserverHelp')}</p>
+    <label class="switch">
+      <span>{t('beta.showsSource')}</span>
+      <input type="checkbox" role="switch" bind:checked={preferences.showsEventSource} />
+    </label>
+    <label class="switch">
+      <span>{t('beta.showsAllEvents')}</span>
+      <input type="checkbox" role="switch" bind:checked={preferences.showsAllEvents} />
+    </label>
+    <p class="secondary">{t('beta.showsSourceHelp')}</p>
+    <p class="secondary">{t('beta.showsAllEventsHelp')}</p>
   {:else if section === 'licences'}
     <!-- `LicensesView` нативной: своя лицензия, потом — на чём всё построено; строка открывает текст. -->
     <ul class="rows">
@@ -831,6 +881,10 @@
     height: var(--size-avatar-profile);
     margin-block-end: var(--space-close);
     border-radius: var(--radius-card);
+    /* Касания подряд — счёт, а не зум двойным касанием; долгое — не меню «Сохранить фото». */
+    touch-action: manipulation;
+    -webkit-touch-callout: none;
+    user-select: none;
   }
   .profile-name {
     font-size: var(--font-size-title);

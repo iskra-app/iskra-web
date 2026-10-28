@@ -53,7 +53,9 @@ export type ServiceEvent =
   | { type: 'roomTopicChanged' }
   | { type: 'roomPictureChanged' }
   | { type: 'roomCreated' }
-  | { type: 'encryptionEnabled' };
+  | { type: 'encryptionEnabled' }
+  /** Событие, которого лента не показывает, — только при «Все события в чате»: тип, деталь и отправитель. */
+  | { type: 'hidden'; description: string };
 
 export interface PollAnswer {
   id: string;

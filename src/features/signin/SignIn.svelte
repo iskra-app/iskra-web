@@ -22,7 +22,7 @@
   import ProblemPanel from '../../design/ProblemPanel.svelte';
   import { discoverServer, SignInError, type ServerInfo, type SignInProblem } from '../../core/auth/server';
   import { signInWithPassword, startOAuth, startSso } from '../../core/auth/signIn';
-  import { app } from '../../core/session/app.svelte.ts';
+  import { app, type Resume } from '../../core/session/app.svelte.ts';
   import { t, type TextKey } from '../../i18n/index.svelte.ts';
   import Icon from '../../design/Icon.svelte';
   import { languageChoices } from '../app/languages';
@@ -35,11 +35,16 @@
     /** Что на самом деле сломалось — мелким текстом под сообщением. */
     detail?: string;
     ended?: boolean;
+    /** Сервер попросил войти снова — этим человеком и с этим устройством. */
+    resume?: Resume | undefined;
   }
-  let { problem: initialProblem, detail: initialDetail, ended = false }: Props = $props();
+  let { problem: initialProblem, detail: initialDetail, ended = false, resume }: Props = $props();
 
-  let address = $state('');
-  let username = $state('');
+  // Вход снова: сервер и имя уже известны — их не набирают заново.
+  // svelte-ignore state_referenced_locally
+  let address = $state(resume?.homeserverUrl ?? '');
+  // svelte-ignore state_referenced_locally
+  let username = $state(resume ? resume.userId.replace(/^@/, '').replace(/:.*$/, '') : '');
   let password = $state('');
   let server = $state<ServerInfo | null>(null);
   /** Форма пароля: сервер другого входа не знает, или о ней попросили. */
@@ -97,7 +102,7 @@
     if (!s) return;
     pending = create ? 'createAccount' : 'signIn';
     void run(async () => {
-      const url = s.oauth ? await startOAuth(s, { create }) : startSso(s);
+      const url = s.oauth ? await startOAuth(s, { create }) : startSso(s, create ? undefined : resumeDevice);
       window.location.assign(url);
       // Страница уходит; кнопка остаётся занятой, пока не ушла.
       await new Promise(() => {});
@@ -122,9 +127,21 @@
     const s = server;
     if (!s || !username.trim() || !password) return;
     void run(async () => {
-      const account = await signInWithPassword(s, username, password);
+      const account = await signInWithPassword(s, username, password, resumeDevice);
       password = '';
       await app.signIn(account);
+    });
+  }
+
+  /** Прежнее устройство — только тому же серверу: другому его ID ни о чём не говорит. */
+  const resumeDevice = $derived(resume && server?.baseUrl === resume.homeserverUrl ? resume.deviceId : undefined);
+
+  // Вход снова — сразу к кнопкам «Войти»: адрес сервера известен.
+  // svelte-ignore state_referenced_locally
+  if (resume) {
+    void run(async () => {
+      server = await discoverServer(resume.homeserverUrl);
+      usingPassword = false;
     });
   }
 
@@ -167,6 +184,9 @@
         <div class="back"><QuietButton disabled={busy} onclick={back}>{t('signIn.back')}</QuietButton></div>
         <h1 class="form-title">{t('signIn.signInTo', { name: serverName })}</h1>
         <p class="secondary">{t('signIn.passwordHelp')}</p>
+        {#if resume}
+          <ProblemPanel title={t('session.ended.title')} message={t('session.signInAgain.message', { user: resume.userId })} />
+        {/if}
         <TextField bind:value={username} label={t('signIn.username')} showLabel autocomplete="username" autofocus disabled={busy} />
         <TextField
           bind:value={password}
@@ -191,7 +211,9 @@
         <p class="secondary">{t('signIn.tagline')}</p>
       </header>
 
-      {#if showEnded}
+      {#if resume}
+        <ProblemPanel title={t('session.ended.title')} message={t('session.signInAgain.message', { user: resume.userId })} />
+      {:else if showEnded}
         <ProblemPanel title={t('session.ended.title')} message={t('session.ended.message')} />
       {/if}
 

@@ -38,6 +38,12 @@ export interface OutgoingFile {
    * с именем `sticker.<ext>`: `m.sticker` отдал бы картинку серверу открытой.
    */
   sticker?: { body: string };
+  /**
+   * Работа, отложенная до отправки, — сжатие видео: долгая, и лоток не должен её ждать.
+   * Отдаёт файл, который и уходит (уже без `prepare`); не вышло — исходный, а не ошибку.
+   * Бросает только отмену.
+   */
+  prepare?: (signal: AbortSignal, onProgress: (fraction: number) => void) => Promise<OutgoingFile>;
 }
 
 /** Волна в событии — целые 0…1024, как шлёт нативная Искра (`TimelineMapper.waveformScale`). */
@@ -141,10 +147,38 @@ async function put(
   return { file: { ...info, url } };
 }
 
+/** Кусок потока загрузки: `Blob.stream()` файл из памяти отдаёт одним куском — прогресса не видно. */
+const STREAM_CHUNK = 64 * 1024;
+
+/**
+ * Тело загрузки потоком, который говорит, сколько из него уже забрали. `highWaterMark: 0` —
+ * ничего не читать впрок: прогресс — то, что взял получатель, а не то, что мы приготовили.
+ */
+function streamWithProgress(body: Blob, onProgress: (loaded: number, total: number) => void): ReadableStream<Uint8Array> {
+  let loaded = 0;
+  return new ReadableStream<Uint8Array>(
+    {
+      async pull(controller) {
+        if (loaded >= body.size) {
+          controller.close();
+          return;
+        }
+        const chunk = new Uint8Array(await body.slice(loaded, loaded + STREAM_CHUNK).arrayBuffer());
+        controller.enqueue(chunk);
+        loaded += chunk.byteLength;
+        onProgress(loaded, body.size);
+      },
+    },
+    { highWaterMark: 0 },
+  );
+}
+
 /**
  * `UploadClient` поверх настоящего клиента. `viaFetch` — загрузка своим `fetch`, а не
  * `uploadContent`: тот в браузере идёт через `XMLHttpRequest` (ради прогресса) мимо
- * `fetchFn` клиента — и демо-сервер, живущий в `fetchFn`, его бы не увидел.
+ * `fetchFn` клиента — и демо-сервер, живущий в `fetchFn`, его бы не увидел. Только для демо:
+ * тело уходит потоком, и прогресс — по тому, что демо забрало (`DemoHomeserver.receive`);
+ * настоящий `fetch` с потоком в теле умеет не везде (Safari — нет).
  */
 export function uploadClientFor(client: MatrixClient, viaFetch?: typeof globalThis.fetch): UploadClient {
   return {
@@ -164,7 +198,7 @@ export function uploadClientFor(client: MatrixClient, viaFetch?: typeof globalTh
         if (name) url.searchParams.set('filename', name);
         const response = await viaFetch(url.href, {
           method: 'POST',
-          body,
+          body: onProgress ? streamWithProgress(body, onProgress) : body,
           headers: { 'Content-Type': type, Authorization: `Bearer ${client.getAccessToken() ?? ''}` },
           ...(signal ? { signal } : {}),
         });

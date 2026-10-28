@@ -18,6 +18,7 @@ import {
   SyncState,
   TokenRefresher,
   type MatrixClient,
+  type MatrixError,
   type ValidatedAuthMetadata,
 } from 'matrix-js-sdk';
 import { AllDevicesIsolationMode } from 'matrix-js-sdk/lib/crypto-api';
@@ -54,8 +55,11 @@ export type Connection = 'connecting' | 'online' | 'offline';
 export interface SessionEvents {
   /** Токены обновились — их надо сохранить, иначе после перезагрузки вход пропадёт. */
   onTokensRefreshed: (tokens: { accessToken: string; refreshToken?: string }) => Promise<void>;
-  /** Сервер перестал принимать сеанс: его завершили с другого устройства. */
-  onLoggedOut: () => void;
+  /**
+   * Сервер перестал принимать сеанс. `soft` — он просит войти снова, а устройство оставил
+   * (`soft_logout`): ключи и переписка на нём ещё годятся, и стирать их нельзя.
+   */
+  onLoggedOut: (soft: boolean) => void;
 }
 
 export interface SessionOptions {
@@ -123,6 +127,11 @@ export class UserSession {
   private readonly account: Account;
   private readonly detach: Array<() => void> = [];
   private stopped = false;
+
+  /** Сервер, с которым клиент разговаривает на самом деле — после поиска по имени аккаунта. */
+  get homeserver(): string {
+    return this.client.getHomeserverUrl();
+  }
 
   private constructor(client: MatrixClient, account: Account, keys: SecretStorageKeyHolder | null, persistent: boolean) {
     this.client = client;
@@ -504,7 +513,7 @@ export class UserSession {
         { clientId: account.oauth.clientId, redirectUri: account.oauth.redirectUri, deviceId: account.deviceId },
         logger,
       );
-      const refresher = new TokenRefresher(oauth, (tokens) =>
+      const refresher = new TokenRefresher(refusalsOnly(oauth), (tokens) =>
         events.onTokensRefreshed({
           accessToken: tokens.accessToken,
           ...(tokens.refreshToken ? { refreshToken: tokens.refreshToken } : {}),
@@ -570,9 +579,11 @@ export class UserSession {
     this.client.on(ClientEvent.Sync, onSync);
     this.detach.push(() => this.client.off(ClientEvent.Sync, onSync));
 
-    const onLoggedOut = () => {
+    const onLoggedOut = (error: MatrixError) => {
       if (this.stopped) return;
-      events.onLoggedOut();
+      // С refresh-токеном SDK сначала пробует обновиться, и выход — это отказ в обновлении:
+      // сеанс завершён, а `soft_logout` в ответе — про прежний, просто истёкший токен.
+      events.onLoggedOut(error?.data?.['soft_logout'] === true && !this.client.getRefreshToken());
     };
     this.client.on(HttpApiEvent.SessionLoggedOut, onLoggedOut);
     this.detach.push(() => this.client.off(HttpApiEvent.SessionLoggedOut, onLoggedOut));
@@ -632,8 +643,11 @@ export class UserSession {
         });
         const token = this.client.getAccessToken();
         const refresh = this.client.getRefreshToken();
-        if (refresh) await auth.revokeToken(refresh, 'refresh_token');
-        if (token) await auth.revokeToken(token, 'access_token');
+        // Каждый отдельно: не отозвался refresh — access всё равно отзываем.
+        await Promise.allSettled([
+          ...(refresh ? [auth.revokeToken(refresh, 'refresh_token')] : []),
+          ...(token ? [auth.revokeToken(token, 'access_token')] : []),
+        ]);
       } else {
         await this.client.logout(false);
       }
@@ -650,6 +664,29 @@ export class UserSession {
   }
 }
 
+/**
+ * Обновление токена, которому сервер сказал «нет», SDK считает выходом — на любой 4xx, и сеанс
+ * завершается со стиранием всего локального, ключей шифрования тоже. Но 429 («слишком часто»)
+ * и 408 — не отказ, а «попозже». Отказ — только ответ по RFC 6749, §5.2: 400 (`invalid_grant`)
+ * или 401. Остальное уходит наверх не `HTTPError`-ом, и SDK повторит обновление позже, как
+ * после сбоя сети.
+ */
+export function refusalsOnly(oauth: OAuth2): OAuth2 {
+  const grant = oauth.performRefreshTokenGrant.bind(oauth);
+  oauth.performRefreshTokenGrant = async (refreshToken) => {
+    try {
+      return await grant(refreshToken);
+    } catch (error) {
+      const status = (error as { httpStatus?: unknown } | null)?.httpStatus;
+      if (typeof status === 'number' && status !== 400 && status !== 401) {
+        throw new Error(`token refresh deferred (${status})`, { cause: error });
+      }
+      throw error;
+    }
+  };
+  return oauth;
+}
+
 /** Удаляет базы пользователя; с клиентом — его руками, без — по именам. */
 export async function wipeUserData(userId: string, client?: MatrixClient): Promise<void> {
   const names = databaseNames(userId);
@@ -661,10 +698,13 @@ export async function wipeUserData(userId: string, client?: MatrixClient): Promi
     }
   }
   if (typeof indexedDB === 'undefined') return;
-  await Promise.all([
+  // Каждая сама по себе: одна не удалилась — остальные всё равно удаляются, а ошибка — наверх.
+  const results = await Promise.allSettled([
     deleteDatabase(`matrix-js-sdk:${names.sync}`),
     deleteDatabase(`${names.cryptoPrefix}::matrix-sdk-crypto`),
     deleteDatabase(`${names.cryptoPrefix}::matrix-sdk-crypto-meta`),
     deleteDatabase(searchDatabaseName(userId)),
   ]);
+  const failed = results.find((result) => result.status === 'rejected');
+  if (failed) throw failed.reason;
 }

@@ -19,6 +19,7 @@
   import { t } from '../../i18n/index.svelte.ts';
   import { roomFailureText } from './text';
   import RoomRulesDialog from './RoomRulesDialog.svelte';
+  import AvatarCropper from '../media/AvatarCropper.svelte';
 
   let { open, details, session, onclose }: { open: boolean; details: RoomDetailsStore; session: UserSession; onclose: () => void } = $props();
 
@@ -76,12 +77,19 @@
     if (done) onclose();
   }
 
-  async function picked() {
+  /** Выбранный снимок, который ещё обрезают — уходит только квадрат из обрезки. */
+  let cropping = $state<File | null>(null);
+
+  function picked() {
     const file = picker?.files?.[0];
     if (picker) picker.value = '';
-    if (!file || !file.type.startsWith('image/')) return;
+    if (file?.type.startsWith('image/')) cropping = file;
+  }
+
+  async function setPicture(photo: Blob) {
+    cropping = null;
     try {
-      const mxc = await session.uploadPublic(file, file.name, file.type);
+      const mxc = await session.uploadPublic(photo, 'avatar.jpg', photo.type);
       await details.setPicture(mxc);
     } catch {
       details.failure = 'picture';
@@ -185,6 +193,8 @@
 </Dialog>
 
 <RoomRulesDialog open={rulesOpen} {details} onclose={() => (rulesOpen = false)} />
+
+<AvatarCropper file={cropping} oncancel={() => (cropping = null)} ondone={(photo) => void setPicture(photo)} />
 
 <ConfirmDialog
   open={!!unbanning}

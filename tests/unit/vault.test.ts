@@ -111,4 +111,20 @@ describe('хранилище аккаунтов', () => {
     expect(await vault.localNames(alice.userId)).toEqual({});
     expect(await vault.localNames(bob.userId)).toEqual({ '!a:x': 'Тёща' });
   });
+  it('обновление токенов и «уже виденные сеансы» одновременно — новый refresh-токен не теряется', async () => {
+    await vault.add({ ...alice, refreshToken: 'old_refresh' });
+    await Promise.all([
+      vault.updateTokens(alice.userId, { accessToken: 'new_access', refreshToken: 'new_refresh' }),
+      vault.setKnownDevices(alice.userId, ['DEV2']),
+      vault.setKnownDevices(alice.userId, ['DEV2', 'DEV3']),
+    ]);
+    expect(await vault.secrets(alice.userId)).toMatchObject({ accessToken: 'new_access', refreshToken: 'new_refresh' });
+    expect(await vault.knownDevices(alice.userId)).toEqual(['DEV2', 'DEV3']);
+  });
+
+  it('токены, обновлённые после выхода, запись не воскрешают', async () => {
+    await vault.add(alice);
+    await Promise.all([vault.updateTokens(alice.userId, { accessToken: 'late' }), vault.remove(alice.userId)]);
+    expect(await vault.current()).toBeUndefined();
+  });
 });

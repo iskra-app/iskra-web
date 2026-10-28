@@ -12,8 +12,9 @@
  *
  * Оба ключа — неизвлекаемые, свои у индекса: лежат в его же базе и уходят вместе с ней.
  * «Очистить поисковый индекс» стирает базу целиком, и новый индекс получает новые ключи.
- * Что это даёт и чего нет — как у `vault.ts`: от скопированного с диска профиля браузера
- * защищает, от кода на нашем же origin — нет, граница там — CSP.
+ * Что это даёт и чего нет — как у `secretBox.ts`: слов не видно ни в файлах профиля, ни в
+ * DevTools; но ключи лежат рядом, и тому, у кого копия профиля, они достанутся вместе с базой.
+ * От кода на нашем же origin — тоже нет, граница там — CSP.
  *
  * Чат тоже ищется отпечатком: «в этом чате» — ещё одно слово запроса.
  */
@@ -149,6 +150,31 @@ export class SearchIndex {
     const tx = this.db.transaction(DOCS, 'readwrite');
     const store = tx.objectStore(DOCS);
     for (const id of eventIds) store.delete(id);
+    await done(tx);
+  }
+
+  /**
+   * Удаление, пришедшее событием: стереть, только если запись из того же чата и удаляет её
+   * автор — или тот, кому в чате можно удалять чужое (`byModerator`). Иначе любой участник
+   * одного чата стирал бы из поиска сообщения другого, назвав их ID.
+   */
+  async removeRedacted(eventId: string, roomId: string, redactor: string, byModerator: boolean): Promise<void> {
+    const doc = await request(this.db.transaction(DOCS).objectStore(DOCS).get(eventId) as IDBRequest<StoredDoc | undefined>);
+    if (!doc || doc.roomId !== roomId) return;
+    if (!byModerator) {
+      const open = await unseal<{ sender: string }>(this.keys.seal, doc.sealed).catch(() => undefined);
+      if (open?.sender !== redactor) return;
+    }
+    await this.remove([eventId]);
+  }
+
+  /** Всё из комнаты — по её отпечатку: из неё ушли. */
+  async removeRoom(roomId: string): Promise<void> {
+    const term = await this.roomTerm(roomId);
+    const tx = this.db.transaction(DOCS, 'readwrite');
+    const store = tx.objectStore(DOCS);
+    const keys = await request(store.index('terms').getAllKeys(term) as IDBRequest<string[]>);
+    for (const id of keys) store.delete(id);
     await done(tx);
   }
 

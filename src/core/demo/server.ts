@@ -68,6 +68,11 @@ interface DemoRequest {
 const tokenFor = (deviceId: string) => `demo-token-${deviceId}`;
 /** Сколько длинный опрос ждёт, если нового нет. SDK просит 30 секунд; демо не нужно столько. */
 const LONG_POLL_CAP_MS = 5_000;
+/**
+ * «Сеть» демо для загрузок, байт в миллисекунду — 2 МБ/с, как мобильный интернет: фото уходит
+ * за полсекунды, видео — за несколько, и полоса прогресса успевает показаться.
+ */
+const UPLINK_BYTES_PER_MS = 2_000;
 
 export class DemoHomeserver {
   readonly baseUrl = DEMO_BASE_URL;
@@ -227,6 +232,9 @@ export class DemoHomeserver {
     // микрозадачах, и цикл исходящих запросов Rust-крипто не отдавал бы очередь таймерам —
     // а на таймерах держится длинный опрос, которого ждёт, например, запись данных аккаунта.
     await new Promise((resolve) => setTimeout(resolve, 0));
+    // Загрузка потоком (`uploadClientFor`): забрать его здесь, со скоростью «сети» — отправитель
+    // видит прогресс. `Request` с потоком в теле WebKit не построит, а байты — построит.
+    if (init?.body instanceof ReadableStream) init = { ...init, body: await receive(init.body, init.signal ?? undefined) };
     const request = new Request(input, init);
     const url = new URL(request.url);
     const method = request.method.toUpperCase();
@@ -253,6 +261,10 @@ export class DemoHomeserver {
     const deviceId = token.startsWith('demo-token-') ? token.slice('demo-token-'.length) : undefined;
 
     if (this.variant === 'slow') await delay(this.slowDelayMs, init?.signal ?? undefined);
+
+    if (deviceId && this.account.devices[deviceId]?.signInAgain && !url.pathname.endsWith('/login') && !url.pathname.endsWith('/versions')) {
+      return json(401, { errcode: 'M_UNKNOWN_TOKEN', error: 'Sign in again', soft_logout: true });
+    }
 
     for (const [routeMethod, pattern, handler] of this.routes) {
       if (routeMethod !== method) continue;
@@ -296,6 +308,7 @@ export class DemoHomeserver {
       identifier?: { type?: string; user?: string };
       user?: string;
       token?: string;
+      device_id?: string;
     };
     const ok =
       request.type === 'm.login.password'
@@ -307,9 +320,12 @@ export class DemoHomeserver {
           : false;
     if (!ok) return json(403, { errcode: 'M_FORBIDDEN', error: 'Invalid username or password' });
     // Каждый вход — новое устройство, как у настоящего сервера: иначе второй вход после
-    // выхода столкнулся бы с ключами прошлого.
-    const deviceId = `DEMO${String(this.account.nextDevice++).padStart(3, '0')}`;
-    this.account.devices[deviceId] = { oneTimeKeys: 0 };
+    // выхода столкнулся бы с ключами прошлого. Кроме входа снова с `device_id` устройства,
+    // которое сервер оставил (`signInAgain`): оно продолжается со своими ключами.
+    const kept = request.device_id ? this.account.devices[request.device_id] : undefined;
+    const deviceId = kept ? request.device_id! : `DEMO${String(this.account.nextDevice++).padStart(3, '0')}`;
+    if (kept) delete kept.signInAgain;
+    else this.account.devices[deviceId] = { oneTimeKeys: 0 };
     this.save();
     return json(200, {
       user_id: demoUsers.alice,
@@ -317,6 +333,12 @@ export class DemoHomeserver {
       device_id: deviceId,
       well_known: { 'm.homeserver': { base_url: DEMO_BASE_URL } },
     });
+  }
+
+  /** Попросить все устройства войти снова — `soft_logout`, как сервер с истёкшим токеном. */
+  askToSignInAgain(): void {
+    for (const device of Object.values(this.account.devices)) device.signInAgain = true;
+    this.save();
   }
 
   private save(): void {
@@ -1351,6 +1373,24 @@ function json(status: number, body: unknown): Response {
 
 function unrecognized(): Response {
   return json(404, { errcode: 'M_UNRECOGNIZED', error: 'Unrecognized request' });
+}
+
+/** Тело загрузки — по кускам, с паузой на каждый, как по сети в `UPLINK_BYTES_PER_MS`. */
+async function receive(body: ReadableStream<Uint8Array>, signal: AbortSignal | undefined): Promise<Blob> {
+  const reader = body.getReader();
+  const parts: Uint8Array[] = [];
+  try {
+    for (;;) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      parts.push(value);
+      await delay(value.byteLength / UPLINK_BYTES_PER_MS, signal);
+    }
+  } catch (error) {
+    await reader.cancel(error).catch(() => {});
+    throw error;
+  }
+  return new Blob(parts as BlobPart[]);
 }
 
 function delay(ms: number, signal: AbortSignal | undefined): Promise<void> {

@@ -75,6 +75,27 @@ test('ответ и правка: полоса над полем, ↑ берёт
   await expect(field).toHaveValue('');
 });
 
+test('отменённая правка возвращает поле как было: слова и ответ, к которому они шли', async ({ page }) => {
+  await signInToDemo(page);
+  await openRoom(page, /^Выходные/);
+  const field = page.getByRole('textbox', { name: 'Сообщение' });
+  await field.fill('Первая реплика');
+  await page.getByRole('button', { name: 'Отправить' }).click();
+  await expect(page.getByRole('img', { name: 'Отправляется' })).toHaveCount(0, { timeout: 10_000 });
+
+  // Полунаписанный ответ — и правка поверх него.
+  await (await menuOf(page, 'Я — пирог')).getByRole('menuitem', { name: 'Ответить' }).click();
+  await field.fill('Недописанный ответ');
+  await (await menuOf(page, 'Первая реплика')).getByRole('menuitem', { name: 'Изменить' }).click();
+  await expect(page.getByText('Изменение сообщения')).toBeVisible();
+  await expect(field).toHaveValue('Первая реплика');
+
+  await field.press('Escape');
+  await expect(page.getByText('Изменение сообщения')).toBeHidden();
+  await expect(page.getByText('Ответ', { exact: true })).toBeVisible();
+  await expect(field).toHaveValue('Недописанный ответ');
+});
+
 test('удаление своего — с вопросом, и исчезает у всех', async ({ page }) => {
   await signInToDemo(page);
   await openRoom(page, /^Выходные/);
@@ -231,7 +252,7 @@ test('мышь: панель по наведению; справка по кла
   await page.getByRole('log').click();
   await page.keyboard.press('?');
   const help = page.getByRole('dialog', { name: 'Сочетания клавиш' });
-  await expect(help).toContainText('Быстрый переход к чату');
+  await expect(help).toContainText('Поиск по сообщениям');
   await expect(help).toContainText('изменить последнее своё');
   await page.keyboard.press('Escape');
   await expect(help).toBeHidden();
@@ -473,6 +494,36 @@ test('плавающая дата: пока листают — день того
   await expect(page.locator('.floating.shown')).toBeVisible();
   await expect(floating).not.toBeEmpty();
   await expect(page.locator('.floating.shown')).toHaveCount(0, { timeout: 3000 });
+});
+
+test('подгрузка истории посреди инерции: место чтения не прыгает на начало подгруженного', async ({ page }) => {
+  await signInToDemo(page);
+  await openRoom(page, /^Длинная история/);
+  await expect(bubble(page, 'Сообщение номер 400')).toBeInViewport();
+  // Инерция тачпада или пальца: каждый кадр шаг вверх, и ещё шаг — сразу после того, как
+  // история легла в DOM, до раскладки. Верхнее видимое сообщение должно меняться понемногу,
+  // а не перескакивать на страницу подгруженного.
+  const jumps = await page.evaluate(async () => {
+    const scroller = document.querySelector<HTMLElement>('.scroller')!;
+    const topmost = () => {
+      const top = scroller.getBoundingClientRect().top;
+      const row = [...scroller.querySelectorAll<HTMLElement>('[data-anchor]')].find((r) => r.getBoundingClientRect().bottom > top);
+      return Number(row?.textContent?.match(/номер (\d+)/)?.[1]);
+    };
+    new MutationObserver(() => (scroller.scrollTop -= 10)).observe(scroller.querySelector('[role=log]')!, { childList: true });
+    const found: string[] = [];
+    let before = topmost();
+    for (let frame = 0; frame < 300; frame++) {
+      await new Promise(requestAnimationFrame);
+      scroller.scrollTop -= 40;
+      const now = topmost();
+      if (Math.abs(now - before) > 3) found.push(`${before} → ${now}`);
+      before = now;
+    }
+    return { found, reached: before };
+  });
+  expect(jumps.found).toEqual([]);
+  expect(jumps.reached).toBeLessThan(300);
 });
 
 test('заблокировали собеседника — вместо поля «Вы заблокировали…» и «Разблокировать»', async ({ page }) => {

@@ -1,7 +1,7 @@
 <!--
-  «Быстрая реакция» — `ReactionsView` нативной Искры: шесть подсказок в одно касание и «+» —
+  «Быстрая реакция» — `ReactionsView` нативной Искры: пять подсказок в одно касание и «+» —
   за ним весь каталог, та же `EmojiPanel`, что у меню сообщения: здесь нельзя выбрать то,
-  чего сообщению не поставить. Выбранная не из шести встаёт в ряд последней, подсвеченной, —
+  чего сообщению не поставить. Выбранная не из пяти встаёт на место пятой, подсвеченной, —
   иначе у настройки не было бы видимого значения.
 
   `mine` в панели пуст нарочно: у сообщения это «уже поставленные — нажать, чтобы снять», а
@@ -13,15 +13,21 @@
   import PlainButton from '../../design/PlainButton.svelte';
   import { t } from '../../i18n/index.svelte.ts';
   import { preferences } from '../app/preferences.svelte.ts';
-  import EmojiPanel from '../room/EmojiPanel.svelte';
+  import { Lazy } from '../../design/lazy.svelte.ts';
   import { quickReactions } from '../room/reactions';
 
   let { labelledby }: { labelledby: string } = $props();
 
   let picking = $state(false);
+  const emojiPanel = new Lazy(() => import('../room/EmojiPanel.svelte'));
+  const EmojiPanel = $derived(emojiPanel.when(picking));
   const nobody: ReadonlySet<string> = new Set();
+  // Пять и «+» — шесть ячеек, одна строка и на телефоне. Не из пяти — на месте пятой: шестой
+  // «+» перенесся бы на свою строку.
   const choices = $derived(
-    (quickReactions as readonly string[]).includes(preferences.quickReaction) ? [...quickReactions] : [...quickReactions, preferences.quickReaction],
+    (quickReactions as readonly string[]).includes(preferences.quickReaction)
+      ? [...quickReactions]
+      : [...quickReactions.slice(0, -1), preferences.quickReaction],
   );
 
   function pick(emoji: string) {
@@ -42,7 +48,7 @@
 </div>
 
 <Dialog open={picking} title={t('reactions.more')} onclose={() => (picking = false)}>
-  <EmojiPanel mine={nobody} recent={preferences.recentEmoji} onpick={pick} />
+  {#if EmojiPanel}<EmojiPanel mine={nobody} recent={preferences.recentEmoji} onpick={pick} />{/if}
   <PlainButton onclick={() => (picking = false)}>{t('common.cancel')}</PlainButton>
 </Dialog>
 

@@ -4,6 +4,7 @@
   `Ctrl` или `⌘` — по платформе.
 -->
 <script lang="ts">
+  import { backdropClose } from '../../design/backdropClose';
   import { describe, hotkeys } from '../../design/hotkeys';
   import { t, type TextKey } from '../../i18n/index.svelte.ts';
 
@@ -20,7 +21,7 @@
   });
 </script>
 
-<dialog bind:this={dialog} data-motion="pop" aria-labelledby="{id}-title" {onclose}>
+<dialog bind:this={dialog} use:backdropClose={onclose} data-motion="pop" aria-labelledby="{id}-title" {onclose}>
   <h2 id="{id}-title">{t('hotkeys.title')}</h2>
   <dl>
     {#each rows as hotkey (hotkey.id)}
@@ -37,7 +38,7 @@
   dialog {
     width: min(calc(100% - 2 * var(--space-roomy)), var(--column-timeline-max));
     padding: var(--space-generous);
-    border: none;
+    border: var(--border-hairline) solid var(--color-dialog-edge);
     border-radius: var(--radius-card);
     background: var(--color-background);
     color: var(--color-text);

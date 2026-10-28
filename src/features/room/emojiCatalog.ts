@@ -12,14 +12,6 @@
 export const emojiCategories = ['smileys', 'animals', 'food', 'activity', 'places', 'objects', 'symbols', 'flags'] as const;
 export type EmojiCategory = (typeof emojiCategories)[number];
 
-/** Двенадцать недавних — ряд из шести быстрых дважды, двумя ровными рядами (`RecentEmoji`). */
-export const RECENT_LIMIT = 12;
-
-/** Новое — первым, повтор — без дубля, не длиннее двенадцати. */
-export function addRecent(emoji: string, recent: readonly string[]): string[] {
-  return [emoji, ...recent.filter((e) => e !== emoji)].slice(0, RECENT_LIMIT);
-}
-
 export const emojiCatalog: Record<EmojiCategory, readonly string[]> = {
   smileys: [
     '😀', '😃', '😄', '😁', '😆', '😅', '🤣', '😂', '🙂', '🙃',

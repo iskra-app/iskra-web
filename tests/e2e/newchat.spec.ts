@@ -67,3 +67,25 @@ test('«Присоединиться по адресу»: не адрес — п
   await dialog.getByRole('button', { name: 'Войти' }).click();
   await expect(page.getByRole('heading', { name: 'Гостиная', level: 1 })).toBeVisible({ timeout: 10_000 });
 });
+
+test('диалог закрывается щелчком по подложке, но не щелчком внутри и не выделением, уведённым за край', async ({ page }) => {
+  await signInToDemo(page);
+  const dialog = await openNewChat(page);
+  const box = await dialog.boundingBox();
+  if (!box) throw new Error('у диалога нет размеров');
+
+  // Внутри окна — не закрывает.
+  await dialog.getByRole('heading', { name: 'Новый чат' }).click();
+  await expect(dialog).toBeVisible();
+
+  // Нажали внутри, отпустили на подложке (выделение текста) — тоже не закрывает.
+  await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(2, 2);
+  await page.mouse.up();
+  await expect(dialog).toBeVisible();
+
+  // Щелчок по подложке — закрывает.
+  await page.mouse.click(2, 2);
+  await expect(dialog).toBeHidden();
+});

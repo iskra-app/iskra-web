@@ -20,12 +20,13 @@ import type { AuthCallback } from './callback';
 import { fetchFor, SignInError, type ServerInfo } from './server';
 import type { NewAccount } from '../storage/vault';
 import { quietLogger } from '../support/logger';
+import { secureUrl } from '../support/secureUrl';
 
 const PENDING_KEY = 'iskra.signIn.pending';
 const CLIENTS_KEY = 'iskra.oauth.clients';
 
 type Pending =
-  | { kind: 'sso'; baseUrl: string }
+  | { kind: 'sso'; baseUrl: string; deviceId?: string }
   | {
       kind: 'oauth';
       baseUrl: string;
@@ -60,16 +61,22 @@ function savePending(pending: Pending): void {
   sessionStorage.setItem(PENDING_KEY, JSON.stringify(pending));
 }
 
-/** Забирает ожидание возврата — один раз: повторный возврат с тем же кодом не пройдёт. */
-function takePending(): Pending | null {
+/**
+ * Забирает ожидание возврата — один раз: повторный возврат с тем же кодом не пройдёт. Возврат
+ * OAuth с чужим `state` ожидание не забирает: подброшенная ссылка не обрывает начатый вход.
+ */
+function takePending(callback: AuthCallback): Pending | null {
   const raw = sessionStorage.getItem(PENDING_KEY);
-  sessionStorage.removeItem(PENDING_KEY);
   if (!raw) return null;
+  let pending: Pending | null;
   try {
-    return JSON.parse(raw) as Pending;
+    pending = JSON.parse(raw) as Pending;
   } catch {
-    return null;
+    pending = null;
   }
+  const foreign = pending?.kind === 'oauth' && callback.kind !== 'sso' && callback.state !== pending.state;
+  if (!foreign) sessionStorage.removeItem(PENDING_KEY);
+  return pending;
 }
 
 function randomToken(bytes = 16): string {
@@ -78,7 +85,12 @@ function randomToken(bytes = 16): string {
 
 // ————— Пароль —————
 
-export async function signInWithPassword(server: ServerInfo, username: string, password: string): Promise<NewAccount> {
+/**
+ * `deviceId` — войти снова в то же устройство после мягкого выхода (`Resume`): сервер его
+ * оставил, и ключи на нём годятся. OAuth его не получает: там выход — это отказ в обновлении
+ * токена, то есть сеанс завершён, и устройства на сервере может уже не быть.
+ */
+export async function signInWithPassword(server: ServerInfo, username: string, password: string, deviceId?: string): Promise<NewAccount> {
   const client = createClient({ baseUrl: server.baseUrl, fetchFn: fetchFor(server.demo), logger: quietLogger() });
   const user = username.trim().replace(/^@/, '');
   try {
@@ -86,12 +98,12 @@ export async function signInWithPassword(server: ServerInfo, username: string, p
       type: 'm.login.password',
       identifier: user.includes(':') ? { type: 'm.id.user', user: `@${user}` } : { type: 'm.id.user', user },
       password,
-      initial_device_display_name: deviceDisplayName(),
+      ...(deviceId ? { device_id: deviceId } : { initial_device_display_name: deviceDisplayName() }),
     });
     return {
       userId: login.user_id,
       deviceId: login.device_id,
-      homeserverUrl: login.well_known?.['m.homeserver']?.base_url?.replace(/\/+$/, '') ?? server.baseUrl,
+      homeserverUrl: homeserverFrom(login.well_known?.['m.homeserver']?.base_url) ?? server.baseUrl,
       method: server.demo ? 'demo' : 'password',
       accessToken: login.access_token,
       ...(login.refresh_token ? { refreshToken: login.refresh_token } : {}),
@@ -105,12 +117,21 @@ export async function signInWithPassword(server: ServerInfo, username: string, p
   }
 }
 
+/**
+ * Адрес сервера, который вернул вход (`well_known`): дальше с токеном ходим туда. Не `https:` —
+ * не принимаем, остаёмся там, где входили.
+ */
+function homeserverFrom(raw: unknown): string | undefined {
+  const url = secureUrl(raw);
+  return url ? `${url.origin}${url.pathname.replace(/\/+$/, '')}` : undefined;
+}
+
 // ————— Legacy SSO —————
 
 /** Адрес, куда увести страницу. Сам уход — `location.assign` у вызывающего. */
-export function startSso(server: ServerInfo): string {
+export function startSso(server: ServerInfo, deviceId?: string): string {
   const client = createClient({ baseUrl: server.baseUrl, logger: quietLogger() });
-  savePending({ kind: 'sso', baseUrl: server.baseUrl });
+  savePending({ kind: 'sso', baseUrl: server.baseUrl, ...(deviceId ? { deviceId } : {}) });
   return client.getSsoLoginUrl(redirectUri(), 'sso');
 }
 
@@ -179,7 +200,7 @@ export async function startOAuth(server: ServerInfo, options: { create?: boolean
 
 /** Завершает вход, начатый до редиректа. Любая неудача — «вход не завершился». */
 export async function completeSignIn(callback: AuthCallback): Promise<NewAccount> {
-  const pending = takePending();
+  const pending = takePending(callback);
   if (!pending) throw new SignInError('ssoIncomplete');
 
   if (callback.kind === 'sso' && pending.kind === 'sso') {
@@ -188,7 +209,7 @@ export async function completeSignIn(callback: AuthCallback): Promise<NewAccount
       const login = await client.loginRequest({
         type: 'm.login.token',
         token: callback.loginToken,
-        initial_device_display_name: deviceDisplayName(),
+        ...(pending.deviceId ? { device_id: pending.deviceId } : { initial_device_display_name: deviceDisplayName() }),
       });
       return {
         userId: login.user_id,

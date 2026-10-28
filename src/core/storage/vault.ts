@@ -11,7 +11,7 @@
  * Локальные имена личных чатов («Мама» вместо `anna_1987`) — так же: по чату, под ключом
  * аккаунта, и уходят вместе с ним. Это чьи-то личные заметки о людях, с которыми он говорит.
  */
-import { deleteDatabase, openDatabase, transact } from './idb';
+import { deleteDatabase, openDatabase, transact, update } from './idb';
 import { createSealingKey, randomBase64, seal, unseal, type Sealed } from './secretBox';
 
 const DB_NAME = 'iskra-accounts';
@@ -44,6 +44,12 @@ export interface Account {
   method: SignInMethod;
   oauth?: OAuthGrant;
   signedInAt: number;
+  /**
+   * Сервер попросил войти снова (`soft_logout`): токены мертвы, а устройство, его ключи и
+   * переписка на нём — нет. Сеанс не поднимается, пока человек не войдёт с тем же устройством
+   * (`resume`).
+   */
+  signedOutSoftly?: boolean;
 }
 
 /** Черновик или локальное имя: запись по чату, под ключом аккаунта. */
@@ -121,6 +127,12 @@ export const vault = {
     return { account: publicPart(stored), secrets };
   },
 
+  /** Все, кто есть на этом устройстве, — от последнего вошедшего. */
+  async all(): Promise<Account[]> {
+    const all = await withDb((db) => transact(db, ACCOUNTS, 'readonly', (s) => s.getAll() as IDBRequest<StoredAccount[]>));
+    return all.sort((a, b) => b.signedInAt - a.signedInAt).map(publicPart);
+  },
+
   /** Последний вошедший. Несколько аккаунтов — позже; пока одна вкладка — один аккаунт. */
   async current(): Promise<Account | undefined> {
     const all = await withDb((db) => transact(db, ACCOUNTS, 'readonly', (s) => s.getAll() as IDBRequest<StoredAccount[]>));
@@ -144,10 +156,38 @@ export const vault = {
   },
 
   async setKnownDevices(userId: string, known: string[]): Promise<void> {
-    await withDb(async (db) => {
-      const stored = await transact(db, ACCOUNTS, 'readonly', (s) => s.get(userId) as IDBRequest<StoredAccount | undefined>);
-      if (!stored) return;
-      await transact(db, ACCOUNTS, 'readwrite', (s) => s.put({ ...stored, knownDevices: [...known].sort() }));
+    await withDb((db) =>
+      update<StoredAccount>(db, ACCOUNTS, userId, (stored) => stored && { ...stored, knownDevices: [...known].sort() }),
+    );
+  },
+
+  /** Сервер попросил войти снова: запись и ключи остаются, сеанс — нет. */
+  async markSignedOutSoftly(userId: string): Promise<void> {
+    await withDb((db) => update<StoredAccount>(db, ACCOUNTS, userId, (stored) => stored && { ...stored, signedOutSoftly: true }));
+  },
+
+  /**
+   * Вход снова в то же устройство после мягкого выхода: новые токены — в прежнюю запись, ключ
+   * криптохранилища — прежний, иначе Rust-крипто не откроет свою базу. Записи нет, это
+   * другое устройство или **другой сервер** — `undefined`, и вход идёт как новый: сервер сам
+   * называет `user_id` и `device_id`, и чужой, назвавшись тем же, не должен получить чужие ключи.
+   */
+  async resume(fresh: NewAccount): Promise<{ account: Account; secrets: AccountSecrets } | undefined> {
+    return withDb(async (db) => {
+      const stored = await transact(db, ACCOUNTS, 'readonly', (s) => s.get(fresh.userId) as IDBRequest<StoredAccount | undefined>);
+      if (!stored?.signedOutSoftly || stored.deviceId !== fresh.deviceId || stored.homeserverUrl !== fresh.homeserverUrl) return undefined;
+      const { accessToken, refreshToken, ...rest } = fresh;
+      const old = await unseal<AccountSecrets>(stored.key, stored.sealed);
+      const secrets: AccountSecrets = { accessToken, ...(refreshToken ? { refreshToken } : {}), cryptoStorageKey: old.cryptoStorageKey };
+      const sealed = await seal(stored.key, secrets);
+      const { signedOutSoftly: _soft, oauth: _oauth, ...kept } = stored;
+      const next: StoredAccount = { ...kept, ...rest, signedInAt: Date.now(), sealed };
+      let written = false;
+      await update<StoredAccount>(db, ACCOUNTS, fresh.userId, (current) => {
+        written = current?.signedInAt === stored.signedInAt;
+        return written ? next : undefined;
+      });
+      return written ? { account: publicPart(next), secrets } : undefined;
     });
   },
 
@@ -161,7 +201,9 @@ export const vault = {
       if (tokens.refreshToken) next.refreshToken = tokens.refreshToken;
       // Шифруем до транзакции: транзакция IndexedDB закрывается на первом же await.
       const sealed = await seal(stored.key, next);
-      await transact(db, ACCOUNTS, 'readwrite', (s) => s.put({ ...stored, sealed }));
+      // Пишем в то, что лежит сейчас, а не в прочитанное до шифрования: за это время могли
+      // записать `knownDevices` — или выйти, и тогда записи нет и воскрешать её нельзя.
+      await update<StoredAccount>(db, ACCOUNTS, userId, (current) => current?.signedInAt === stored.signedInAt ? { ...current, sealed } : undefined);
     });
   },
 

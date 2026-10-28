@@ -80,7 +80,7 @@ async function openChat(page: Page) {
   await expect(page.getByRole('log')).toBeVisible();
 }
 
-test('голосовое: Enter — запись без рук, «Отправить» — пузырь в ленте', async ({ page }) => {
+test('голосовое: Enter — запись без рук, «Отправить» — пузырь в ленте', async ({ page }, info) => {
   const problems = watchForProblems(page);
   await fakeMicrophone(page);
   await signInToDemo(page);
@@ -92,9 +92,11 @@ test('голосовое: Enter — запись без рук, «Отправи
   await composer.fill('черновик');
   await expect(record).toBeHidden();
   await composer.fill('');
-  // Щелчок только переключает голосовое и «кружочек»; без рук — Enter.
-  await record.focus();
-  await page.keyboard.press('Enter');
+  // Мышью щелчок сразу записывает без рук (десктоп); пальцем он переключает режим, там — Enter.
+  if (isPhone(info.project.name)) {
+    await record.focus();
+    await page.keyboard.press('Enter');
+  } else await record.click();
 
   const strip = page.getByRole('group', { name: 'Запись голосового' });
   await expect(strip).toBeVisible();
@@ -194,7 +196,7 @@ test('голосовое в ленте: волна и длительность �
   expect(problems).toEqual([]);
 });
 
-test('«кружочек»: камера поверх комнаты, кольцо минуты, «Отправить» — круглое видео в ленте', async ({ page }, info) => {
+test('«кружочек»: камера поверх комнаты, кольцо минуты, «Отправить» — круглое видео в ленте', async ({ page, browserName }, info) => {
   await fakeMicrophone(page);
   await signInToDemo(page);
   await openChat(page);
@@ -203,7 +205,8 @@ test('«кружочек»: камера поверх комнаты, кольц
 
   // Кнопка одна — и на телефоне, и на десктопе: нажатие переключает голосовое и видео.
   if (isPhone(info.project.name)) await page.getByRole('button', { name: 'Записать голосовое' }).tap();
-  else await page.getByRole('button', { name: 'Записать голосовое' }).click();
+  // Мышью щелчок записывает без рук, режим переключает правая кнопка.
+  else await page.getByRole('button', { name: 'Записать голосовое' }).click({ button: 'right' });
   await expect(page.getByRole('button', { name: 'Записать голосовое' })).toBeHidden();
   // Удержание — запись.
   const video = page.getByRole('button', { name: 'Записать видеосообщение' });
@@ -218,6 +221,26 @@ test('«кружочек»: камера поверх комнаты, кольц
   // В кружке — тот самый канвас, который пишется: квадрат.
   const box = (await camera.locator('canvas').boundingBox())!;
   expect(Math.abs(box.width - box.height)).toBeLessThan(2);
+  // В WebKit под Linux (CI) подставная камера кадров не даёт: `captureStream` канваса не доходит
+  // до <video>, и рисовать нечего. Пиксели там не проверить — проверяют Chromium, Firefox и
+  // WebKit на macOS; остальной путь кружочка идёт и там.
+  if (!(browserName === 'webkit' && process.platform === 'linux')) {
+    // Углы — в самих пикселях чёрные, как `SquareVideoExporter` нативной: другие клиенты покажут
+    // квадрат целиком, а за кругом — комната, которую человек не видел. Середина — кадр камеры.
+    // С альфой: пустой канвас прозрачен, и без неё «чёрные углы» прошли бы, не нарисовав ничего.
+    // Ждать, а не читать раз: первый кадр камеры на медленной машине приходит позже «0:01».
+    const pixels = () =>
+      camera.locator('canvas').evaluate((canvas: HTMLCanvasElement) => {
+        const context = canvas.getContext('2d')!;
+        const at = (x: number, y: number) => [...context.getImageData(x, y, 1, 1).data];
+        const s = canvas.width;
+        return { corners: [at(2, 2), at(s - 3, 2), at(2, s - 3), at(s - 3, s - 3)], middle: at(s / 2, s / 2) };
+      });
+    await expect.poll(async () => (await pixels()).middle.slice(0, 3).some((c) => c > 16), { message: 'середина — кадр камеры' }).toBe(true);
+    const { corners, middle } = await pixels();
+    for (const corner of corners) expect(corner).toEqual([0, 0, 0, 255]);
+    expect(middle[3]).toBe(255);
+  }
 
   // Увёл вверх — без рук, отправка кнопкой.
   await page.mouse.move(spot.x + spot.width / 2, spot.y - 100, { steps: 5 });
@@ -225,6 +248,27 @@ test('«кружочек»: камера поверх комнаты, кольц
   await camera.getByRole('button', { name: 'Отправить' }).click();
   await expect(camera).toBeHidden();
   await expect(notes).toHaveCount(1);
+
+  // В просмотрщике — круг без полосы управления браузера; нажатие и пробел — пауза и снова.
+  await notes.click();
+  const viewer = page.getByRole('dialog', { name: 'Видеосообщение' });
+  const round = viewer.locator('video');
+  await expect(round).toHaveAttribute('src', /^blob:/);
+  await expect(round).not.toHaveAttribute('controls');
+  // Пауза — там, где записанное здесь вообще играет: под Playwright ни Chromium (без H.264), ни
+  // WebKit кружочек с поддельной камеры не декодируют (MEDIA_ERR_SRC_NOT_SUPPORTED).
+  const state = () => round.evaluate((v: HTMLVideoElement) => (v.error ? 'broken' : v.readyState > 0 ? 'ready' : 'loading'));
+  await expect.poll(state).not.toBe('loading');
+  if ((await state()) === 'ready') {
+    const paused = () => round.evaluate((v: HTMLVideoElement) => v.paused);
+    const before = await paused();
+    await round.click();
+    await expect.poll(paused).toBe(!before);
+    await page.keyboard.press('Space');
+    await expect.poll(paused).toBe(before);
+  }
+  await page.keyboard.press('Escape');
+  await expect(viewer).toBeHidden();
 });
 
 test('«кружочек»: «Отмена» и Esc — камера закрыта, ничего не ушло', async ({ page }, info) => {
@@ -232,7 +276,7 @@ test('«кружочек»: «Отмена» и Esc — камера закры�
   await fakeMicrophone(page);
   await signInToDemo(page);
   await openChat(page);
-  await page.getByRole('button', { name: 'Записать голосовое' }).click();
+  await page.getByRole('button', { name: 'Записать голосовое' }).click({ button: 'right' });
   const record = page.getByRole('button', { name: 'Записать видеосообщение' });
   const camera = page.getByRole('dialog', { name: 'Видеосообщение' });
   await record.focus();

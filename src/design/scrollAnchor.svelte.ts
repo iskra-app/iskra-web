@@ -29,8 +29,8 @@ export class ScrollAnchor {
 
   private stick = true;
   private anchorKey: string | null = null;
-  /** Где был якорь от верха окна, когда прокрутка стояла на `seenTop`. */
-  private anchorOffset = 0;
+  /** Где якорь в содержимом — от его верха, а не от верха окна: прокрутка этого не меняет. */
+  private anchorAt = 0;
   private seenTop = 0;
   private readonly observer: ResizeObserver;
   private readonly onScroll = () => this.sync();
@@ -52,14 +52,20 @@ export class ScrollAnchor {
     return element.getBoundingClientRect().top - this.container.getBoundingClientRect().top;
   }
 
+  /** Место элемента в содержимом: от прокрутки не зависит, сдвигает его только раскладка. */
+  private at(element: Element): number {
+    return this.top(element) + this.container.scrollTop;
+  }
+
   /**
    * Сверка после прокрутки или изменения раскладки. Браузеры присылают их в разном порядке,
    * поэтому правило одно:
    *
-   * - прокрутка сдвинулась с тех пор, как якорь её видел, — это человек: запомнить, где он
-   *   теперь, и ничего не двигать;
-   * - не сдвинулась — это раскладка: внизу — остаться внизу, иначе вернуть якорный элемент
-   *   туда, где он был.
+   * - внизу и прокрутка не сдвинулась — остаться внизу;
+   * - якорный элемент уехал в содержимом — это раскладка (подгрузка сверху, перенос строк):
+   *   прокрутить ровно на столько же. Прокрутка человека место элемента в содержимом не
+   *   меняет, поэтому её это не трогает — и наоборот: шаг инерции, пришедший между вставкой
+   *   истории и раскладкой, не принимается за «человек сам ушёл наверх подгруженного».
    *
    * Свои изменения ленты (подгрузка истории, новое сообщение) экран объявляет заранее —
    * `capture()` до того, как DOM поменяется, — и тогда якорь снят с положения человека, а не
@@ -68,15 +74,13 @@ export class ScrollAnchor {
   private sync(): void {
     const container = this.container;
     const moved = Math.abs(container.scrollTop - this.seenTop) > 1;
-    if (!moved) {
-      if (this.stick) {
-        container.scrollTop = container.scrollHeight;
-      } else if (this.anchorKey) {
-        const el = this.content.querySelector<HTMLElement>(`[data-anchor="${CSS.escape(this.anchorKey)}"]`);
-        if (el) {
-          const shift = this.top(el) - this.anchorOffset;
-          if (Math.abs(shift) > 0.5) container.scrollTop += shift;
-        }
+    if (this.stick && !moved) {
+      container.scrollTop = container.scrollHeight;
+    } else if (!this.stick && this.anchorKey) {
+      const el = this.content.querySelector<HTMLElement>(`[data-anchor="${CSS.escape(this.anchorKey)}"]`);
+      if (el) {
+        const shift = this.at(el) - this.anchorAt;
+        if (Math.abs(shift) > 0.5) container.scrollTop += shift;
       }
     }
     this.measure();
@@ -115,7 +119,7 @@ export class ScrollAnchor {
     }
     if (found) {
       this.anchorKey = found.dataset['anchor'] ?? null;
-      this.anchorOffset = this.top(found);
+      this.anchorAt = this.at(found);
     }
 
     if (scrollTop <= this.options.topReach) this.options.onNearTop();
@@ -134,7 +138,7 @@ export class ScrollAnchor {
     this.measure();
     // Якорь — само показанное, а не то, что оказалось верхним: раскладка держит на месте его.
     this.anchorKey = element.dataset['anchor'] ?? this.anchorKey;
-    this.anchorOffset = this.top(element);
+    this.anchorAt = this.at(element);
   }
 
   /** «Вниз, к последнему сообщению». */

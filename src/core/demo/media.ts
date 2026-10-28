@@ -1,7 +1,11 @@
 /**
  * Медиа демо-сервера: картинки рисуются здесь же (SVG — текст, его можно сочинить без
- * файлов), загруженное — живёт в памяти, пока открыта вкладка.
+ * файлов), загруженное — живёт в памяти, пока открыта вкладка. Видео не нарисуешь — оно
+ * файлом: три секунды 320×180, H.264 + AAC, 20 КБ (`clip.mp4`, кадр из него — `clip.jpg`;
+ * сделаны `ffmpeg` из `gradients` и `sine`). В боевую сборку демо не попадает, с ним и они.
  */
+import clip from './clip.mp4?inline';
+import clipFrame from './clip.jpg?inline';
 import { DEMO_SERVER } from './fixtures';
 import { voiceWav } from './voice';
 
@@ -11,6 +15,8 @@ export interface DemoMedia {
 }
 
 const encode = (text: string) => new TextEncoder().encode(text);
+/** `data:…;base64,…` из `?inline` — в байты. */
+const fromDataUrl = (url: string) => Uint8Array.from(atob(url.slice(url.indexOf(',') + 1)), (c) => c.charCodeAt(0));
 
 function lake(): string {
   return `<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="800" viewBox="0 0 1200 800">
@@ -47,6 +53,8 @@ export function demoMediaLibrary(): Map<string, DemoMedia> {
     ['forest', { bytes: encode(forest()), type: 'image/svg+xml' }],
     ['yard', { bytes: encode(yard()), type: 'image/svg+xml' }],
     ['voice', { bytes: voiceWav(), type: 'audio/wav' }],
+    ['clip', { bytes: fromDataUrl(clip), type: 'video/mp4' }],
+    ['clip-frame', { bytes: fromDataUrl(clipFrame), type: 'image/jpeg' }],
     ['list', { bytes: encode('Что взять на пикник\n\n— плед\n— термос\n— мангал и угли\n— пирог (Вера)\n'), type: 'text/plain' }],
   ]);
 }

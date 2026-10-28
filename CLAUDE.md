@@ -6,8 +6,10 @@ Iskra Web — веб-клиент Matrix (десктоп в браузере и�
 `iskra-web.md` — план и обоснования решений; читать перед тем, как менять любое из них.
 `ROADMAP.md` — что сделано и что дальше; закрытый пункт отмечается там же, в том же коммите.
 
-Нативная Искра — `zhuravlevb/iskra`, работа идёт в ветке **dev**. Токены (`Theme.swift`),
-акценты (`AccentTheme.swift`), тексты (`Localizable.strings`) и иконку берём оттуда, из dev.
+Нативная Искра — `iskra-app/iskra` (локально `../iskra`), работа идёт в ветке **dev**; она — эталон
+экранов и поведения. Токены (`Theme.swift`), акценты (`AccentTheme.swift`), тексты
+(`Localizable.strings`) и иконку берём оттуда, из dev. Коммиты оттуда переносятся скиллом
+`/port-from-ios` (`.claude/skills/port-from-ios/`); перенесённое помечено трейлером `iOS-Commit`.
 
 ## Команды
 
@@ -17,7 +19,7 @@ pnpm dev            # dev-сервер с dev-CSP
 pnpm lint           # ESLint, включая границы слоёв
 pnpm check          # svelte-check: типы, в том числе ключи переводов
 pnpm test           # Vitest — tests/unit
-pnpm build && pnpm preview   # сборка с боевой CSP и Trusted Types
+ISKRA_DEMO=1 pnpm build && pnpm preview   # сборка с боевой CSP и Trusted Types, с демо
 pnpm e2e            # Playwright — tests/e2e, три движка × телефон/десктоп
 PW_ENGINES=chromium pnpm e2e # один движок
 pnpm icons          # перегенерировать public/icons из assets/iskra-spark.svg
@@ -50,7 +52,8 @@ ISKRA_BASE=/iskra-web/ pnpm build   # сборка в подпапке — пр�
 `elsewhere`, `signed-in`); `UserSession` — единственный владелец `MatrixClient`.
 Токены — только через `core/storage/vault.ts`, под неизвлекаемым ключом.
 
-Демо: адрес `demo.iskra.invalid`, `alice` / `password` (в `pnpm dev` хватает `demo`).
+Демо: адрес `demo.iskra.invalid`, `alice` / `password` (в `pnpm dev` хватает `demo`). В сборке
+демо-сервер есть только с `ISKRA_DEMO=1` (e2e и ночная ставят его сами); боевая — без него.
 
 ## Правила, которые легко нарушить
 

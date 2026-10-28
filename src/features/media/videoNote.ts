@@ -33,9 +33,44 @@ export function videoNoteMimeType(recorder: { isTypeSupported(type: string): boo
 
 /**
  * Квадрат из середины кадра: у вебкамеры 16:9 обрезаются бока, у телефона стоймя — верх и низ.
- * Возвращает, какой кусок кадра брать.
+ * Возвращает, какой кусок кадра брать; `zoom` больше 1 — кусок меньше, вокруг той же середины.
  */
-export function squareCrop(width: number, height: number): { x: number; y: number; side: number } {
-  const side = Math.min(width, height);
+export function squareCrop(width: number, height: number, zoom = 1): { x: number; y: number; side: number } {
+  const side = Math.min(width, height) / Math.max(1, zoom);
   return { x: (width - side) / 2, y: (height - side) / 2, side };
+}
+
+/**
+ * Насколько ближе можно щипком — `maximumZoom` нативной: фронтальная — вдвое, задняя — впятеро;
+ * дальше лицо в кружке — поры, а цифровое приближение за пределом матрицы — каша. Камера,
+ * которая умеет приближать сама (`MediaTrackCapabilities.zoom`), — не дальше своего предела;
+ * не умеет — приближаем обрезкой кадра, и тут честный предел вдвое: из 640 px камеры в 480 px
+ * кружка.
+ */
+export function videoNoteZoomLimit(facing: 'user' | 'environment', lens: { min: number; max: number } | null): number {
+  const wanted = facing === 'user' ? 2 : 5;
+  if (!lens) return Math.min(wanted, 2);
+  return Math.max(1, Math.min(wanted, lens.max / lens.min));
+}
+
+/**
+ * Круг, снаружи которого углы кадра закрашиваются чёрным, — `SquareVideoExporter` нативной.
+ *
+ * Круг в ленте — маска на плеере: пиксели за ним остаются в файле, и любой другой клиент Matrix
+ * их покажет. А там — комната, в которой человек сидел и которую не видел: видоискатель был
+ * круглым. Поэтому углы уходят в файл чёрными — прозрачности у H.264 в mp4 нет.
+ *
+ * Круг чуть шире кадра (`1.04`, как в нативной): иначе на краю нашей же маски в ленте сглаживание
+ * двух кругов дало бы тёмную кайму. Углы кадра — в 0,707 стороны от центра, радиуса 0,52 им хватает.
+ */
+export const VIDEO_NOTE_MASK_OVERSHOOT = 1.04;
+
+/** Закрасить углы квадрата `side` чёрным: квадрат с круглой дырой, заливка even-odd. */
+export function paintCorners(context: Pick<CanvasRenderingContext2D, 'beginPath' | 'rect' | 'arc' | 'fill' | 'fillStyle'>, side: number): void {
+  const r = (side * VIDEO_NOTE_MASK_OVERSHOOT) / 2;
+  context.beginPath();
+  context.rect(0, 0, side, side);
+  context.arc(side / 2, side / 2, r, 0, Math.PI * 2);
+  context.fillStyle = 'black';
+  context.fill('evenodd');
 }

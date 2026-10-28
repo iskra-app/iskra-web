@@ -47,6 +47,8 @@ describe('адрес', () => {
       target: '!abc:matrix.org',
       via: ['matrix.org', 'example.com:8448'],
     });
+    // Не больше трёх и без повторов.
+    expect(parseRoute('#/open/!abc%3Am.org?via=a.org&via=a.org&via=b.org&via=c.org&via=d.org')).toMatchObject({ via: ['a.org', 'b.org', 'c.org'] });
     // Негодный `via` отбрасывается, ссылка остаётся.
     expect(parseRoute('#/open/!abc%3Amatrix.org?via=a/b&other=1')).toEqual({ name: 'open', target: '!abc:matrix.org' });
   });

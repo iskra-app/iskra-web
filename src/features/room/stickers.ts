@@ -1,5 +1,5 @@
 /**
- * «Искорки» — свои стикеры приложения, двенадцать настроений розовой искры, те же PNG, что в
+ * «Искорки» — свои стикеры приложения, десять настроений розовой искры, те же PNG, что в
  * нативной (`StickerArt`): 512 на сторону, прозрачные, без метаданных. Лежат в `public/stickers`
  * и нужны раз на аккаунт — загрузить на сервер (см. `StickerLibrary`).
  */
@@ -18,8 +18,6 @@ const moods: ReadonlyArray<readonly [string, string]> = [
   ['grumpy', '😒'],
   ['loading', '⏳'],
   ['unlocked', '🔓'],
-  ['bypass', '🏃'],
-  ['connected', '📶'],
 ];
 
 export const stickerArt: readonly StickerArt[] = moods.map(([code, emoji]) => ({

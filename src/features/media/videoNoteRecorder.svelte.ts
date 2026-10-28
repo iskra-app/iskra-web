@@ -11,7 +11,7 @@
  * снимающий себя, смотрит в зеркало, и получатель должен увидеть то же, что видел он, а не
  * часы на другой руке. Задняя — не зеркалится.
  */
-import { squareCrop, VIDEO_NOTE_BITRATE, VIDEO_NOTE_FPS, VIDEO_NOTE_MAX_MS, VIDEO_NOTE_SIDE, videoNoteMimeType } from './videoNote';
+import { paintCorners, squareCrop, VIDEO_NOTE_BITRATE, VIDEO_NOTE_FPS, VIDEO_NOTE_MAX_MS, VIDEO_NOTE_SIDE, videoNoteMimeType, videoNoteZoomLimit } from './videoNote';
 
 export type VideoNoteState = 'idle' | 'preparing' | 'ready' | 'recording' | 'finishing' | 'denied' | 'unavailable' | 'failed';
 
@@ -46,6 +46,10 @@ export class VideoNoteRecorder {
   facing = $state<'user' | 'environment'>('user');
   /** Перевернуть можно — телефон с двумя сторонами. */
   canFlip = $state(false);
+  /** Насколько ближе — 1 шире всего. Щипок по кружку, как в нативной. */
+  zoom = $state(1);
+  /** Потолок щипка для этой камеры (`videoNoteZoomLimit`). */
+  maxZoom = $state(1);
 
   /** Квадрат, в который рисуется камера, — он же превью. */
   readonly canvas: HTMLCanvasElement;
@@ -64,6 +68,9 @@ export class VideoNoteRecorder {
   private startedAt = 0;
   private thumbnail: Promise<Blob | null> | null = null;
   private onCap: (() => void) | null = null;
+  /** Зум самой камеры, если она его умеет; нет — приближает обрезка кадра (`digitalZoom`). */
+  private lens: { min: number; max: number } | null = null;
+  private digitalZoom = 1;
 
   constructor() {
     this.canvas = document.createElement('canvas');
@@ -125,6 +132,12 @@ export class VideoNoteRecorder {
     if (settings?.deviceId) this.camera = settings.deviceId;
     // У вебкамеры стороны нет — она смотрит на человека, как фронтальная.
     this.facing = settings?.facingMode === 'environment' ? 'environment' : 'user';
+    // Другая камера начинает с широкого: зум одной ничего не значит для другой (как `flip` нативной).
+    const zoom = (track?.getCapabilities?.() as { zoom?: { min?: number; max?: number } } | undefined)?.zoom;
+    this.lens = zoom?.min && zoom.max && zoom.max > zoom.min ? { min: zoom.min, max: zoom.max } : null;
+    this.maxZoom = videoNoteZoomLimit(this.facing, this.lens);
+    this.zoom = 1;
+    this.digitalZoom = 1;
     this.video.srcObject = stream;
     // Не ждать: `play()` камеры, не отдавшей ни кадра, не разрешается и не отказывает, и
     // подготовка висела бы без слов (так было в WebKit). Рисование и так ждёт размеров кадра.
@@ -162,7 +175,21 @@ export class VideoNoteRecorder {
     }
   }
 
-  /** Кадр камеры — в квадрат канваса, обрезкой середины; фронтальная — зеркально. */
+  /** Ближе или дальше — в пределах `maxZoom`; посреди записи тоже: пишется канвас. */
+  setZoom(factor: number): void {
+    const zoom = Math.min(this.maxZoom, Math.max(1, factor));
+    if (zoom === this.zoom) return;
+    this.zoom = zoom;
+    const track = this.cameraStream?.getVideoTracks()[0];
+    if (this.lens && track) {
+      // Объектив не успел — не беда: следующий шаг щипка спросит снова.
+      void track.applyConstraints({ advanced: [{ zoom: Math.min(this.lens.max, this.lens.min * zoom) } as MediaTrackConstraintSet] }).catch(() => {});
+    } else {
+      this.digitalZoom = zoom;
+    }
+  }
+
+  /** Кадр камеры — в квадрат канваса, обрезкой середины; фронтальная — зеркально; углы — чёрные. */
   private startDrawing(): void {
     const context = this.canvas.getContext('2d');
     if (!context) return;
@@ -172,7 +199,7 @@ export class VideoNoteRecorder {
     this.drawTimer = setInterval(() => {
       const { videoWidth, videoHeight } = this.video;
       if (!videoWidth || !videoHeight) return;
-      const crop = squareCrop(videoWidth, videoHeight);
+      const crop = squareCrop(videoWidth, videoHeight, this.digitalZoom);
       context.save();
       if (this.facing === 'user') {
         context.translate(VIDEO_NOTE_SIDE, 0);
@@ -180,6 +207,8 @@ export class VideoNoteRecorder {
       }
       context.drawImage(this.video, crop.x, crop.y, crop.side, crop.side, 0, 0, VIDEO_NOTE_SIDE, VIDEO_NOTE_SIDE);
       context.restore();
+      // Что за кругом — в файл не уходит: другие клиенты показывают квадрат целиком.
+      paintCorners(context, VIDEO_NOTE_SIDE);
     }, 1000 / VIDEO_NOTE_FPS);
   }
 

@@ -6,6 +6,7 @@
   import { untrack } from 'svelte';
   import { profileRequest } from '../room/profileRequest.svelte.ts';
   import Columns from '../../design/Columns.svelte';
+  import { Lazy } from '../../design/lazy.svelte.ts';
   import Bar from '../../design/Bar.svelte';
   import SparkGlyph from '../../design/SparkGlyph.svelte';
   import IconButton from '../../design/IconButton.svelte';
@@ -28,27 +29,39 @@
   import { showBadge } from './badge.svelte.ts';
   import RoomList from '../rooms/RoomList.svelte';
   import RoomFace from '../rooms/RoomFace.svelte';
-  import QuickSwitcher from '../rooms/QuickSwitcher.svelte';
   import { roomName } from '../rooms/text';
   import RoomView from '../room/RoomView.svelte';
   import HotkeyHelp from './HotkeyHelp.svelte';
-  import NewChatDialog from '../rooms/NewChatDialog.svelte';
   import OpenLinkDialog from './OpenLinkDialog.svelte';
-  import Settings from '../settings/Settings.svelte';
   import { settingsParent, settingsTitles } from '../settings/sections';
-  import RoomPanel from '../room/RoomPanel.svelte';
   import LockedHistoryStrip from '../recovery/LockedHistoryStrip.svelte';
   import type { TimelineStore } from '../../core/timeline/timelineStore.svelte.ts';
 
   let { session }: { session: UserSession } = $props();
   let confirmingSignOut = $state(false);
-  let switching = $state(false);
+  let searching = $state(false);
   let helping = $state(false);
   let creating = $state(false);
   let roomView: RoomView | undefined = $state();
   let roomTimeline: TimelineStore | undefined = $state();
 
   let panelOpen = $state(false);
+  // Узкий экран: «О чате» — лист поверх чата, а не колонка рядом, и уходит вместе с чатом. Иначе
+  // ушли системным «назад» или свайпом, минуя `closeRoom`, — и следующий чат открылся бы листом.
+  // Раньше страницы человека ниже: та открывает панель уже в новом чате.
+  let panelRoom: string | null = null;
+  $effect(() => {
+    const current = roomId;
+    if (current === panelRoom) return;
+    panelRoom = current;
+    if (untrack(() => viewport.layout) !== 'three') panelOpen = false;
+  });
+
+  // Не каждому и не сразу — своими чанками, при первом показе (`design/lazy.svelte.ts`).
+  const settingsScreen = new Lazy(() => import('../settings/Settings.svelte'));
+  const roomPanel = new Lazy(() => import('../room/RoomPanel.svelte'));
+  const messageSearch = new Lazy(() => import('../rooms/MessageSearchDialog.svelte'));
+  const newChat = new Lazy(() => import('../rooms/NewChatDialog.svelte'));
   // Страница человека из ленты — в панели «О чате»: открыть её (и закрыть тред, если он на её месте).
   $effect(() => {
     const pending = profileRequest.pending;
@@ -57,6 +70,10 @@
     panelOpen = true;
   });
   const roomId = $derived(router.route.name === 'room' ? router.route.roomId : null);
+  const Settings = $derived(settingsScreen.when(router.route.name === 'settings'));
+  const RoomPanel = $derived(roomPanel.when(panelOpen && roomId !== null));
+  const MessageSearchDialog = $derived(messageSearch.when(searching));
+  const NewChatDialog = $derived(newChat.when(creating));
   /** Открытый тред — на месте «О чате»: справа на широком экране, листом поверх чата на узком. */
   const threadId = $derived(router.route.name === 'room' ? router.route.thread : undefined);
   function closeThread() {
@@ -162,8 +179,8 @@
     const action = match(event);
     if (!action) return;
     switch (action) {
-      case 'quickSwitch':
-        switching = true;
+      case 'search':
+        searching = true;
         break;
       case 'previousChat':
         step(-1, false);
@@ -208,6 +225,12 @@
     event.preventDefault();
   }
 
+  /** ⓘ, лицо чата и имя в шапке: «О чате» — открыть (вместо треда) или закрыть. */
+  function toggleInfo() {
+    if (threadId) closeThread();
+    panelOpen = threadId ? true : !panelOpen;
+  }
+
   function closeRoom() {
     panelOpen = false;
     router.go({ name: 'home' });
@@ -229,13 +252,13 @@
 </script>
 
 <!--
-  Лицо чата в шапке — рядом с именем, на любой ширине. Нажимается и оно (к «О чате»), но
-  кнопка для этого одна — ⓘ справа: лицо скринридеру не показываем, чтобы «О чате» не было
-  двумя одинаковыми кнопками подряд, и в Tab его нет.
+  Лицо чата в шапке — рядом с именем, на любой ширине. Нажимаются и оно, и имя с подписью (к
+  «О чате»), но кнопка для этого одна — ⓘ справа: лицо и имя скринридеру не показываем, чтобы
+  «О чате» не было тремя одинаковыми кнопками подряд, и в Tab их нет.
 -->
 {#snippet face()}
   {#if room}
-    <button type="button" class="room-face" aria-hidden="true" tabindex="-1" onclick={() => (panelOpen = !panelOpen)}>
+    <button type="button" class="room-face" aria-hidden="true" tabindex="-1" onclick={toggleInfo}>
       <RoomFace {room} {session} />
     </button>
   {/if}
@@ -252,7 +275,7 @@
     <div class="list-column">
       <Bar title={status ?? t('roomList.title')}>
         {#snippet trailing()}
-          <IconButton label={t('quickSwitch.label')} shortcut={describeHotkey('quickSwitch')} onclick={() => (switching = true)}>
+          <IconButton label={t('roomList.searchPrompt')} shortcut={describeHotkey('search')} onclick={() => (searching = true)}>
             <Icon name="search" />
           </IconButton>
           <IconButton label={t('roomList.newConversation')} onclick={() => (creating = true)}>
@@ -273,7 +296,7 @@
   {#snippet main()}
     {#if roomId}
       <div class="main-column">
-      <Bar {title} {subtitle}>
+      <Bar {title} {subtitle} ontitle={toggleInfo}>
         {#snippet leading()}
           {#if viewport.layout === 'stack'}
             <IconButton label={t('room.back')} onclick={closeRoom}><Icon name="back" /></IconButton>
@@ -281,14 +304,7 @@
           {@render face()}
         {/snippet}
         {#snippet trailing()}
-          <IconButton
-            label={t('room.info')}
-            pressed={panelOpen && !threadId}
-            onclick={() => {
-              if (threadId) closeThread();
-              panelOpen = threadId ? true : !panelOpen;
-            }}
-          >
+          <IconButton label={t('room.info')} pressed={panelOpen && !threadId} onclick={toggleInfo}>
             <Icon name="info" />
           </IconButton>
         {/snippet}
@@ -315,14 +331,14 @@
             {/if}
           {/snippet}
         </Bar>
-        <Settings {session} section={router.route.section} />
+        {#if Settings}<Settings {session} section={router.route.section} />{/if}
       </div>
     {:else}
       <!-- Чат не выбран — не надпись-инструкция, а искра: видна, но ничего не просит. Для
            скринридера — те же слова, что были на экране. -->
       <div class="watermark">
         <span class="visually-hidden">{t('room.noRoomSelectedTitle')}</span>
-        <span class="spark"><SparkGlyph /></span>
+        <span class="spark"><SparkGlyph blinks /></span>
       </div>
     {/if}
   {/snippet}
@@ -346,7 +362,7 @@
           <IconButton label={t('room.infoClose')} onclick={() => (panelOpen = false)}><Icon name="close" /></IconButton>
         {/snippet}
       </Bar>
-      {#if roomId}
+      {#if roomId && RoomPanel}
         {#key roomId}
           <RoomPanel
             {session}
@@ -367,9 +383,9 @@
 
 <svelte:window {onkeydown} />
 
-<QuickSwitcher {session} open={switching} onclose={() => (switching = false)} />
+{#if MessageSearchDialog}<MessageSearchDialog {session} open={searching} onclose={() => (searching = false)} />{/if}
 <HotkeyHelp open={helping} onclose={() => (helping = false)} />
-<NewChatDialog open={creating} {session} onclose={() => (creating = false)} />
+{#if NewChatDialog}<NewChatDialog open={creating} {session} onclose={() => (creating = false)} />{/if}
 {#if link}
   <OpenLinkDialog open={askingLink} {session} target={link.target} via={link.via} onopen={closeLink} onclose={() => closeLink()} />
 {/if}

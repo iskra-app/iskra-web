@@ -10,19 +10,21 @@
 <script lang="ts">
   import { untrack } from 'svelte';
   import ConfirmDialog from '../../design/ConfirmDialog.svelte';
+  import type { UnsignedDevice } from '../../core/encryption/sendAnyway';
+  import Dialog from '../../design/Dialog.svelte';
+  import PlainButton from '../../design/PlainButton.svelte';
   import type { OutgoingFile } from '../../core/media/upload';
   import { fileSize } from '../media/files';
-  import { prepareFile, stickerFile } from '../media/prepare';
+  import { MetadataNotRemovedError, prepareFile, stickerFile } from '../media/prepare';
   import Menu from '../../design/Menu.svelte';
   import { viewport } from '../../design/viewport.svelte.ts';
   import { stickerOf, type Sticker } from '../../core/stickers/imagePack';
-  import StickerPanel from './StickerPanel.svelte';
   import { showsStickers } from './stickers';
   import type { Recording } from '../media/voiceRecorder.svelte.ts';
   import { VideoNoteRecorder } from '../media/videoNoteRecorder.svelte.ts';
   import { VIDEO_NOTE_SIDE } from '../media/videoNote';
-  import VideoNoteCapture from './VideoNoteCapture.svelte';
-  import Viewer, { type ViewerItem } from '../media/Viewer.svelte';
+  import type { ViewerItem } from '../media/Viewer.svelte';
+  import { Lazy } from '../../design/lazy.svelte.ts';
   import type { Message } from '../../core/timeline/message';
   import { router } from '../../core/navigation/router.svelte.ts';
   import { threadsShownIn } from './threads';
@@ -31,7 +33,6 @@
   import { i18n, t } from '../../i18n/index.svelte.ts';
   import type { ComposerContext, MessageActions } from './actions';
   import Composer from './Composer.svelte';
-  import PollComposer from './PollComposer.svelte';
   import SelectionBar from './SelectionBar.svelte';
   import ForwardDialog from './ForwardDialog.svelte';
   import ReactorsDialog from './ReactorsDialog.svelte';
@@ -87,6 +88,8 @@
   let context = $state<ComposerContext>(null);
   /** Черновик, отложенный на время правки: правка — не черновик. */
   let stashed = '';
+  /** И ответ, к которому он был: правка занимает поле, а когда кончается, поле возвращается как было. */
+  let stashedContext: ComposerContext = null;
   /** Кто стоит за `@Имя` в черновике — см. `composerMentions.ts`. */
   let mentions = $state<ComposerMention[]>([]);
   let stashedMentions: ComposerMention[] = [];
@@ -96,6 +99,8 @@
   let reactorsOf = $state<Reactor[] | null>(null);
   /** На что жалуются; `null` — окно закрыто. */
   let reporting = $state<Message | null>(null);
+  /** «Просмотреть JSON»: событие текстом; `json` пусто — на сервере его ещё нет. */
+  let source = $state<{ json: string | undefined } | null>(null);
   let endingPoll = $state<Message | null>(null);
   let creatingPoll = $state(false);
   /** Выбранные сообщения — ключи, пока выбирают; `null` почти всегда. См. `selection.ts`. */
@@ -160,9 +165,20 @@
   }
   let viewing = $state<{ items: ViewerItem[]; start: string } | null>(null);
 
+  // Камера, стикеры, просмотрщик, опрос — не в каждом разговоре: своими чанками, при первом открытии.
+  const videoNoteCapture = new Lazy(() => import('./VideoNoteCapture.svelte'));
+  const stickerPanelView = new Lazy(() => import('./StickerPanel.svelte'));
+  const viewer = new Lazy(() => import('../media/Viewer.svelte'));
+  const pollComposer = new Lazy(() => import('./PollComposer.svelte'));
+  const Viewer = $derived(viewer.when(!!viewing));
+  const PollComposer = $derived(pollComposer.when(creatingPoll));
+
   // Служебные строки — по настройкам «Чаты»: лента перекладывается сразу, без перезагрузки.
   $effect(() => {
     store?.setServiceHiding({ nameChanges: preferences.hideNameChanges, membership: preferences.hideMembershipChanges });
+  });
+  $effect(() => {
+    store?.setShowsAllEvents(preferences.showsAllEvents);
   });
 
   $effect(() => {
@@ -172,6 +188,7 @@
     text = '';
     context = null;
     stashed = '';
+    stashedContext = null;
     mentions = [];
     stashedMentions = [];
     selection = null;
@@ -238,6 +255,7 @@
   const draftText = () => (context?.kind === 'edit' ? stashed : text);
 
   function oninput(value: string) {
+    void store?.prepareToSend();
     if (context?.kind !== 'edit') {
       // Скрыл «печатает…» — о наборе никому не говорим; остановку — тоже незачем.
       if (preferences.hideTyping) return;
@@ -257,18 +275,16 @@
       attachments = [];
       text = '';
       mentions = [];
+      context = null;
     } else if (context?.kind === 'edit') {
       store.edit(context.message, value, mentions);
-      text = stashed;
-      stashed = '';
-      mentions = stashedMentions;
-      stashedMentions = [];
+      endEditing();
     } else {
       store.send(value, context?.kind === 'reply' ? context.message : undefined, mentions);
       text = '';
       mentions = [];
+      context = null;
     }
-    context = null;
     clearTimeout(saveTimer);
     void session.saveDraft(draftKey, text);
   }
@@ -301,6 +317,7 @@
 
   /** Один на открытый чат: камеру держит он, слой камеры — здесь, поверх комнаты. */
   const videoNote = new VideoNoteRecorder();
+  const VideoNoteCapture = $derived(videoNoteCapture.when(videoNote.open));
   let videoHolding = $state(false);
 
   /**
@@ -333,6 +350,7 @@
 
   /** Панель стикеров — у кнопки в поле, где её нажали. */
   let stickerPanel = $state<{ x: number; y: number } | null>(null);
+  const StickerPanel = $derived(stickerPanelView.when(!!stickerPanel));
 
   /** Стикер выбран: панель закрывается сразу, стикер уходит следом — с ответом, если отвечали. */
   async function sendSticker(sticker: Sticker) {
@@ -353,23 +371,34 @@
 
   function edit(message: Message) {
     if (!message.canEdit || !('body' in message.kind)) return;
+    // Запомнено перед *первой* правкой: от одной правки к другой слова первого сообщения
+    // не должны стать чужими «своими».
     if (context?.kind !== 'edit') {
       stashed = text;
       stashedMentions = mentions;
+      stashedContext = context;
     }
     context = { kind: 'edit', message };
     // В теле своего — Markdown, каким оно ушло: упоминания — снова `@Имя` с записью рядом.
     ({ text, mentions } = unlinkMentions(message.kind.body));
   }
 
+  /**
+   * Поле — как было до правки: слова, упоминания и ответ, к которому они шли (`endEditing`
+   * нативной). Не пустым и не с текстом правленого сообщения.
+   */
+  function endEditing() {
+    text = stashed;
+    stashed = '';
+    mentions = stashedMentions;
+    stashedMentions = [];
+    context = stashedContext;
+    stashedContext = null;
+  }
+
   function cancelContext() {
-    if (context?.kind === 'edit') {
-      text = stashed;
-      stashed = '';
-      mentions = stashedMentions;
-      stashedMentions = [];
-    }
-    context = null;
+    if (context?.kind === 'edit') endEditing();
+    else context = null;
   }
 
   // ————— «@» —————
@@ -392,6 +421,17 @@
 
   // ————— Вложения —————
 
+  /**
+   * «Отправить всё равно» из-за неподписанных устройств — сначала показать, каким устройствам
+   * придётся довериться: доверие навсегда, и человек должен видеть, кому именно.
+   */
+  let trusting = $state<{ key: string; devices: UnsignedDevice[] } | null>(null);
+  async function askSendAnyway(key: string) {
+    const devices = (await store?.devicesToTrust(key)) ?? [];
+    if (devices.length) trusting = { key, devices };
+    else store?.sendAnyway(key);
+  }
+
   /** Выбрали, вставили или перетащили — посчитать размеры и миниатюры и положить в лоток. */
   async function addFiles(files: File[]) {
     const limit = await session.uploadLimit();
@@ -402,7 +442,13 @@
     });
     if (fitting.length === files.length) notice = '';
     const settings = { stripMetadata: preferences.stripMetadata, compress: preferences.compress, compression: preferences.compression };
-    const prepared = await Promise.all(fitting.map((file) => prepareFile(file, settings)));
+    const results = await Promise.allSettled(fitting.map((file) => prepareFile(file, settings)));
+    const prepared: OutgoingFile[] = [];
+    for (const result of results) {
+      if (result.status === 'fulfilled') prepared.push(result.value);
+      else if (result.reason instanceof MetadataNotRemovedError) notice = t('upload.metadataNotRemoved', { name: result.reason.fileName });
+      else throw result.reason;
+    }
     attachments = [...attachments, ...prepared];
   }
 
@@ -453,11 +499,15 @@
     },
     reactors: (message) => (reactorsOf = store?.reactors(message) ?? []),
     report: (message) => (reporting = message),
+    get viewSource() {
+      return preferences.showsEventSource ? (message: Message) => (source = { json: store?.sourceJSON(message) }) : undefined;
+    },
     get canPin() {
       return !!store?.canPin;
     },
     reply: (message) => {
-      if (context?.kind === 'edit') text = stashed;
+      // Из правки — сначала наружу, чтобы слова старого сообщения не стали началом ответа.
+      if (context?.kind === 'edit') endEditing();
       context = { kind: 'reply', message };
     },
     edit,
@@ -470,7 +520,7 @@
     unpin: (message) => store?.unpin(message),
     remove: (message) => (deleting = message),
     retry: (key) => store?.retry(key),
-    sendAnyway: (key) => store?.sendAnyway(key),
+    sendAnyway: (key) => void askSendAnyway(key),
     discard: (key) => store?.discard(key),
     openMenu: (message, at, sheet) => (menu = { message, at, sheet }),
     stickerIsMine: (message) => {
@@ -570,7 +620,7 @@
       <Timeline bind:this={timeline} {store} {session} {openAt} showSenders={room?.kind !== 'direct'} {actions} {selection} ontoggle={toggleSelected} />
     {/key}
   {/if}
-  {#if videoNote.open}
+  {#if videoNote.open && VideoNoteCapture}
     <VideoNoteCapture recorder={videoNote} holding={videoHolding} onsend={() => void finishVideoNote()} oncancel={cancelVideoNote} />
   {/if}
   <div class="below">
@@ -648,16 +698,30 @@
 </div>
 
 <Menu open={!!stickerPanel} x={stickerPanel?.x ?? 0} y={stickerPanel?.y ?? 0} sheet={!viewport.finePointer} label={t('stickers.title')} onclose={() => (stickerPanel = null)}>
-  {#if stickerPanel}
+  {#if stickerPanel && StickerPanel}
     <StickerPanel library={session.stickers} media={session.media} {roomId} onpick={(sticker) => void sendSticker(sticker)} />
   {/if}
 </Menu>
 
-{#if viewing}
+{#if viewing && Viewer}
   <Viewer items={viewing.items} start={viewing.start} media={session.media} onclose={() => (viewing = null)} />
 {/if}
 
 <MessageMenu message={menu?.message ?? null} at={menu?.at ?? { x: 0, y: 0 }} sheet={menu?.sheet ?? false} {actions} onclose={() => (menu = null)} />
+
+<ConfirmDialog
+  open={!!trusting}
+  title={t('sendAnyway.trustTitle')}
+  message={t('sendAnyway.trustMessage')}
+  details={trusting?.devices.map((d) => t('sendAnyway.device', { owner: d.owner, name: d.name ?? d.deviceId, id: d.deviceId })) ?? []}
+  confirmLabel={t('message.delivery.sendAnyway')}
+  cancelLabel={t('common.cancel')}
+  onclose={() => (trusting = null)}
+  onconfirm={() => {
+    if (trusting) store?.sendAnyway(trusting.key, trusting.devices);
+    trusting = null;
+  }}
+/>
 
 <ConfirmDialog
   open={!!deleting}
@@ -690,18 +754,26 @@
 
 <ReactorsDialog reactors={reactorsOf} {session} onclose={() => (reactorsOf = null)} />
 
+<Dialog open={!!source} title={t('beta.viewSource')} onclose={() => (source = null)}>
+  {#if source}
+    {#if source.json}<pre class="source">{source.json}</pre>{:else}<p>{t('beta.noSource')}</p>{/if}
+    <PlainButton onclick={() => (source = null)}>{t('beta.close')}</PlainButton>
+  {/if}
+</Dialog>
 <ReportDialog message={reporting} onreport={(message, reason) => store?.report(message, reason)} onclose={() => (reporting = null)} />
 
 <ForwardDialog open={!!forwarding} {session} onsend={(ids, comment) => void forwardTo(ids, comment)} onclose={() => (forwarding = null)} />
 
-<PollComposer
-  open={creatingPoll}
-  onclose={() => (creatingPoll = false)}
-  onsend={(draft) => {
-    store?.sendPoll(draft);
-    creatingPoll = false;
-  }}
-/>
+{#if PollComposer}
+  <PollComposer
+    open={creatingPoll}
+    onclose={() => (creatingPoll = false)}
+    onsend={(draft) => {
+      store?.sendPoll(draft);
+      creatingPoll = false;
+    }}
+  />
+{/if}
 
 <ConfirmDialog
   open={!!endingPoll}
@@ -732,6 +804,15 @@
 
 
 <style>
+  .source {
+    max-height: var(--size-media-max-height);
+    margin: 0;
+    overflow: auto;
+    font-size: var(--font-size-caption);
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+    user-select: text;
+  }
   .room {
     position: relative;
     isolation: isolate;
