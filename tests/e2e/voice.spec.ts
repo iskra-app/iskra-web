@@ -223,14 +223,19 @@ test('«кружочек»: камера поверх комнаты, кольц
   expect(Math.abs(box.width - box.height)).toBeLessThan(2);
   // Углы — в самих пикселях чёрные, как `SquareVideoExporter` нативной: другие клиенты покажут
   // квадрат целиком, а за кругом — комната, которую человек не видел. Середина — кадр камеры.
-  const pixels = await camera.locator('canvas').evaluate((canvas: HTMLCanvasElement) => {
-    const context = canvas.getContext('2d')!;
-    const at = (x: number, y: number) => [...context.getImageData(x, y, 1, 1).data.slice(0, 3)];
-    const s = canvas.width;
-    return { corners: [at(2, 2), at(s - 3, 2), at(2, s - 3), at(s - 3, s - 3)], middle: at(s / 2, s / 2) };
-  });
-  for (const corner of pixels.corners) expect(corner).toEqual([0, 0, 0]);
-  expect(pixels.middle.some((c) => c > 16)).toBe(true);
+  // С альфой: пустой канвас прозрачен, и без неё «чёрные углы» прошли бы, не нарисовав ничего.
+  // Ждать, а не читать раз: первый кадр камеры на медленной машине приходит позже «0:01».
+  const pixels = () =>
+    camera.locator('canvas').evaluate((canvas: HTMLCanvasElement) => {
+      const context = canvas.getContext('2d')!;
+      const at = (x: number, y: number) => [...context.getImageData(x, y, 1, 1).data];
+      const s = canvas.width;
+      return { corners: [at(2, 2), at(s - 3, 2), at(2, s - 3), at(s - 3, s - 3)], middle: at(s / 2, s / 2) };
+    });
+  await expect.poll(async () => (await pixels()).middle.slice(0, 3).some((c) => c > 16), { message: 'середина — кадр камеры' }).toBe(true);
+  const { corners, middle } = await pixels();
+  for (const corner of corners) expect(corner).toEqual([0, 0, 0, 255]);
+  expect(middle[3]).toBe(255);
 
   // Увёл вверх — без рук, отправка кнопкой.
   await page.mouse.move(spot.x + spot.width / 2, spot.y - 100, { steps: 5 });

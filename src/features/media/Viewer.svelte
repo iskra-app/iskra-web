@@ -450,7 +450,7 @@
           {#if item.kind === 'videoNote'}
             <!-- Кружочек — без полосы управления браузера: она режет круг и закрывает лицо. Нажатие
                  по нему и пробел — пауза и снова; закончился — нажатие играет сначала. -->
-            <!-- svelte-ignore a11y_media_has_caption, a11y_click_events_have_key_events, a11y_no_noninteractive_element_interactions -->
+            <!-- svelte-ignore a11y_media_has_caption -->
             <video bind:this={note} src={full} autoplay playsinline class="round" onclick={toggleNote}></video>
           {:else}
             <!-- svelte-ignore a11y_media_has_caption -->
