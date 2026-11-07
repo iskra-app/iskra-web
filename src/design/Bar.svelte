@@ -35,6 +35,8 @@
     position: sticky;
     top: 0;
     z-index: 1;
+    /* В колонке под шапкой — длинная лента, и без этого шапка уступала бы ей по высоте. */
+    flex: none;
     display: grid;
     grid-template-columns: auto minmax(0, 1fr) auto;
     align-items: center;
@@ -57,11 +59,14 @@
     white-space: nowrap;
     text-overflow: ellipsis;
   }
+  /* Плотнее обычного: заголовок с подписью должен уместиться в высоту кнопок шапки, иначе шапка
+     чата выходит выше соседних колонок и черта под ними идёт ступенькой. */
   .titles {
     position: relative;
     display: flex;
     flex-direction: column;
     min-width: 0;
+    line-height: var(--line-height-bar);
   }
   /* Нажимается текст, а не вся середина: за пустое место шапки в окне PWA таскают окно. */
   .pressable {

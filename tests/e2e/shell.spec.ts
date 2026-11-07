@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { isPhone, signInToDemo, watchForProblems } from './helpers';
+import { isPhone, openRoom, signInToDemo, watchForProblems } from './helpers';
 
 test('адрес чата открывает чат; на телефоне — вместо списка, на десктопе — рядом', async ({ page }, info) => {
   const problems = watchForProblems(page);
@@ -16,6 +16,19 @@ test('адрес чата открывает чат; на телефоне — �
     await expect(list).toBeVisible();
   }
   expect(problems).toEqual([]);
+});
+
+test('шапки колонок одной высоты: списка чатов, чата с подписью и «О чате»', async ({ page }, info) => {
+  test.skip(info.project.name.endsWith('phone'), 'колонки рядом — только на широком экране');
+  await signInToDemo(page);
+  await openRoom(page, /^Выходные/);
+  await page.getByRole('button', { name: 'О чате' }).click();
+  const bars = page.locator('header[data-titlebar]');
+  await expect(bars).toHaveCount(3);
+  // Панель ещё открывается: мерить, когда встала.
+  await expect
+    .poll(async () => new Set(await bars.evaluateAll((all) => all.map((bar) => bar.getBoundingClientRect().height))).size)
+    .toBe(1);
 });
 
 test('правая панель на широком экране сдвигает чат, а не перекрывает его', async ({ page }, info) => {

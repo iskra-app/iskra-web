@@ -202,6 +202,7 @@
   --font-size-body: 1rem;
   --font-size-caption: 0.8125rem; /* 13 */
   --font-size-caption2: 0.6875rem; /* 11 — число в кружке реакции, как .caption2 */
+  --line-height-bar: 1.2; /* заголовок с подписью в шапке — не выше её кнопок */
   --font-size-title: 1.25rem; /* 20 */
   --font-size-large-title: 1.75rem; /* 28 */
   --line-height-body: 1.35;
