@@ -99,7 +99,6 @@
   }
   .count {
     color: var(--color-text-secondary);
-    font-variant-numeric: tabular-nums;
   }
   .list {
     display: grid;

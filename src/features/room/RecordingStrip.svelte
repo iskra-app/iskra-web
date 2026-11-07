@@ -163,7 +163,6 @@
   }
   .clock {
     flex: none;
-    font-variant-numeric: tabular-nums;
   }
   .wave {
     flex: 1;

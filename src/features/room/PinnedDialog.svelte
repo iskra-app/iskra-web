@@ -10,7 +10,6 @@
   import Dialog from '../../design/Dialog.svelte';
   import EmptyState from '../../design/EmptyState.svelte';
   import { ICON_VIEWBOX, icons } from '../../design/icons.ts';
-  import PlainButton from '../../design/PlainButton.svelte';
   import type { RoomDetailsStore } from '../../core/rooms/roomDetails.svelte.ts';
   import type { UserSession } from '../../core/session/userSession.svelte.ts';
   import { i18n, t } from '../../i18n/index.svelte.ts';
@@ -41,7 +40,7 @@
   const day = (ts: number) => new Intl.DateTimeFormat(i18n.locale, { day: 'numeric', month: 'short' }).format(ts);
 </script>
 
-<Dialog {open} title={t('room.pinnedTitle')} {onclose}>
+<Dialog closeLabel={t('room.searchClose')} {open} title={t('room.pinnedTitle')} {onclose}>
   {#if details && details.pinned.length === 0}
     <EmptyState title={t('room.pinnedEmpty')} />
   {:else if details}
@@ -69,7 +68,6 @@
       {/each}
     </ul>
   {/if}
-  <PlainButton onclick={onclose}>{t('room.searchClose')}</PlainButton>
 </Dialog>
 
 <style>

@@ -3,6 +3,7 @@
   возвращает его, когда закрыт, и закрывается по `Esc`.
 -->
 <script lang="ts">
+  import DialogClose from './DialogClose.svelte';
   import { backdropClose } from './backdropClose';
   interface Props {
     open: boolean;
@@ -12,12 +13,14 @@
     details?: string[];
     confirmLabel: string;
     cancelLabel: string;
+    /** Подпись крестика. */
+    closeLabel: string;
     /** Действие разрушительное: кнопка подтверждения — красная, а не акцентная. */
     destructive?: boolean;
     onconfirm: () => void;
     onclose: () => void;
   }
-  let { open, title, message, details = [], confirmLabel, cancelLabel, destructive = false, onconfirm, onclose }: Props = $props();
+  let { open, title, message, details = [], confirmLabel, cancelLabel, closeLabel, destructive = false, onconfirm, onclose }: Props = $props();
 
   let dialog: HTMLDialogElement | undefined = $state();
   const id = $props.id();
@@ -42,6 +45,7 @@
     <button type="button" class="cancel press" onclick={onclose}>{cancelLabel}</button>
     <button type="button" class="confirm press" class:destructive onclick={onconfirm}>{confirmLabel}</button>
   </div>
+  <DialogClose label={closeLabel} onclick={onclose} />
 </dialog>
 
 <style>
@@ -59,6 +63,7 @@
   }
   h2 {
     margin: 0 0 var(--space-close);
+    padding-inline-end: var(--tap-target);
     font-size: var(--font-size-title);
   }
   p {

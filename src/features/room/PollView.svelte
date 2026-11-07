@@ -155,7 +155,6 @@
   }
   .share {
     font-size: var(--font-size-caption);
-    font-variant-numeric: tabular-nums;
     opacity: 0.7;
   }
   .bar {

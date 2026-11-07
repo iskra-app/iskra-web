@@ -62,9 +62,6 @@
     height: var(--size-icon);
     fill: currentColor;
   }
-  .coords {
-    font-variant-numeric: tabular-nums;
-  }
   .within {
     margin-inline-start: var(--space-close);
     font-size: var(--font-size-caption);

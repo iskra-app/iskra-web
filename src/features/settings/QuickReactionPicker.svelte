@@ -47,7 +47,7 @@
   </button>
 </div>
 
-<Dialog open={picking} title={t('reactions.more')} onclose={() => (picking = false)}>
+<Dialog closeLabel={t('recovery.close')} open={picking} title={t('reactions.more')} onclose={() => (picking = false)}>
   {#if EmojiPanel}<EmojiPanel mine={nobody} recent={preferences.recentEmoji} onpick={pick} />{/if}
   <PlainButton onclick={() => (picking = false)}>{t('common.cancel')}</PlainButton>
 </Dialog>

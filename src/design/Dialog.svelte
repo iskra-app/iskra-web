@@ -1,6 +1,7 @@
 <!--
   Окно с формой: нативный `<dialog>` с `showModal()` — фокус внутри, `Esc` и щелчок по подложке
-  закрывают, фокус возвращается туда, откуда открыли. Содержимое и кнопки — у того, кто открыл.
+  закрывают, фокус возвращается туда, откуда открыли. Крестик в шапке — у каждого окна.
+  Содержимое и кнопки — у того, кто открыл.
 -->
 <script lang="ts">
   import type { Snippet } from 'svelte';
@@ -12,6 +13,8 @@
   interface Props {
     open: boolean;
     title: string;
+    /** Подпись крестика: тексты — у того, кто открыл. */
+    closeLabel: string;
     onclose: () => void;
     /**
      * Окно со страницами внутри («Новый чат» → «Новая комната»): стрелка у заголовка, и `Esc`
@@ -20,7 +23,9 @@
     back?: { label: string; onclick: () => void };
     children: Snippet;
   }
-  let { open, title, onclose, back, children }: Props = $props();
+  let { open, title, closeLabel, onclose, back, children }: Props = $props();
+
+  const FOCUSABLE = 'a[href], button:not(:disabled), input:not(:disabled), select:not(:disabled), textarea:not(:disabled), [tabindex]:not([tabindex="-1"])';
 
   let dialog: HTMLDialogElement | undefined = $state();
   const id = $props.id();
@@ -32,12 +37,20 @@
     if (open && !dialog.open) {
       shown = true;
       dialog.showModal();
+      focusContent(dialog);
     }
     if (!open && dialog.open) {
       dialog.close();
       return whenClosed(dialog, () => (shown = false));
     }
   });
+
+  /** Шапка — первая в разметке, но начинать окно надо с содержимого: иначе поле формы не получит фокус. */
+  function focusContent(node: HTMLDialogElement) {
+    const heading = node.querySelector(':scope > .heading');
+    if (!heading?.contains(document.activeElement)) return;
+    [...node.querySelectorAll<HTMLElement>(FOCUSABLE)].find((element) => !heading.contains(element))?.focus();
+  }
 
   function oncancel(event: Event) {
     if (!back) return;
@@ -48,14 +61,11 @@
 
 <dialog bind:this={dialog} use:backdropClose={onclose} data-motion="pop" aria-labelledby="{id}-title" {onclose} {oncancel}>
   {#if open || shown}
-    {#if back}
-      <div class="heading">
-        <IconButton label={back.label} onclick={back.onclick}><Icon name="back" /></IconButton>
-        <h2 id="{id}-title">{title}</h2>
-      </div>
-    {:else}
+    <div class="heading" class:paged={!!back}>
+      {#if back}<IconButton label={back.label} onclick={back.onclick}><Icon name="back" /></IconButton>{/if}
       <h2 id="{id}-title">{title}</h2>
-    {/if}
+      <IconButton label={closeLabel} onclick={onclose}><Icon name="close" /></IconButton>
+    </div>
     {@render children()}
   {/if}
 </dialog>
@@ -85,14 +95,27 @@
     background: var(--color-scrim);
   }
   h2 {
+    flex: 1;
+    min-width: 0;
     margin: 0;
     font-size: var(--font-size-title);
+    overflow-wrap: anywhere;
   }
-  /* Стрелка — на месте отступа окна: заголовок остаётся вровень с остальным. */
+  /* Шапка не уезжает с длинным содержимым — крестик всегда под рукой. Кнопки крупнее строки
+     заголовка: запас сверху уходит в отступ окна. */
   .heading {
+    position: sticky;
+    inset-block-start: 0;
+    z-index: 1;
     display: flex;
     align-items: center;
     gap: var(--space-tight);
+    margin-block-start: calc(-1 * var(--space-close));
+    margin-inline-end: calc(-1 * var(--space-close));
+    background: var(--color-background);
+  }
+  /* Стрелка — на месте отступа окна: заголовок остаётся вровень с остальным. */
+  .heading.paged {
     margin-inline-start: calc(-1 * var(--space-normal));
   }
 </style>

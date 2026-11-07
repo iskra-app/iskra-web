@@ -183,7 +183,6 @@
   .length {
     flex: none;
     font-size: var(--font-size-caption);
-    font-variant-numeric: tabular-nums;
   }
   .problem {
     display: block;

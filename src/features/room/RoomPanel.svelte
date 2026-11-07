@@ -452,7 +452,7 @@
   <RoomEditDialog open={editing} {details} {session} onclose={() => (editing = false)} />
   <InviteDialog open={inviting} {session} {details} onclose={() => (inviting = false)} />
 
-  <ConfirmDialog
+  <ConfirmDialog closeLabel={t('recovery.close')}
     open={leaving}
     title={t(details.direct ? 'room.manage.deleteChatQuestion' : 'room.manage.leaveQuestion')}
     message={t(details.direct ? 'room.manage.deleteChatHelp' : 'room.manage.leaveHelp')}

@@ -75,7 +75,6 @@
     color: var(--on-accent);
     font-size: var(--font-size-caption);
     font-weight: 600;
-    font-variant-numeric: tabular-nums;
     line-height: 1;
   }
   .count {

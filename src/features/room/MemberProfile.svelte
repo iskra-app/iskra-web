@@ -133,7 +133,7 @@
 
 <QrCodeDialog open={showingCode} {link} name={member.name} subtitle={member.id} seed={member.id} {photo} onclose={() => (showingCode = false)} />
 
-<ConfirmDialog
+<ConfirmDialog closeLabel={t('recovery.close')}
   open={banning}
   title={t('room.manage.blockQuestion', { name: member.name })}
   message={t('room.manage.blockHelp')}
@@ -147,7 +147,7 @@
   }}
 />
 
-<ConfirmDialog
+<ConfirmDialog closeLabel={t('recovery.close')}
   open={blocking}
   title={t('message.menu.blockConfirm', { name: member.name })}
   message={t('message.menu.blockConfirmMessage')}

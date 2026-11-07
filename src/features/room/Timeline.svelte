@@ -554,7 +554,6 @@
     color: var(--on-accent);
     font-size: var(--font-size-caption);
     font-weight: 600;
-    font-variant-numeric: tabular-nums;
     line-height: var(--size-unread-badge);
   }
   .to-bottom svg {

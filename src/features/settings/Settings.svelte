@@ -754,14 +754,13 @@
   {/if}
 </div>
 
-<Dialog open={reading !== null} title={reading?.licence.name ?? ''} onclose={() => (reading = null)}>
+<Dialog closeLabel={t('recovery.close')} open={reading !== null} title={reading?.licence.name ?? ''} onclose={() => (reading = null)}>
   {#if reading}
     <pre class="licence">{reading.text}</pre>
-    <PlainButton onclick={() => (reading = null)}>{t('folders.done')}</PlainButton>
   {/if}
 </Dialog>
 
-<ConfirmDialog
+<ConfirmDialog closeLabel={t('recovery.close')}
   open={confirmNewCode}
   title={t('recovery.new.title')}
   message={t('recovery.new.message')}
@@ -772,13 +771,13 @@
   onconfirm={() => void makeNewCode()}
 />
 
-<Dialog open={!!newCode} title={t('settings.recoveryCode')} onclose={() => (newCode = null)}>
+<Dialog closeLabel={t('recovery.close')} open={!!newCode} title={t('settings.recoveryCode')} onclose={() => (newCode = null)}>
   {#if newCode}
     <RecoveryCode code={newCode} userId={session.userId} onsaved={() => (newCode = null)} />
   {/if}
 </Dialog>
 
-<ConfirmDialog
+<ConfirmDialog closeLabel={t('recovery.close')}
   open={confirmClear}
   title={t('storage.confirm.title')}
   message={t('storage.confirm.body')}
@@ -788,7 +787,7 @@
   onconfirm={() => void clearCache()}
 />
 
-<ConfirmDialog
+<ConfirmDialog closeLabel={t('recovery.close')}
   open={confirmSearchClear}
   title={t('storage.search.confirm.title')}
   message={t('storage.search.confirm.body')}
@@ -799,7 +798,7 @@
   onconfirm={() => void clearSearchIndex()}
 />
 
-<ConfirmDialog
+<ConfirmDialog closeLabel={t('recovery.close')}
   open={confirmingSignOut}
   title={t('signOut.confirmTitle')}
   message={t('signOut.confirmMessage')}

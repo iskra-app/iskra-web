@@ -5,6 +5,7 @@
 <script lang="ts">
   import type { AuthRequest } from '../../core/encryption/recovery.svelte.ts';
   import PrimaryButton from '../../design/PrimaryButton.svelte';
+  import DialogClose from '../../design/DialogClose.svelte';
   import PlainButton from '../../design/PlainButton.svelte';
   import TextField from '../../design/TextField.svelte';
   import { t } from '../../i18n/index.svelte.ts';
@@ -75,6 +76,7 @@
       <PlainButton onclick={oncancel}>{t('recovery.approve.cancel')}</PlainButton>
     </div>
   {/if}
+  <DialogClose label={t('recovery.close')} onclick={oncancel} />
 </dialog>
 
 <style>
@@ -98,6 +100,7 @@
   }
   h2 {
     margin: 0;
+    padding-inline-end: var(--tap-target);
     font-size: var(--font-size-title);
   }
   p {

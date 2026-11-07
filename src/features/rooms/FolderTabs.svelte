@@ -108,7 +108,6 @@
     border-radius: var(--radius-circle);
     background: var(--color-selected);
     color: var(--color-text-secondary);
-    font-variant-numeric: tabular-nums;
     text-align: center;
   }
 </style>

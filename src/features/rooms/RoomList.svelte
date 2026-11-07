@@ -257,7 +257,7 @@
 
 <ChatPeek room={peeking} {session} actions={peeking ? rowActions(peeking) : []} onclose={() => (peeking = null)} />
 
-<ConfirmDialog
+<ConfirmDialog closeLabel={t('recovery.close')}
   open={!!leaving}
   title={t('roomList.swipe.leaveConfirmTitle')}
   message={t('roomList.swipe.leaveConfirmMessage')}

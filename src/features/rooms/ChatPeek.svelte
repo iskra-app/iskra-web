@@ -81,7 +81,7 @@
   };
 </script>
 
-<Dialog open={!!room} title={current ? roomName(current) : ''} {onclose}>
+<Dialog closeLabel={t('roomList.peek.close')} open={!!room} title={current ? roomName(current) : ''} {onclose}>
   {#if current}
     {#if hasUnread(current)}
       <p class="secondary">{t('roomList.peek.staysUnread')}</p>
@@ -97,7 +97,6 @@
       {#each actions as action (action.label)}
         <li><button type="button" onclick={action.run}>{action.label}</button></li>
       {/each}
-      <li><button type="button" onclick={onclose}>{t('roomList.peek.close')}</button></li>
     </ul>
   {/if}
 </Dialog>

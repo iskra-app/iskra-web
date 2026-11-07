@@ -9,7 +9,6 @@
   import { untrack } from 'svelte';
   import Dialog from '../../design/Dialog.svelte';
   import EmptyState from '../../design/EmptyState.svelte';
-  import PlainButton from '../../design/PlainButton.svelte';
   import type { MessageSearch } from '../../core/search/messageSearch.svelte.ts';
   import type { UserSession } from '../../core/session/userSession.svelte.ts';
   import { t } from '../../i18n/index.svelte.ts';
@@ -40,7 +39,7 @@
   $effect(() => search?.search(query));
 </script>
 
-<Dialog {open} title={t('room.searchInChat')} {onclose}>
+<Dialog closeLabel={t('room.searchClose')} {open} title={t('room.searchInChat')} {onclose}>
   <MessageSearchField bind:value={query} label={t('room.searchPrompt')} autofocus />
   <div class="results">
     {#if search}
@@ -51,7 +50,6 @@
       {/if}
     {/if}
   </div>
-  <PlainButton onclick={onclose}>{t('room.searchClose')}</PlainButton>
 </Dialog>
 
 <style>

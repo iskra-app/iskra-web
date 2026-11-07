@@ -6,7 +6,6 @@
 -->
 <script lang="ts">
   import Dialog from '../../design/Dialog.svelte';
-  import PrimaryButton from '../../design/PrimaryButton.svelte';
   import { contains } from '../../core/rooms/folders';
   import type { RoomSummary } from '../../core/rooms/types';
   import type { UserSession } from '../../core/session/userSession.svelte.ts';
@@ -27,7 +26,7 @@
   const current = $derived(room ? (session.rooms.get(room.id) ?? room) : null);
 </script>
 
-<Dialog open={!!room} title={current ? roomName(current) : ''} {onclose}>
+<Dialog closeLabel={t('recovery.close')} open={!!room} title={current ? roomName(current) : ''} {onclose}>
   {#if current}
     <div class="membership">
       <ul class="group" aria-label={t('folders.addToFolder')}>
@@ -48,7 +47,6 @@
       </ul>
       <p class="secondary">{t('folders.membershipFooter')}</p>
       {#if store.failed}<p class="problem" role="alert">{t('folders.saveFailed')}</p>{/if}
-      <PrimaryButton onclick={onclose}>{t('folders.done')}</PrimaryButton>
     </div>
   {/if}
 </Dialog>

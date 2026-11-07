@@ -6,7 +6,6 @@
 <script lang="ts">
   import { ICON_VIEWBOX, icons } from '../../design/icons.ts';
   import Dialog from '../../design/Dialog.svelte';
-  import QuietButton from '../../design/QuietButton.svelte';
   import { t } from '../../i18n/index.svelte.ts';
   import { OWN_SERVER_GUIDE, publicServers } from './servers';
 
@@ -15,7 +14,7 @@
   const servers = publicServers(typeof navigator === 'undefined' ? [] : (navigator.languages ?? [navigator.language]));
 </script>
 
-<Dialog {open} title={t('servers.title')} {onclose}>
+<Dialog closeLabel={t('recovery.close')} {open} title={t('servers.title')} {onclose}>
   <p class="secondary">{t('servers.intro')}</p>
   <ul>
     {#each servers as server (server.address)}
@@ -43,7 +42,6 @@
       </a>
     </li>
   </ul>
-  <QuietButton onclick={onclose}>{t('recovery.close')}</QuietButton>
 </Dialog>
 
 <style>

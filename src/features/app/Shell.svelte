@@ -390,7 +390,7 @@
   <OpenLinkDialog open={askingLink} {session} target={link.target} via={link.via} onopen={closeLink} onclose={() => closeLink()} />
 {/if}
 
-<ConfirmDialog
+<ConfirmDialog closeLabel={t('recovery.close')}
   open={confirmingSignOut}
   title={t('signOut.confirmTitle')}
   message={t('signOut.confirmMessage')}

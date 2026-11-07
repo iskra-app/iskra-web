@@ -17,7 +17,7 @@
   }
 </script>
 
-<Dialog open={!!member} title={t('room.manage.roleQuestion', { name: member?.name ?? '' })} {onclose}>
+<Dialog closeLabel={t('recovery.close')} open={!!member} title={t('room.manage.roleQuestion', { name: member?.name ?? '' })} {onclose}>
   {#if member}
     <div class="roles" role="radiogroup" aria-label={t('room.manage.roleHeader')}>
       {#each details.rolesFor(member) as role (role)}

@@ -32,7 +32,7 @@
   const shown = $derived((reactors ?? []).filter((r) => filter === null || r.key === filter));
 </script>
 
-<Dialog open={!!reactors} title={plural('message.menu.reactors', reactors?.length ?? 0)} {onclose}>
+<Dialog closeLabel={t('recovery.close')} open={!!reactors} title={plural('message.menu.reactors', reactors?.length ?? 0)} {onclose}>
   {#if reactors}
     <div class="tabs" role="radiogroup" aria-label={plural('message.menu.reactors', reactors.length)}>
       <button type="button" role="radio" aria-checked={filter === null} onclick={() => (filter = null)}>

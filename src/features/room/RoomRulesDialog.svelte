@@ -40,7 +40,7 @@
   const candidates = $derived(details.members.filter((m) => m.role === 'member' && !m.invited && details.rolesFor(m).some((r) => r !== 'member')));
 </script>
 
-<Dialog
+<Dialog closeLabel={t('recovery.close')}
   {open}
   title={appointing ? t('room.rules.appointTitle') : t('room.rules.title')}
   back={appointing ? { label: t('room.rules.title'), onclick: () => (appointing = false) } : undefined}

@@ -67,7 +67,6 @@
   .count {
     flex: 1;
     font-weight: 600;
-    font-variant-numeric: tabular-nums;
     text-align: center;
   }
   .actions {

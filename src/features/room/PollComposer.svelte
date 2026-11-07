@@ -47,7 +47,7 @@
   }
 </script>
 
-<Dialog {open} title={t('poll.newTitle')} {onclose}>
+<Dialog closeLabel={t('recovery.close')} {open} title={t('poll.newTitle')} {onclose}>
   <form onsubmit={submit}>
     <TextField bind:value={draft.question} label={t('poll.question')} showLabel placeholder={t('poll.questionPlaceholder')} autofocus />
 

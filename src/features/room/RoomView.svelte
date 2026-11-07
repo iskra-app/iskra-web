@@ -12,7 +12,6 @@
   import ConfirmDialog from '../../design/ConfirmDialog.svelte';
   import type { UnsignedDevice } from '../../core/encryption/sendAnyway';
   import Dialog from '../../design/Dialog.svelte';
-  import PlainButton from '../../design/PlainButton.svelte';
   import type { OutgoingFile } from '../../core/media/upload';
   import { fileSize } from '../media/files';
   import { MetadataNotRemovedError, prepareFile, stickerFile } from '../media/prepare';
@@ -709,7 +708,7 @@
 
 <MessageMenu message={menu?.message ?? null} at={menu?.at ?? { x: 0, y: 0 }} sheet={menu?.sheet ?? false} {actions} onclose={() => (menu = null)} />
 
-<ConfirmDialog
+<ConfirmDialog closeLabel={t('recovery.close')}
   open={!!trusting}
   title={t('sendAnyway.trustTitle')}
   message={t('sendAnyway.trustMessage')}
@@ -723,7 +722,7 @@
   }}
 />
 
-<ConfirmDialog
+<ConfirmDialog closeLabel={t('recovery.close')}
   open={!!deleting}
   title={t('message.menu.deleteConfirmTitle')}
   message={t('message.menu.deleteConfirmMessage')}
@@ -737,7 +736,7 @@
   }}
 />
 
-<ConfirmDialog
+<ConfirmDialog closeLabel={t('recovery.close')}
   open={deletingSelection}
   title={t('message.selection.deleteTitle')}
   message={t('message.selection.deleteMessage')}
@@ -754,10 +753,9 @@
 
 <ReactorsDialog reactors={reactorsOf} {session} onclose={() => (reactorsOf = null)} />
 
-<Dialog open={!!source} title={t('beta.viewSource')} onclose={() => (source = null)}>
+<Dialog closeLabel={t('beta.close')} open={!!source} title={t('beta.viewSource')} onclose={() => (source = null)}>
   {#if source}
     {#if source.json}<pre class="source">{source.json}</pre>{:else}<p>{t('beta.noSource')}</p>{/if}
-    <PlainButton onclick={() => (source = null)}>{t('beta.close')}</PlainButton>
   {/if}
 </Dialog>
 <ReportDialog message={reporting} onreport={(message, reason) => store?.report(message, reason)} onclose={() => (reporting = null)} />
@@ -775,7 +773,7 @@
   />
 {/if}
 
-<ConfirmDialog
+<ConfirmDialog closeLabel={t('recovery.close')}
   open={!!endingPoll}
   title={t('poll.endConfirmTitle')}
   message={t('poll.endConfirmMessage')}
@@ -789,7 +787,7 @@
   }}
 />
 
-<ConfirmDialog
+<ConfirmDialog closeLabel={t('recovery.close')}
   open={!!placing}
   title={t('location.confirm')}
   message={placing?.accuracy !== undefined ? t('location.accuracy', { distance: distance(placing.accuracy, i18n.locale) }) : t('location.accuracyUnknown')}

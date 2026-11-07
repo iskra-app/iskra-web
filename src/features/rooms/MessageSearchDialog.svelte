@@ -13,6 +13,8 @@
   import type { SearchHit } from '../../core/search/messageSearch.svelte.ts';
   import type { UserSession } from '../../core/session/userSession.svelte.ts';
   import { backdropClose } from '../../design/backdropClose';
+  import Icon from '../../design/Icon.svelte';
+  import IconButton from '../../design/IconButton.svelte';
   import { t } from '../../i18n/index.svelte.ts';
   import { revealRequest } from '../app/revealRequest.svelte.ts';
   import RoomFace from './RoomFace.svelte';
@@ -95,6 +97,7 @@
     spellcheck="false"
     {onkeydown}
   />
+  <span class="close"><IconButton label={t('recovery.close')} onclick={onclose}><Icon name="close" /></IconButton></span>
   {#if hits.length || search.foundNothing}
     <ul id="{id}-results" role="listbox" aria-label={t('roomList.searchPrompt')}>
       {#each hits as hit, index (hit.id)}
@@ -146,11 +149,18 @@
   input {
     min-height: var(--size-navigation-bar);
     margin: var(--space-close);
-    padding: 0 var(--space-roomy);
+    padding-block: 0;
+    padding-inline: var(--space-roomy) var(--tap-target);
     border: none;
     border-radius: var(--radius-control);
     background: var(--color-incoming-bubble);
     font-size: var(--font-size-body);
+  }
+  /* В конце поля, вровень с ним. */
+  .close {
+    position: absolute;
+    inset-block-start: calc(var(--space-close) + (var(--size-navigation-bar) - var(--tap-target)) / 2);
+    inset-inline-end: var(--space-close);
   }
   input:focus-visible {
     outline: var(--border-thick) solid var(--accent);

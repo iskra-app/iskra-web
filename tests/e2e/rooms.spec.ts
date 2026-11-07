@@ -119,7 +119,7 @@ test('действия строки: прочитано и непрочитан�
   // Папок нет — нет и «В папку».
   await expect(actions.items()).toHaveText(
     phone
-      ? ['Открыть чат', 'Отметить прочитанным', 'Закрепить', 'В архив', 'Удалить', 'Закрыть предпросмотр']
+      ? ['Открыть чат', 'Отметить прочитанным', 'Закрепить', 'В архив', 'Удалить']
       : ['Подглядеть', 'Открыть чат', 'Отметить прочитанным', 'Закрепить', 'В архив', 'Удалить'],
   );
   await actions.item('Отметить прочитанным').click();
@@ -202,7 +202,7 @@ test('«В папку» из меню строки: галочка — чат в
   await expect(personal).not.toBeChecked();
   await personal.check();
   await expect(personal).toBeChecked();
-  await sheet.getByRole('button', { name: 'Готово' }).click();
+  await sheet.getByRole('button', { name: 'Закрыть' }).click();
   await expect(sheet).toBeHidden();
 
   await tabs.getByRole('tab', { name: /^Личные/ }).click();
@@ -212,7 +212,7 @@ test('«В папку» из меню строки: галочка — чат в
   // Сняли галочку у личного чата — его в «Личных» нет, хоть он и подходит под правило.
   await (await rowActions(page, /^Аня/, phone)).item('В папку').click();
   await page.getByRole('dialog', { name: 'Аня' }).getByRole('switch', { name: 'Личные' }).uncheck();
-  await page.getByRole('dialog', { name: 'Аня' }).getByRole('button', { name: 'Готово' }).click();
+  await page.getByRole('dialog', { name: 'Аня' }).getByRole('button', { name: 'Закрыть' }).click();
   await expect(page.getByRole('link', { name: /^Аня/ })).toHaveCount(0);
   expect(problems).toEqual([]);
 });

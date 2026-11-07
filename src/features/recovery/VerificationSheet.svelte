@@ -7,6 +7,7 @@
 -->
 <script lang="ts">
   import type { VerificationStore } from '../../core/encryption/verification.svelte.ts';
+  import DialogClose from '../../design/DialogClose.svelte';
   import PlainButton from '../../design/PlainButton.svelte';
   import { t } from '../../i18n/index.svelte.ts';
 
@@ -47,7 +48,6 @@
     <h2 id="{id}-title">{t('verification.waiting.title')}</h2>
     <p id="{id}-message">{t('verification.waiting.message')}</p>
     <span class="spinner" aria-hidden="true"></span>
-    <PlainButton onclick={() => verification.close()}>{t('verification.close')}</PlainButton>
   {:else if step?.name === 'negotiating'}
     <h2 id="{id}-title">{t('verification.negotiating.title')}</h2>
     <p id="{id}-message">{t('verification.negotiating.message')}</p>
@@ -68,8 +68,8 @@
     {@const key = step.name}
     <h2 id="{id}-title">{t(`verification.${key}.title`)}</h2>
     <p id="{id}-message">{t(`verification.${key}.message`)}</p>
-    <PlainButton onclick={() => verification.close()}>{t('verification.close')}</PlainButton>
   {/if}
+  <DialogClose label={t('verification.close')} onclick={() => verification.close()} />
 </dialog>
 
 <style>
@@ -95,6 +95,7 @@
   }
   h2 {
     margin: 0;
+    padding-inline-end: var(--tap-target);
     font-size: var(--font-size-title);
   }
   p {

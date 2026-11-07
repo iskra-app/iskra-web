@@ -443,7 +443,6 @@
     font-size: var(--font-size-caption);
     line-height: 1.2;
     color: var(--color-text-secondary);
-    font-variant-numeric: tabular-nums;
     white-space: nowrap;
   }
   .marks svg {
@@ -530,7 +529,6 @@
   .count {
     margin-inline-start: var(--space-tight);
     color: var(--color-text-secondary);
-    font-variant-numeric: tabular-nums;
     font-weight: 500;
   }
   .mine .count {

@@ -265,6 +265,19 @@ test('мышь: панель по наведению; справка по кла
   await expect(page).not.toHaveURL(/#\/room\//);
 });
 
+test('окно: крестик закрывает, а фокус при открытии — у поля, а не у крестика', async ({ page }) => {
+  const problems = watchForProblems(page);
+  await signInToDemo(page);
+  await openRoom(page, /^Выходные/);
+  await page.getByRole('button', { name: 'Добавить фото или файл' }).click();
+  await page.getByRole('menuitem', { name: 'Опрос' }).click();
+  const dialog = page.getByRole('dialog', { name: 'Новый опрос' });
+  await expect(dialog.getByRole('textbox').first()).toBeFocused();
+  await dialog.getByRole('button', { name: 'Закрыть' }).click();
+  await expect(dialog).toBeHidden();
+  expect(problems).toEqual([]);
+});
+
 test('телефон: меню листом снизу', async ({ page }, info) => {
   test.skip(!isPhone(info.project.name), 'лист — для пальца');
   await signInToDemo(page);

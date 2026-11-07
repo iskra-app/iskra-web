@@ -55,7 +55,7 @@
   }
 </script>
 
-<Dialog {open} title={t('message.forward.title')} {onclose}>
+<Dialog closeLabel={t('recovery.close')} {open} title={t('message.forward.title')} {onclose}>
   <TextField bind:value={query} label={t('message.forward.prompt')} placeholder={t('message.forward.prompt')} autofocus />
   <ul class="grid" aria-label={t('message.forward.title')}>
     {#each shown as room (room.id)}

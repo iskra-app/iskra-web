@@ -125,7 +125,7 @@
   </section>
 {/if}
 
-<ConfirmDialog
+<ConfirmDialog closeLabel={t('recovery.close')}
   open={confirming}
   title={all ? t('devices.endOthersConfirm') : t('devices.endConfirm')}
   message=""
@@ -142,7 +142,7 @@
   }}
 />
 
-<Dialog open={asking} title={t('devices.passwordTitle')} onclose={finish}>
+<Dialog closeLabel={t('recovery.close')} open={asking} title={t('devices.passwordTitle')} onclose={finish}>
   <form
     class="password"
     onsubmit={(event) => {
