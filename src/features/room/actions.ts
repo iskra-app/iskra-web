@@ -29,7 +29,8 @@ export interface MessageActions {
   openMedia(message: Message): void;
   /** «N реакций» — кто что поставил. Только в группе: в личном пилюля и так говорит, кто. */
   showsReactors: boolean;
-  reactors(message: Message): void;
+  /** Кто что поставил; `filter` — сразу на этой эмодзи. */
+  reactors(message: Message, filter?: string): void;
   /** «Просмотреть JSON» (бета-функции) — окно с событием; нет — пункта в меню нет. */
   viewSource?: (message: Message) => void;
   /** «Пожаловаться» — окно с необязательной причиной. */

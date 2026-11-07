@@ -109,6 +109,8 @@
   --size-mention-row: 3.5rem; /* 56 — лицо и по 8 сверху и снизу */
   --size-mention-list: 16.25rem; /* 260 — четыре с половиной строки «@»: половина говорит, что есть ещё */
   --size-reaction-cell: 2.75rem; /* 44 — Theme.Size.reactionCell: эмодзи в панели */
+  --size-reaction-circle: 1.75rem; /* 28 — Theme.Reaction.circle: эмодзи на углу пузыря */
+  --reaction-overhang: 1.25rem; /* 20 — Theme.Reaction.overhang: на пузыре остаётся 8, меньше его отступа */
   --size-emoji-panel: 16.75rem; /* 268 — Theme.Size.emojiPanel: высота панели «Больше эмодзи» */
   --size-emoji-panel-width: 22.5rem; /* 360 — Theme.Size.emojiPanelWidth: полторы ширины меню */
   --size-emoji-header: 1.75rem; /* 28 — Theme.Size.emojiHeader: заголовок раздела */
@@ -199,6 +201,7 @@
   --font-code: ui-monospace, 'SF Mono', Menlo, Consolas, 'Liberation Mono', monospace;
   --font-size-body: 1rem;
   --font-size-caption: 0.8125rem; /* 13 */
+  --font-size-caption2: 0.6875rem; /* 11 — число в кружке реакции, как .caption2 */
   --font-size-title: 1.25rem; /* 20 */
   --font-size-large-title: 1.75rem; /* 28 */
   --line-height-body: 1.35;
@@ -255,6 +258,7 @@
   --color-incoming-bubble-on-wallpaper: #fcfcfc;
   --color-mono-bubble-on-wallpaper: #dedede;
   --color-own-reaction: rgb(0 0 0 / 0.16);
+  --color-own-reaction-glass: rgb(0 0 0 / 0.22); /* Theme.Reaction.mineTint */
   --color-danger: #ff3b30;
   /* Предупреждение, а не ошибка: «Из России может быть недоступен» — systemOrange. */
   --color-warning: #ff9500;
@@ -286,6 +290,7 @@
   --color-glass-opaque: #1c1c1e;
   --color-incoming-bubble: rgb(255 255 255 / 0.08);
   --color-own-reaction: rgb(255 255 255 / 0.16);
+  --color-own-reaction-glass: rgb(255 255 255 / 0.22);
   --color-danger: #ff453a;
   --color-warning: #ff9f0a;
   --color-selected: rgb(255 255 255 / 0.1);
@@ -309,6 +314,7 @@
     --color-glass-opaque: #1c1c1e;
     --color-incoming-bubble: rgb(255 255 255 / 0.08);
     --color-own-reaction: rgb(255 255 255 / 0.16);
+    --color-own-reaction-glass: rgb(255 255 255 / 0.22);
     --color-danger: #ff453a;
   --color-warning: #ff9f0a;
     --color-selected: rgb(255 255 255 / 0.1);

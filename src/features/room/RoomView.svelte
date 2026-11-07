@@ -96,6 +96,7 @@
   let deleting = $state<Message | null>(null);
   /** Кто отреагировал — открытое окно; `null` — закрыто. */
   let reactorsOf = $state<Reactor[] | null>(null);
+  let reactorsFilter = $state<string | null>(null);
   /** На что жалуются; `null` — окно закрыто. */
   let reporting = $state<Message | null>(null);
   /** «Просмотреть JSON»: событие текстом; `json` пусто — на сервере его ещё нет. */
@@ -496,7 +497,10 @@
     get openThread() {
       return usesThreads ? (message: Message) => message.eventId && router.go({ name: 'room', roomId, thread: message.eventId }) : undefined;
     },
-    reactors: (message) => (reactorsOf = store?.reactors(message) ?? []),
+    reactors: (message, filter) => {
+      reactorsFilter = filter ?? null;
+      reactorsOf = store?.reactors(message) ?? [];
+    },
     report: (message) => (reporting = message),
     get viewSource() {
       return preferences.showsEventSource ? (message: Message) => (source = { json: store?.sourceJSON(message) }) : undefined;
@@ -751,7 +755,7 @@
   }}
 />
 
-<ReactorsDialog reactors={reactorsOf} {session} onclose={() => (reactorsOf = null)} />
+<ReactorsDialog reactors={reactorsOf} initialFilter={reactorsFilter} {session} onclose={() => (reactorsOf = null)} />
 
 <Dialog closeLabel={t('beta.close')} open={!!source} title={t('beta.viewSource')} onclose={() => (source = null)}>
   {#if source}

@@ -42,6 +42,68 @@ test('меню сообщения: реакция ставится из меню
   expect(problems).toEqual([]);
 });
 
+test('реакция — кружок на углу пузыря; первая и последняя появляются и уходят масштабом', async ({ page, browserName }, info) => {
+  const problems = watchForProblems(page);
+  await signInToDemo(page);
+  await openRoom(page, /^Выходные/);
+  const row = page.locator('.row', { hasText: 'Я — пирог' });
+  // Покадрово: был ли в списке кружок с анимацией. Список на месте и пустым — иначе масштаба нет.
+  await row.locator('.reactions').evaluate((list) => {
+    const watch = window as unknown as { animated: number };
+    watch.animated = 0;
+    const frame = () => {
+      for (const item of list.children) watch.animated += item.getAnimations().length;
+      requestAnimationFrame(frame);
+    };
+    frame();
+  });
+  const animated = () => page.evaluate(() => (window as unknown as { animated: number }).animated);
+  // В WebKit e2e просит меньше движения (`helpers.ts`), и анимаций там нет.
+  const animates = browserName !== 'webkit';
+
+  const menu = await menuOf(page, 'Я — пирог');
+  await menu.getByRole('menuitemcheckbox', { name: 'Реакция 👍' }).click();
+  const circle = row.getByRole('list', { name: 'Реакции' }).getByRole('button', { name: '👍, 1 человек' });
+  await expect(circle).toHaveAttribute('aria-pressed', 'true', { timeout: 10_000 });
+  if (animates) await expect.poll(animated).toBeGreaterThan(0);
+
+  // На нижнем углу чужого пузыря: 4 от правого края, 8 на пузыре, 20 — ниже него.
+  await expect(async () => {
+    const around = (await row.locator('.bubble').boundingBox())!;
+    const at = (await circle.boundingBox())!;
+    expect(at.width).toBeCloseTo(28, 0);
+    expect(around.x + around.width - (at.x + at.width)).toBeCloseTo(4, 0);
+    expect(at.y + at.height - (around.y + around.height)).toBeCloseTo(20, 0);
+  }).toPass();
+
+  await expect(page.getByRole('img', { name: 'Отправляется' })).toHaveCount(0);
+
+  // Правый щелчок и удержание — список поставивших, сразу на этой эмодзи; реакция не снимается.
+  const reactors = page.getByRole('dialog', { name: '1 реакция' });
+  if (isPhone(info.project.name)) {
+    const box = (await circle.boundingBox())!;
+    const at = { clientX: box.x + 8, clientY: box.y + 8, pointerId: 7, pointerType: 'touch', isPrimary: true };
+    await circle.dispatchEvent('pointerdown', at);
+    await expect(reactors).toBeVisible();
+    await circle.dispatchEvent('pointerup', at);
+    await circle.dispatchEvent('click');
+  } else {
+    await circle.click({ button: 'right' });
+    await expect(reactors).toBeVisible();
+  }
+  await expect(reactors.getByRole('radio', { name: '👍 1' })).toBeChecked();
+  await reactors.getByRole('button', { name: 'Закрыть' }).click();
+  await expect(reactors).toBeHidden();
+  await expect(circle).toHaveAttribute('aria-pressed', 'true');
+
+  await page.waitForTimeout(600);
+  const before = await animated();
+  await circle.click();
+  await expect(circle).toHaveCount(0, { timeout: 10_000 });
+  if (animates) await expect.poll(animated).toBeGreaterThan(before);
+  expect(problems).toEqual([]);
+});
+
 test('ответ и правка: полоса над полем, ↑ берёт последнее своё, Esc отменяет', async ({ page }) => {
   await signInToDemo(page);
   await openRoom(page, /^Выходные/);
@@ -245,7 +307,7 @@ test('мышь: панель по наведению; справка по кла
   const pie = bubble(page, 'Я — пирог');
   await pie.hover();
   // Панель — рядом с пузырём, у каждого сообщения своя.
-  await pie.locator('..').getByRole('button', { name: 'Ответить' }).click();
+  await pie.locator('../..').getByRole('button', { name: 'Ответить' }).click();
   await expect(page.getByText('Ответ', { exact: true })).toBeVisible();
   await page.getByRole('textbox', { name: 'Сообщение' }).press('Escape');
 

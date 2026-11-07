@@ -1,3 +1,5 @@
+import { flip } from 'svelte/animate';
+
 /**
  * Движение, которое не умеет CSS сам. Всё остальное — в `base.css` и токенах (`--timing-*`).
  */
@@ -56,4 +58,40 @@ export function slideFromEnd(_node: Element, { duration = 220 }: { duration?: nu
 /** Проявиться и погаснуть — подложка под листом. */
 export function fadeInOut(_node: Element, { duration = 150 }: { duration?: number } = {}): Motion {
   return { duration: reducedMotion() ? 0 : duration, easing: easeOut, css: (t) => `opacity: ${t}` };
+}
+
+/** `Theme.Timing.reactionPops`: `.spring(duration: 0.4, bounce: 0.3)`, со временем на затухание. */
+const REACTION_POP = 480;
+const REACTION_PERIOD = 0.4;
+const REACTION_DAMPING = 0.7;
+function reactionSpring(t: number): number {
+  const omega = (2 * Math.PI) / REACTION_PERIOD;
+  const damped = omega * Math.sqrt(1 - REACTION_DAMPING ** 2);
+  const decay = REACTION_DAMPING * omega;
+  const time = (t * REACTION_POP) / 1000;
+  return 1 - Math.exp(-decay * time) * (Math.cos(damped * time) + (decay / damped) * Math.sin(damped * time));
+}
+
+/** Из ничего, а не на месте: реакция — маленькое событие, и в ленте ей одной можно подпрыгнуть. */
+const REACTION_SCALE_FROM = 0.01;
+export function reactionPops(_node: Element): Motion {
+  return {
+    duration: reducedMotion() ? 0 : REACTION_POP,
+    easing: reactionSpring,
+    css: (t) => `transform: scale(${REACTION_SCALE_FROM + (1 - REACTION_SCALE_FROM) * t})`,
+  };
+}
+
+/** Снятая — быстрее, чем пришла, и без отскока; прозрачность прячет последнюю крошку стекла. */
+export function reactionLeaves(_node: Element): Motion {
+  return {
+    duration: reducedMotion() ? 0 : 160,
+    easing: (t) => t * t,
+    css: (t) => `transform: scale(${REACTION_SCALE_FROM + (1 - REACTION_SCALE_FROM) * t}); opacity: ${t}`,
+  };
+}
+
+/** Соседи уступают место той же пружиной. */
+export function reactionSlides(node: Element, rects: { from: DOMRect; to: DOMRect }) {
+  return flip(node, rects, { duration: reducedMotion() ? 0 : REACTION_POP, easing: reactionSpring });
 }
