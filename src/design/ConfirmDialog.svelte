@@ -39,8 +39,8 @@
   {/if}
   <div class="actions">
     <!-- Ни одна из двух не выделена как «правильная»: фокус — на отмене. -->
-    <button type="button" class="cancel" onclick={onclose}>{cancelLabel}</button>
-    <button type="button" class="confirm" class:destructive onclick={onconfirm}>{confirmLabel}</button>
+    <button type="button" class="cancel press" onclick={onclose}>{cancelLabel}</button>
+    <button type="button" class="confirm press" class:destructive onclick={onconfirm}>{confirmLabel}</button>
   </div>
 </dialog>
 

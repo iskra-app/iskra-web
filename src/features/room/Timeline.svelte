@@ -360,7 +360,7 @@
 {#if anchor && !anchor.atBottom}
   <button
     type="button"
-    class="to-bottom"
+    class="to-bottom press"
     aria-label={unseenBelow > 0 ? `${t('room.scrollToBottom')}, ${plural('roomList.unread', unseenBelow)}` : t('room.scrollToBottom')}
     title={t('room.scrollToBottom')}
     onclick={() => anchor?.scrollToBottom()}
@@ -401,7 +401,7 @@
   }
   .item:global(.flash) {
     border-radius: var(--radius-bubble);
-    animation: flash 1.6s ease-out;
+    animation: flash var(--timing-flash) var(--ease-out);
   }
   @keyframes flash {
     from {
@@ -527,7 +527,8 @@
   .to-bottom {
     transition:
       opacity var(--timing-chrome) var(--ease-out),
-      transform var(--timing-chrome) var(--ease-out);
+      transform var(--timing-chrome) var(--ease-out),
+      scale var(--timing-chrome) var(--ease-out);
   }
   @starting-style {
     .to-bottom {
@@ -535,11 +536,14 @@
       transform: scale(var(--motion-menu-scale-from));
     }
     .unseen {
-      transform: scale(0);
+      opacity: 0;
+      transform: scale(var(--motion-menu-scale-from));
     }
   }
   .unseen {
-    transition: transform var(--timing-reaction) var(--ease-menu-open);
+    transition:
+      opacity var(--timing-reaction) var(--ease-out),
+      transform var(--timing-reaction) var(--ease-menu-open);
     position: absolute;
     inset-block-start: calc(-1 * var(--size-unread-badge) / 2);
     min-width: var(--size-unread-badge);

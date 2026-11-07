@@ -569,7 +569,7 @@
     will-change: transform;
   }
   .frame.settling {
-    transition: transform var(--timing-chrome) ease-out;
+    transition: transform var(--timing-chrome) var(--ease-out);
   }
   img,
   video {

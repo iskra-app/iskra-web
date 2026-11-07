@@ -152,6 +152,11 @@
       background: var(--color-selected);
     }
   }
+  /* Нажатый пункт — подсветкой, как `MessageMenuRowStyle` нативной, а не потускнением. */
+  .menu :global([role^='menuitem']:active) {
+    background: var(--color-selected);
+    opacity: 1;
+  }
   .menu :global([role^='menuitem'].danger) {
     color: var(--color-danger);
   }

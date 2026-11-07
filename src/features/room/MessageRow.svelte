@@ -520,6 +520,7 @@
   }
   /* Нажатие — чуть вдавливается и отпружинивает: реакция ставится пальцем, и палец это видит. */
   .reactions button:active:not(:disabled) {
+    opacity: 1;
     transform: scale(var(--motion-scale-from));
   }
   /* Своя — тоном серого, а не рамкой: заметно, когда ищешь, и не кричит, когда нет. Число своей — акцентом. */
@@ -548,8 +549,9 @@
       touch-action: pan-y;
     }
   }
-  .bubble {
-    transition: transform var(--timing-chrome) ease-out;
+  /* Отпущенное после свайпа возвращается на место; под пальцем переход снимает `touchGestures`. */
+  .stack {
+    transition: transform var(--timing-chrome) var(--ease-out);
   }
   /* По ширине картинки: подпись переносится под неё, а не растягивает пузырь. */
   .bubble.visual {
@@ -694,7 +696,7 @@
   .html :global(.spoiler) {
     background: currentColor;
     border-radius: var(--radius-control);
-    transition: background var(--timing-chrome);
+    transition: background var(--timing-chrome) var(--ease-out);
   }
   .html :global(.spoiler:hover),
   .html :global(.spoiler:focus) {

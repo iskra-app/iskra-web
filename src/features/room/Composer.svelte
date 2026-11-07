@@ -591,15 +591,15 @@
           onclick={(event) => recordClick(event, kind)}
           oncontextmenu={recordContext}
         >
-          <svg viewBox={ICON_VIEWBOX} aria-hidden="true">
+          <svg class="icon-swap" viewBox={ICON_VIEWBOX} aria-hidden="true">
             {#if recording && !press}<path d={icons.send} />{:else if kind === 'video'}<path d={icons.video} />{:else}<path d={icons.mic} />{/if}
           </svg>
         </button>
       </span>
     {/each}
   {:else}
-    <button type="submit" class="send" disabled={empty || disabled} aria-label={t('room.send')} title={t('room.send')}>
-      <svg viewBox={ICON_VIEWBOX} aria-hidden="true"><path d={icons.send} /></svg>
+    <button type="submit" class="send press" disabled={empty || disabled} aria-label={t('room.send')} title={t('room.send')}>
+      <svg class="icon-swap" viewBox={ICON_VIEWBOX} aria-hidden="true"><path d={icons.send} /></svg>
     </button>
   {/if}
 </form>
@@ -805,6 +805,9 @@
   }
   .voice.held {
     transform: scale(var(--motion-held-scale));
+  }
+  .voice:active {
+    opacity: 1;
   }
   /* Замок над пальцем: вверх — без рук. Подсказка там, где палец, а не в конце полосы. */
   .lock {

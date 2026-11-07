@@ -15,7 +15,7 @@
   let { onclick, disabled = false, busy = false, danger = false, children }: Props = $props();
 </script>
 
-<button type="button" class="plain" class:danger disabled={disabled || busy} aria-busy={busy} {onclick}>
+<button type="button" class="plain press" class:danger disabled={disabled || busy} aria-busy={busy} {onclick}>
   {@render children()}
 </button>
 

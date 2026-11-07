@@ -148,6 +148,7 @@
       background: var(--color-incoming-bubble);
     }
   }
+  .row:active,
   .row[aria-current='page'] {
     background: var(--color-selected);
   }

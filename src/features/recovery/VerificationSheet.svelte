@@ -129,7 +129,7 @@
     border: 2px solid var(--color-text-secondary);
     border-inline-end-color: transparent;
     border-radius: var(--radius-circle);
-    animation: spin 0.8s linear infinite;
+    animation: spin var(--timing-spinner) linear infinite;
   }
   @keyframes spin {
     to {

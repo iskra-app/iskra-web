@@ -85,6 +85,11 @@ dialog[data-motion][open] {
   transition-duration: var(--timing-menu-open);
   transition-timing-function: var(--ease-menu-open);
 }
+/* Лист — без перелёта: пружина подняла бы его над нижним краем, и под ним мелькнула бы щель. */
+dialog[data-motion='sheet'][open] {
+  transition-duration: var(--timing-screen);
+  transition-timing-function: var(--ease-screen);
+}
 dialog[data-motion='pop']:not([open]) {
   opacity: 0;
   transform: scale(var(--motion-scale-from));
@@ -182,6 +187,42 @@ dialog[data-motion][open]::backdrop {
   }
 }
 
+/*
+ * Нажатие. Любая кнопка под пальцем тускнеет (`rowPressed` нативной), `.press` — кнопка-плашка:
+ * вдавливается целиком (`PrimaryAction.pressed`). Просили меньше движения — вдавливания нет,
+ * остаётся потускнение. Нулевая специфичность у общего правила: своё у компонента важнее.
+ */
+:where(button) {
+  transition: opacity var(--timing-chrome) var(--ease-out);
+}
+:where(button:not(:disabled):active) {
+  opacity: var(--opacity-pressed);
+}
+.press {
+  transition: scale var(--timing-chrome) var(--ease-out);
+}
+@media (prefers-reduced-motion: no-preference) {
+  .press:active:not(:disabled) {
+    scale: var(--motion-press-scale);
+    opacity: 1;
+  }
+}
+
+/* Значок сменился (вставлен заново): проявляется, а не подменяется. */
+.icon-swap {
+  transition:
+    opacity var(--timing-chrome) var(--ease-out),
+    scale var(--timing-chrome) var(--ease-out),
+    filter var(--timing-chrome) var(--ease-out);
+}
+@starting-style {
+  .icon-swap {
+    opacity: 0;
+    scale: var(--motion-icon-scale-from);
+    filter: blur(var(--blur-icon));
+  }
+}
+
 .visually-hidden {
   position: absolute;
   width: 1px;
@@ -206,7 +247,7 @@ input[type='checkbox'] {
   border-radius: var(--radius-circle);
   background: var(--color-separator);
   cursor: pointer;
-  transition: background-color var(--timing-chrome) ease-out;
+  transition: background-color var(--timing-chrome) var(--ease-out);
 }
 input[type='checkbox']::before {
   content: '';
@@ -218,7 +259,9 @@ input[type='checkbox']::before {
   border-radius: var(--radius-circle);
   background: var(--color-on-switch);
   box-shadow: var(--shadow-switch-knob);
-  transition: translate var(--timing-chrome) ease-out;
+  transition:
+    translate var(--timing-chrome) var(--ease-out),
+    scale var(--timing-chrome) var(--ease-out);
 }
 input[type='checkbox']:checked {
   background: var(--accent);
@@ -228,6 +271,11 @@ input[type='checkbox']:checked::before {
 }
 input[type='checkbox']:checked:dir(rtl)::before {
   translate: calc(-1 * (var(--size-switch-width) - var(--size-switch-knob) - 2 * var(--space-tight))) 0;
+}
+@media (prefers-reduced-motion: no-preference) {
+  input[type='checkbox']:active:not(:disabled)::before {
+    scale: var(--motion-knob-stretch);
+  }
 }
 input[type='checkbox']:disabled {
   opacity: 0.4;

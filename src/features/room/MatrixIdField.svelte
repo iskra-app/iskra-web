@@ -30,7 +30,7 @@
     <span class="id">{userId}</span>
   </span>
   <button type="button" aria-label={t('message.menu.copy')} title={t('message.menu.copy')} onclick={() => void copy()}>
-    <svg viewBox={ICON_VIEWBOX} aria-hidden="true"><path d={copied ? icons.check : icons.copy} /></svg>
+    {#key copied}<svg class="icon-swap" viewBox={ICON_VIEWBOX} aria-hidden="true"><path d={copied ? icons.check : icons.copy} /></svg>{/key}
   </button>
 </div>
 

@@ -96,6 +96,10 @@
 {/if}
 
 <style>
+  /* Долгое нажатие на сообщении — меню, и пока палец решает, снимок под ним не меняется (`menuLift` нативной). */
+  .media:active {
+    opacity: 1;
+  }
   .media {
     position: relative;
     display: block;
@@ -127,7 +131,7 @@
     border-radius: var(--radius-circle);
   }
   .loading {
-    animation: pulse 1.4s ease-in-out infinite;
+    animation: pulse var(--timing-placeholder) ease-in-out infinite;
   }
   @keyframes pulse {
     50% {
