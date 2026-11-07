@@ -46,14 +46,17 @@ test('фото в ленте: место отведено до загрузки,
   expect(problems).toEqual([]);
 });
 
-test('файл: «Сохранить» скачивает его с исходным именем', async ({ page }) => {
+test('файл: «Сохранить» скачивает его с исходным именем', async ({ page, browserName }) => {
   await signInToDemo(page);
   await openRoom(page, /^Выходные/);
   const card = page.getByRole('log').getByRole('article').filter({ hasText: 'Что взять.txt' });
   await expect(card).toContainText('96');
   const download = page.waitForEvent('download');
   await card.getByRole('button', { name: 'Сохранить' }).click();
-  expect((await download).suggestedFilename()).toBe('Что взять.txt');
+  // WebKit под Linux с ubuntu-26.04 сам меняет пробел в имени на «_»: `download` у ссылки верный,
+  // и в остальных браузерах имя доходит как есть.
+  const spaces = browserName === 'webkit' && process.platform === 'linux' ? '_' : ' ';
+  expect((await download).suggestedFilename()).toBe(`Что${spaces}взять.txt`);
 });
 
 test('фото в зашифрованный чат: выбрать → лоток → подпись → ушло и открывается', async ({ page }) => {
