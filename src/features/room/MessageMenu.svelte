@@ -76,7 +76,7 @@
     <p class="fact">{t('message.menu.sentAt', { time: exactly(message.ts) })}</p>
     {#if message.kind.at}<p class="fact">{t('message.menu.deletedAt', { time: exactly(message.kind.at) })}</p>{/if}
   {:else if message}
-    <div class="reactions" role="group" aria-label={t('message.menu.addReaction')}>
+    <div class="reactions" class:sheet role="group" aria-label={t('message.menu.addReaction')}>
       {#each quickReactions as emoji (emoji)}
         {@const mine = message.reactions.some((r) => r.key === emoji && r.mine)}
         <button
@@ -181,6 +181,11 @@
     padding-block-end: var(--space-tight);
     margin-block-end: var(--space-tight);
     border-block-end: var(--border-hairline) solid var(--color-separator);
+  }
+  /* Воздух вокруг эмодзи — один со всех сторон (`ReactionBar.inset` нативной): снизу столько же,
+     сколько у меню по краям. На листе этот край шире. */
+  .reactions.sheet {
+    padding-block-end: var(--space-close);
   }
   .reactions button {
     justify-content: center;

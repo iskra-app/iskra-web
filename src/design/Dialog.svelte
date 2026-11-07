@@ -21,9 +21,11 @@
      * возвращает на прежнюю страницу, а не закрывает окно. Подпись — у того, кто открыл.
      */
     back?: { label: string; onclick: () => void };
+    /** Окно на стекле, и в нём ничего его не закрашивает: список поставивших реакции. */
+    glass?: boolean;
     children: Snippet;
   }
-  let { open, title, closeLabel, onclose, back, children }: Props = $props();
+  let { open, title, closeLabel, onclose, back, glass = false, children }: Props = $props();
 
   const FOCUSABLE = 'a[href], button:not(:disabled), input:not(:disabled), select:not(:disabled), textarea:not(:disabled), [tabindex]:not([tabindex="-1"])';
 
@@ -59,7 +61,7 @@
   }
 </script>
 
-<dialog bind:this={dialog} use:backdropClose={onclose} data-motion="pop" aria-labelledby="{id}-title" {onclose} {oncancel}>
+<dialog bind:this={dialog} class:glass use:backdropClose={onclose} data-motion="pop" aria-labelledby="{id}-title" {onclose} {oncancel}>
   {#if open || shown}
     <div class="heading" class:paged={!!back}>
       {#if back}<IconButton label={back.label} onclick={back.onclick}><Icon name="back" /></IconButton>{/if}
@@ -81,6 +83,13 @@
     color: var(--color-text);
     box-shadow: 0 var(--space-close) var(--space-generous) rgb(0 0 0 / 0.25);
     overflow-y: auto;
+  }
+  @supports (backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px)) {
+    dialog.glass {
+      background: var(--color-glass);
+      -webkit-backdrop-filter: saturate(180%) blur(var(--backdrop-blur));
+      backdrop-filter: saturate(180%) blur(var(--backdrop-blur));
+    }
   }
   /* Колонка — у окна всегда, а не только открытого: закрывающееся ещё догорает (`display` с
      `allow-discrete` в `base.css`), `[open]` с него уже снят — и содержимое вставало в ряд. */
@@ -113,6 +122,11 @@
     margin-block-start: calc(-1 * var(--space-close));
     margin-inline-end: calc(-1 * var(--space-close));
     background: var(--color-background);
+  }
+  /* На стекле шапка без заливки, иначе на окне видна полоса. Содержимое под неё не уезжает:
+     прокручивается оно само, а не окно (`ReactorsDialog`). */
+  dialog.glass .heading {
+    background: transparent;
   }
   /* Стрелка — на месте отступа окна: заголовок остаётся вровень с остальным. */
   .heading.paged {
