@@ -114,7 +114,9 @@ jobs:
   # это не годится, для «попробовать dev» — да.
   nightly:
     needs: [check, e2e]
-    if: github.event_name == 'push' && github.ref == 'refs/heads/dev'
+    # `!cancelled()` и явные результаты: в dev `verified` пропущен, и без этого пропуск предка
+    # молча отменял бы и эту job, хотя проверки прошли.
+    if: ${{ !cancelled() && github.event_name == 'push' && github.ref == 'refs/heads/dev' && needs.check.result == 'success' && needs.e2e.result == 'success' }}
     # Pages ещё не включены (или недоступны для приватного репозитория на бесплатном
     # плане) — это не повод красить CI: провал виден в самой job.
     continue-on-error: true
