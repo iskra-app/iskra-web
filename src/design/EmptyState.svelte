@@ -22,6 +22,15 @@
     height: 100%;
     padding: var(--space-generous);
     text-align: center;
+    transition:
+      opacity var(--timing-arrival) var(--ease-out),
+      transform var(--timing-arrival) var(--ease-out);
+  }
+  @starting-style {
+    .empty {
+      opacity: 0;
+      transform: translateY(var(--motion-rise));
+    }
   }
   h2 {
     margin: 0;

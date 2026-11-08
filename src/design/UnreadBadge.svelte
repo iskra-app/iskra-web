@@ -86,6 +86,24 @@
     border-radius: var(--radius-circle);
     background: var(--accent);
   }
+  .reacted,
+  .mention,
+  .count,
+  .dot {
+    transition:
+      opacity var(--timing-reaction) var(--ease-out),
+      transform var(--timing-reaction) var(--ease-menu-open),
+      background-color var(--timing-chrome) var(--ease-out);
+  }
+  @starting-style {
+    .reacted,
+    .mention,
+    .count,
+    .dot {
+      opacity: 0;
+      transform: scale(var(--motion-icon-scale-from));
+    }
+  }
   .count.muted,
   .dot.muted {
     background: var(--color-muted-badge);

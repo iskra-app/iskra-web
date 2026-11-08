@@ -14,7 +14,7 @@
 <script lang="ts">
   import type { Snippet } from 'svelte';
   import { viewport } from './viewport.svelte.ts';
-  import { fadeInOut, slideFromEnd } from './motion';
+  import { fadeInOut, panelSlides, slideFromEnd } from './motion';
   import { LIST_IDEAL, LIST_MAX, LIST_MIN, clampListWidth as clamp } from './columns';
 
   interface Props {
@@ -129,11 +129,17 @@
   {#if panel && panelOpen}
     {#if panelAsSheet}
       <!-- Скрим — только указатель; с клавиатуры лист закрывает Esc. -->
-      <div class="scrim" aria-hidden="true" onclick={() => onClosePanel?.()} transition:fadeInOut></div>
+      <div class="scrim" aria-hidden="true" onclick={() => onClosePanel?.()} transition:fadeInOut|global></div>
     {/if}
-    <aside class="panel" class:sheet={panelAsSheet} transition:slideFromEnd={{ duration: panelAsSheet ? 220 : 0 }}>
-      {@render panel()}
-    </aside>
+    {#if panelAsSheet}
+      <aside class="panel sheet" transition:slideFromEnd|global={{ duration: 220 }}>
+        {@render panel()}
+      </aside>
+    {:else}
+      <aside class="panel" transition:panelSlides|global>
+        {@render panel()}
+      </aside>
+    {/if}
   {/if}
 </div>
 
@@ -167,6 +173,7 @@
   }
   .columns[data-layout='three'] {
     grid-template-columns: var(--list-width) 0 minmax(0, 1fr);
+    grid-auto-columns: var(--column-panel);
   }
   .columns[data-layout='three'][data-panel-open='true'] {
     grid-template-columns: var(--list-width) 0 minmax(0, 1fr) var(--column-panel);
@@ -225,7 +232,11 @@
     user-select: none;
   }
 
+  /* Закрывающаяся панель уже без своей дорожки (`data-panel-open`): без явного места сетка
+     уронила бы её во вторую строку, и она догорала бы на нижней половине окна. */
   .panel:not(.sheet) {
+    grid-column: 4;
+    grid-row: 1;
     border-inline-start: var(--border-hairline) solid var(--color-separator);
   }
 

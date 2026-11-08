@@ -34,6 +34,22 @@
     strip?.querySelector<HTMLElement>(`[data-folder="${CSS.escape(id)}"]`)?.scrollIntoView({ block: 'nearest', inline: 'nearest' });
   });
 
+  // Плашка выбранной скользит к новой вкладке, а не перепрыгивает.
+  let thumb = $state({ x: 0, width: 0, ready: false });
+  function measure() {
+    const el = strip?.querySelector<HTMLElement>(`[data-folder="${CSS.escape(selected)}"]`);
+    if (el) thumb = { x: el.offsetLeft, width: el.offsetWidth, ready: true };
+  }
+  $effect(() => {
+    void tabs;
+    void selected;
+    measure();
+    if (!strip || typeof ResizeObserver === 'undefined') return;
+    const observer = new ResizeObserver(measure);
+    observer.observe(strip);
+    return () => observer.disconnect();
+  });
+
   /** ←/→ — по вкладкам, как у любого списка вкладок. */
   function onkeydown(event: KeyboardEvent) {
     if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') return;
@@ -52,6 +68,7 @@
 </script>
 
 <div class="strip" role="tablist" aria-label={t('folders.title')} tabindex="-1" bind:this={strip} {onkeydown} {oncontextmenu}>
+  <span class="thumb" class:ready={thumb.ready} style:translate="{thumb.x}px 0" style:width="{thumb.width}px" aria-hidden="true"></span>
   {#each tabs as tab (tab.id)}
     <button
       type="button"
@@ -69,6 +86,7 @@
 
 <style>
   .strip {
+    position: relative;
     display: flex;
     gap: var(--space-tight);
     padding: var(--space-tight) var(--space-close);
@@ -93,9 +111,25 @@
     font-size: var(--font-size-caption);
     cursor: pointer;
   }
+  button {
+    position: relative;
+    transition: color var(--timing-chrome) var(--ease-out);
+  }
   button[aria-selected='true'] {
-    background: var(--color-selected);
     font-weight: 600;
+  }
+  .thumb {
+    position: absolute;
+    inset-block: var(--space-tight);
+    inset-inline-start: 0;
+    border-radius: var(--radius-circle);
+    background: var(--color-selected);
+    pointer-events: none;
+  }
+  .thumb.ready {
+    transition:
+      translate var(--timing-screen) var(--ease-menu-open),
+      width var(--timing-screen) var(--ease-menu-open);
   }
   .name {
     overflow: hidden;
@@ -109,5 +143,12 @@
     background: var(--color-selected);
     color: var(--color-text-secondary);
     text-align: center;
+    animation: count-pop var(--timing-reaction) var(--ease-menu-open);
+  }
+  @keyframes count-pop {
+    from {
+      transform: scale(var(--motion-icon-scale-from));
+      opacity: 0;
+    }
   }
 </style>

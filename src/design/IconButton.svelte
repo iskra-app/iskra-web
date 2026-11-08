@@ -44,6 +44,15 @@
     background: transparent;
     color: var(--accent);
     cursor: pointer;
+    transition:
+      background-color var(--timing-chrome) var(--ease-out),
+      opacity var(--timing-chrome) var(--ease-out),
+      scale var(--timing-chrome) var(--ease-out);
+  }
+  @media (prefers-reduced-motion: no-preference) {
+    .icon-button:active:not(:disabled) {
+      scale: var(--motion-press-scale);
+    }
   }
   /* Наведение — только там, где указатель умеет наводиться: на телефоне тап оставлял бы «залипшую» подсветку. */
   @media (hover: hover) {

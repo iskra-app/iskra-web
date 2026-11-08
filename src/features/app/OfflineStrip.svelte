@@ -2,13 +2,14 @@
 <script lang="ts">
   import QuietButton from '../../design/QuietButton.svelte';
   import type { UserSession } from '../../core/session/userSession.svelte.ts';
+  import { collapse } from '../../design/motion';
   import { t } from '../../i18n/index.svelte.ts';
 
   let { session }: { session: UserSession } = $props();
 </script>
 
 {#if session.connection === 'offline'}
-  <div class="offline" role="status">
+  <div class="offline" role="status" transition:collapse>
     <span class="text">
       <strong>{t('session.offlineTitle')}</strong>
       <span>{t('session.offlineMessage')}</span>

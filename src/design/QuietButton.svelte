@@ -15,6 +15,9 @@
     background: transparent;
     color: var(--accent);
     cursor: pointer;
+    transition:
+      background-color var(--timing-chrome) var(--ease-out),
+      opacity var(--timing-chrome) var(--ease-out);
   }
   /* Наведение — только там, где указатель умеет наводиться: на телефоне тап оставлял бы «залипшую» подсветку. */
   @media (hover: hover) {

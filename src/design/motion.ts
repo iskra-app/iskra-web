@@ -61,8 +61,8 @@ export function fadeInOut(_node: Element, { duration = 150 }: { duration?: numbe
 }
 
 /** `Theme.Timing.reactionPops`: `.spring(duration: 0.4, bounce: 0.3)`, со временем на затухание. */
-const REACTION_POP = 480;
-const REACTION_PERIOD = 0.4;
+const REACTION_POP = 320;
+const REACTION_PERIOD = 0.27;
 const REACTION_DAMPING = 0.7;
 function reactionSpring(t: number): number {
   const omega = (2 * Math.PI) / REACTION_PERIOD;
@@ -85,7 +85,7 @@ export function reactionPops(_node: Element): Motion {
 /** Снятая — быстрее, чем пришла, и без отскока; прозрачность прячет последнюю крошку стекла. */
 export function reactionLeaves(_node: Element): Motion {
   return {
-    duration: reducedMotion() ? 0 : 160,
+    duration: reducedMotion() ? 0 : 120,
     easing: (t) => t * t,
     css: (t) => `transform: scale(${REACTION_SCALE_FROM + (1 - REACTION_SCALE_FROM) * t}); opacity: ${t}`,
   };
@@ -94,4 +94,33 @@ export function reactionLeaves(_node: Element): Motion {
 /** Соседи уступают место той же пружиной. */
 export function reactionSlides(node: Element, rects: { from: DOMRect; to: DOMRect }) {
   return flip(node, rects, { duration: reducedMotion() ? 0 : REACTION_POP, easing: reactionSpring });
+}
+
+/** Появиться снизу и уйти обратно — плашки поверх экрана («Нет сети», «Доступна новая версия»). */
+export function riseInOut(_node: Element, { duration = 220 }: { duration?: number } = {}): Motion {
+  return {
+    duration: reducedMotion() ? 0 : duration,
+    easing: easeOut,
+    css: (t, u) => `opacity: ${t}; transform: translateY(${u * 0.5}rem) scale(${1 - u * 0.04})`,
+  };
+}
+
+/** Полоса в потоке раскрывается по высоте, а не выталкивает соседей рывком. */
+export function collapse(node: Element, { duration = 220 }: { duration?: number } = {}): Motion {
+  const height = (node as HTMLElement).offsetHeight;
+  return {
+    duration: reducedMotion() ? 0 : duration,
+    easing: easeOut,
+    css: (t) => `overflow: hidden; height: ${height * t}px; opacity: ${t}`,
+  };
+}
+
+/** Боковая панель рядом с чатом: колонка встаёт сразу, а содержимое въезжает с края и проявляется. */
+export function panelSlides(_node: Element, { duration = 160 }: { duration?: number } = {}): Motion {
+  const rtl = typeof document !== 'undefined' && document.dir === 'rtl';
+  return {
+    duration: reducedMotion() ? 0 : duration,
+    easing: easeOut,
+    css: (t, u) => `opacity: ${t}; transform: translateX(${(rtl ? -u : u) * 2}rem)`,
+  };
 }
