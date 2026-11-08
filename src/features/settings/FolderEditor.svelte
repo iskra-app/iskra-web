@@ -189,7 +189,7 @@
     display: flex;
     align-items: center;
     gap: var(--space-normal);
-    min-height: var(--tap-target);
+    min-height: var(--row-setting);
     padding: var(--space-tight) var(--space-normal);
     cursor: pointer;
   }

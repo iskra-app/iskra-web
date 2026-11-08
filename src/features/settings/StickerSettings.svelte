@@ -144,7 +144,7 @@
     align-items: center;
     justify-content: space-between;
     gap: var(--space-normal);
-    min-height: var(--tap-target);
+    min-height: var(--row-setting);
     padding: var(--space-close) var(--space-normal);
     border-radius: var(--radius-card);
     background: var(--color-surface);
