@@ -133,7 +133,8 @@
     min-height: var(--row-room);
     padding: var(--space-close) var(--space-normal);
     margin-inline: var(--space-tight);
-    border-radius: var(--radius-control);
+    border-radius: var(--radius-row);
+    font-size: var(--font-size-text);
     color: inherit;
     text-decoration: none;
     /* Пятьсот комнат — не беда: строки вне экрана не раскладываются и не рисуются. */
@@ -141,6 +142,14 @@
     contain-intrinsic-size: auto var(--row-room);
     /* Долгое нажатие — наше меню, а не системное «Открыть ссылку» поверх (iOS). */
     -webkit-touch-callout: none;
+    transition:
+      background-color var(--timing-chrome) var(--ease-out),
+      scale var(--timing-chrome) var(--ease-out);
+  }
+  @media (prefers-reduced-motion: no-preference) {
+    .row:active {
+      scale: var(--motion-press-scale);
+    }
   }
   /* Наведение — только там, где указатель умеет наводиться: на телефоне тап оставлял бы «залипшую» подсветку. */
   @media (hover: hover) {

@@ -300,7 +300,7 @@
     margin: var(--space-close) var(--space-tight);
     padding: 0 var(--space-normal);
     border: none;
-    border-radius: var(--radius-control);
+    border-radius: var(--radius-row);
     background: transparent;
     color: var(--color-text-secondary);
     font-weight: 500;

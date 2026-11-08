@@ -52,7 +52,7 @@
     min-height: var(--tap-target);
     padding: var(--space-close) var(--space-normal);
     border: none;
-    border-radius: var(--radius-control);
+    border-radius: var(--radius-row);
     background: transparent;
     color: inherit;
     font: inherit;
