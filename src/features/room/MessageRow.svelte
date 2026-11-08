@@ -745,10 +745,18 @@
     outline: 2px solid var(--accent);
     outline-offset: 2px;
   }
-  .row:hover .hover-bar,
-  .row:focus-within .hover-bar {
+  /* Фокус — только с клавиатуры: после закрытия меню он возвращается на «ещё» или пузырь,
+     и `:focus-within` держал бы панель открытой. Наведение — только у настоящей мыши: на
+     касании `:hover` залипает после нажатия. */
+  .row:has(:focus-visible) .hover-bar {
     opacity: 1;
     pointer-events: auto;
+  }
+  @media (hover: hover) {
+    .row:hover .hover-bar {
+      opacity: 1;
+      pointer-events: auto;
+    }
   }
   .hover-bar button {
     display: grid;

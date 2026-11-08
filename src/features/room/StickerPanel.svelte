@@ -10,6 +10,7 @@
 -->
 <script lang="ts">
   import { ICON_VIEWBOX, icons } from '../../design/icons.ts';
+  import Icon from '../../design/Icon.svelte';
   import Menu from '../../design/Menu.svelte';
   import { viewport } from '../../design/viewport.svelte.ts';
   import type { MediaLoader } from '../../core/media/media';
@@ -147,7 +148,7 @@
         onclick={() => {
           menu = null;
           void library.remove(sticker);
-        }}>{t('stickers.remove')}</button
+        }}><Icon name="delete" />{t('stickers.remove')}</button
       >
     {:else}
       <button
@@ -156,7 +157,7 @@
         onclick={() => {
           menu = null;
           void library.add(sticker);
-        }}>{t('stickers.add')}</button
+        }}><Icon name="plus" />{t('stickers.add')}</button
       >
     {/if}
   {/if}

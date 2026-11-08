@@ -143,6 +143,16 @@
     text-align: start;
     cursor: pointer;
   }
+  /* Иконка перед названием: цвет пункта (красный у «danger»), не сжимается. */
+  .menu :global([role^='menuitem'] > svg) {
+    flex: none;
+    width: var(--size-icon);
+    height: var(--size-icon);
+    color: var(--color-text-secondary);
+  }
+  .menu :global([role^='menuitem'].danger > svg) {
+    color: inherit;
+  }
   .menu :global([role^='menuitem']:focus-visible) {
     outline: 2px solid var(--accent);
     outline-offset: -2px;

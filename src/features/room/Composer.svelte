@@ -19,6 +19,7 @@
 <script lang="ts">
   import { ICON_VIEWBOX, icons } from '../../design/icons.ts';
   import { tick } from 'svelte';
+  import Icon from '../../design/Icon.svelte';
   import Menu from '../../design/Menu.svelte';
   import { viewport } from '../../design/viewport.svelte.ts';
   import { isMac } from '../../design/hotkeys';
@@ -605,8 +606,8 @@
 </form>
 
 <Menu open={!!attachMenu} x={attachMenu?.x ?? 0} y={attachMenu?.y ?? 0} sheet={!viewport.finePointer} label={t('room.attach')} onclose={() => (attachMenu = null)}>
-  <button type="button" role="menuitem" onclick={() => choose('image/*,video/*')}>{t('room.attachPhoto')}</button>
-  <button type="button" role="menuitem" onclick={() => choose('')}>{t('room.attachFile')}</button>
+  <button type="button" role="menuitem" onclick={() => choose('image/*,video/*')}><Icon name="photo" />{t('room.attachPhoto')}</button>
+  <button type="button" role="menuitem" onclick={() => choose('')}><Icon name="attach" />{t('room.attachFile')}</button>
   {#if onpoll}
     <button
       type="button"
@@ -614,7 +615,7 @@
       onclick={() => {
         attachMenu = null;
         onpoll?.();
-      }}>{t('poll.attach')}</button
+      }}><Icon name="chats" />{t('poll.attach')}</button
     >
   {/if}
   {#if onlocation}
@@ -624,7 +625,7 @@
       onclick={() => {
         attachMenu = null;
         onlocation?.();
-      }}>{t('location.attach')}</button
+      }}><Icon name="location" />{t('location.attach')}</button
     >
   {/if}
 </Menu>

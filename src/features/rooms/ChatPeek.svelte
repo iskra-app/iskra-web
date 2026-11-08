@@ -5,18 +5,20 @@
   чата, а это не он. «Открыть чат» — путь насквозь, и вот он уже читает, как всегда.
 
   Лента только для глаз: листается в историю, но ни меню, ни реакций, ни ответа — это делают
-  в чате. Под ней — то, что можно сделать со строкой, те же пункты, что у её меню.
+  в чате.
 -->
 <script module lang="ts">
   export interface PeekAction {
     label: string;
+    icon: IconName;
     run: () => void;
   }
 </script>
 
 <script lang="ts">
   import Dialog from '../../design/Dialog.svelte';
-  import { hasUnread, type RoomSummary } from '../../core/rooms/types';
+  import type { IconName } from '../../design/icons.ts';
+  import type { RoomSummary } from '../../core/rooms/types';
   import type { TimelineStore } from '../../core/timeline/timelineStore.svelte.ts';
   import type { UserSession } from '../../core/session/userSession.svelte.ts';
   import { t } from '../../i18n/index.svelte.ts';
@@ -29,10 +31,9 @@
     /** Чат, в который подглядывают; `null` — карточки нет. */
     room: RoomSummary | null;
     session: UserSession;
-    actions: readonly PeekAction[];
     onclose: () => void;
   }
-  let { room, session, actions, onclose }: Props = $props();
+  let { room, session, onclose }: Props = $props();
 
   const roomId = $derived(room?.id ?? null);
   /** Живая сводка: отметили прочитанным из-под карточки — строка «только подглядываете» уходит. */
@@ -83,9 +84,6 @@
 
 <Dialog closeLabel={t('roomList.peek.close')} open={!!room} title={current ? roomName(current) : ''} {onclose}>
   {#if current}
-    {#if hasUnread(current)}
-      <p class="secondary">{t('roomList.peek.staysUnread')}</p>
-    {/if}
     <div class="card">
       {#if store}
         {#key store}
@@ -93,20 +91,10 @@
         {/key}
       {/if}
     </div>
-    <ul class="actions">
-      {#each actions as action (action.label)}
-        <li><button type="button" onclick={action.run}>{action.label}</button></li>
-      {/each}
-    </ul>
   {/if}
 </Dialog>
 
 <style>
-  .secondary {
-    margin: 0;
-    color: var(--color-text-secondary);
-    font-size: var(--font-size-caption);
-  }
   .card {
     display: flex;
     flex-direction: column;
@@ -115,30 +103,5 @@
     border-radius: var(--radius-card);
     background: var(--color-surface);
     overflow: hidden;
-  }
-  .actions {
-    display: flex;
-    flex-direction: column;
-    flex-shrink: 0;
-    margin: 0;
-    padding: 0;
-    border-radius: var(--radius-card);
-    background: var(--color-surface);
-    list-style: none;
-    overflow: hidden;
-  }
-  .actions > * + * {
-    border-block-start: var(--border-hairline) solid var(--color-separator);
-  }
-  button {
-    width: 100%;
-    min-height: var(--tap-target);
-    padding: var(--space-tight) var(--space-normal);
-    border: none;
-    background: transparent;
-    color: var(--accent);
-    font: inherit;
-    text-align: start;
-    cursor: pointer;
   }
 </style>

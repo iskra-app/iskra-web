@@ -167,7 +167,6 @@ test('«Подглядеть»: последние сообщения — и ч�
     await rowActions(page, /^Выходные/, phone);
   }
   const peek = page.getByRole('dialog', { name: 'Выходные' });
-  await expect(peek).toContainText('Вы только подглядываете — прочитанным не отметится');
   await expect(peek.getByRole('log')).toContainText('Алиса, ты с нами?');
   // Посмотрели вдоволь — отметки нет.
   await page.waitForTimeout(1500);

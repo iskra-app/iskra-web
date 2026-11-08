@@ -389,14 +389,16 @@
        прокрутки ленте от этого не положено. */
     overflow-x: hidden;
     overscroll-behavior: contain;
+    /* Ширина окна — для полосы «непрочитанные», которой тесна колонка `.content`. */
+    container-type: inline-size;
   }
   .content {
+    /* Поле от края окна до пузырей: гаттер или, на широком окне, остаток по бокам колонки. */
+    --edge: calc(var(--timeline-gutter) + max(0px, (100cqw - var(--column-timeline-max)) / 2));
     display: flex;
     flex-direction: column;
-    max-width: var(--column-timeline-max);
     min-height: 100%;
-    margin-inline: auto;
-    padding: var(--space-normal) var(--timeline-gutter);
+    padding: var(--space-normal) var(--edge);
     justify-content: flex-end;
   }
   .item:global(.flash) {
@@ -482,7 +484,7 @@
   .unread {
     /* До краёв ленты, за поля, которые держат пузыри: полоса, остановившаяся там же, где они,
        была бы ещё одной фигурой в их столбце. */
-    margin: var(--space-roomy) calc(-1 * var(--timeline-gutter)) var(--space-close);
+    margin: var(--space-roomy) calc(-1 * var(--edge)) var(--space-close);
     padding: var(--space-tight) 0;
     background: var(--color-incoming-bubble);
     color: var(--color-text-secondary);

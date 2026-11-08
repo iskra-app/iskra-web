@@ -7,6 +7,7 @@
 -->
 <script lang="ts">
   import { ICON_VIEWBOX, icons } from '../../design/icons.ts';
+  import Icon from '../../design/Icon.svelte';
   import Menu from '../../design/Menu.svelte';
   import PlainButton from '../../design/PlainButton.svelte';
   import { viewport } from '../../design/viewport.svelte.ts';
@@ -104,7 +105,7 @@
       onclick={() => {
         menu = null;
         void library.remove(sticker);
-      }}>{t('stickers.remove')}</button
+      }}><Icon name="delete" />{t('stickers.remove')}</button
     >
   {/if}
 </Menu>
