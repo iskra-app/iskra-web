@@ -5,7 +5,7 @@
  * - вчера — «Вчера»;
  * - на этой неделе (до шести дней назад) — день недели («вт»): при семи «вторник» мог бы
  *   значить и этот вторник, и прошлый;
- * - раньше — дата цифрами («12.07.25»), в форме, привычной языку.
+ * - раньше — дата словами («12 июл»), в прошлые годы с годом («12 июл 2025 г.»).
  *
  * Дни считаются от полуночи до полуночи, а не часами: «пятница» или «08.07» не может
  * зависеть от того, в какое время суток ушло сообщение.
@@ -16,7 +16,8 @@ export function roomTimestamp(ts: number, now: number, locale: string, yesterday
   if (days <= 0) return new Intl.DateTimeFormat(locale, { hour: '2-digit', minute: '2-digit' }).format(date);
   if (days === 1) return yesterday;
   if (days <= 6) return new Intl.DateTimeFormat(locale, { weekday: 'short' }).format(date);
-  return new Intl.DateTimeFormat(locale, { day: '2-digit', month: '2-digit', year: '2-digit' }).format(date);
+  const sameYear = date.getFullYear() === new Date(now).getFullYear();
+  return new Intl.DateTimeFormat(locale, sameYear ? { day: 'numeric', month: 'short' } : { day: 'numeric', month: 'short', year: 'numeric' }).format(date);
 }
 
 function startOfDay(date: Date): number {
