@@ -27,9 +27,9 @@ export const builtOn: Licence[] = [
   { name: 'Svelte', kind: 'MIT', text: raw(() => import('./licences/svelte.txt?raw')) },
   { name: 'DOMPurify', kind: 'MPL-2.0 / Apache 2.0', text: raw(() => import('./licences/dompurify.txt?raw')) },
   { name: 'commonmark.js', kind: 'BSD-2-Clause', text: raw(() => import('./licences/commonmark.txt?raw')) },
+  { name: 'Lucide', kind: 'ISC / MIT', text: raw(() => import('./licences/lucide.txt?raw')) },
   { name: 'blobatar', kind: 'MIT', text: raw(() => import('./licences/blobatar.txt?raw')) },
   { name: 'Inter', kind: 'OFL-1.1', text: raw(() => import('./licences/inter.txt?raw')) },
-  { name: 'Material Symbols', kind: 'Apache 2.0', text: raw(() => import('./licences/material-symbols.txt?raw')) },
   { name: 'uqr', kind: 'MIT', text: raw(() => import('./licences/uqr.txt?raw')) },
   // Сжатие видео: разбор и сборка mp4 — грузится, только когда видео уходит сжатым.
   { name: 'Mediabunny', kind: 'MPL-2.0', text: raw(() => import('./licences/mediabunny.txt?raw')) },

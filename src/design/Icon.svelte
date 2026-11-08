@@ -1,13 +1,20 @@
 <!--
-  Иконка из `icons.ts` — Material Symbols, в разметке. Никаких шрифтов иконок с CDN.
-  Заливка — `currentColor`, чтобы иконка брала цвет кнопки.
+  Иконка из `icons.ts` — Lucide, в разметке. Никаких шрифтов иконок с CDN.
+  Обводка — `currentColor`, чтобы иконка брала цвет кнопки; толщина — `--icon-stroke`.
+  Стилизовать `<svg>` из родителя — `:global(svg)`; `class` — только для `:global(.имя)`.
+  Без `aria-label` иконка скрыта от чтения с экрана сама.
 -->
 <script lang="ts">
-  import { ICON_VIEWBOX, icons, type IconName } from './icons.ts';
+  import { filledIcons, icons, type IconName } from './icons.ts';
 
-  let { name }: { name: IconName } = $props();
+  interface Props {
+    name: IconName;
+    class?: string;
+    role?: 'img';
+    'aria-label'?: string;
+  }
+  let { name, class: className, role, 'aria-label': label }: Props = $props();
+  const Glyph = $derived(icons[name]);
 </script>
 
-<svg viewBox={ICON_VIEWBOX} fill="currentColor" aria-hidden="true">
-  <path d={icons[name]} />
-</svg>
+<Glyph fill={filledIcons.has(name) ? 'currentColor' : 'none'} class={className} {role} aria-label={label} />

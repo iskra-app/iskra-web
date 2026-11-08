@@ -286,3 +286,8 @@ input[type='checkbox']:disabled {
     transition: none;
   }
 }
+
+/* Иконки Lucide: толщина линии из токена, а не из атрибута. */
+.lucide-icon {
+  stroke-width: var(--icon-stroke);
+}

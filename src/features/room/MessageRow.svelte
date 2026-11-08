@@ -19,7 +19,7 @@
   выделенным текстом правый щелчок остаётся браузеру: его меню там нужнее нашего.
 -->
 <script lang="ts">
-  import { ICON_VIEWBOX, icons } from '../../design/icons.ts';
+  import Icon from '../../design/Icon.svelte';
   import Avatar from '../../design/Avatar.svelte';
   import { reactionLeaves, reactionPops, reactionSlides } from '../../design/motion';
   import { reactionTilt } from '../../design/reactionTilt';
@@ -279,16 +279,16 @@
            `MessageMarks` нативной Искры: в углу время дерётся с последней строкой за место. -->
       <span class="marks">
         {#if message.pinned}
-          <svg class="pin" viewBox={ICON_VIEWBOX} role="img" aria-label={t('room.pinned')}><path d={icons.pin} /></svg>
+          <Icon name="pin" role="img" aria-label={t('room.pinned')} />
         {/if}
         {#if message.edited}<span>{t('message.edited')}</span>{/if}
         <time>{clock(message.ts, i18n.locale)}</time>
         {#if message.delivery.state === 'sending'}
-          <svg viewBox={ICON_VIEWBOX} role="img" aria-label={t('message.delivery.sending')}><path d={icons.sending} /></svg>
+          <Icon name="sending" role="img" aria-label={t('message.delivery.sending')} />
         {:else if message.own && message.readMark}
-          <svg viewBox={ICON_VIEWBOX} role="img" aria-label={t('message.delivery.read')}><path d={icons.read} /></svg>
+          <Icon name="read" role="img" aria-label={t('message.delivery.read')} />
         {:else if message.own && !message.read && message.delivery.state === 'sent' && message.eventId}
-          <svg viewBox={ICON_VIEWBOX} role="img" aria-label={t('message.delivery.sent')}><path d={icons.check} /></svg>
+          <Icon name="check" role="img" aria-label={t('message.delivery.sent')} />
         {/if}
       </span>
         {#if interactive && viewport.finePointer}
@@ -298,11 +298,11 @@
             <button type="button" tabindex="-1" aria-label={t('message.menu.react', { emoji: preferences.quickReaction })} title={t('message.menu.react', { emoji: preferences.quickReaction })} onclick={() => actions.react(message, preferences.quickReaction)}>{preferences.quickReaction}</button>
             {#if actions.canReply}
               <button type="button" tabindex="-1" aria-label={t('message.menu.reply')} title={t('message.menu.reply')} onclick={() => actions.reply(message)}>
-                <svg viewBox={ICON_VIEWBOX} aria-hidden="true"><path d={icons.reply} /></svg>
+                <Icon name="reply" />
               </button>
             {/if}
             <button type="button" aria-label={t('message.menu.more')} title={t('message.menu.more')} aria-haspopup="menu" onclick={more}>
-              <svg viewBox={ICON_VIEWBOX} aria-hidden="true"><path d={icons.more} /></svg>
+              <Icon name="more" />
             </button>
           </div>
         {/if}
@@ -475,10 +475,9 @@
     color: var(--color-text-secondary);
     white-space: nowrap;
   }
-  .marks svg {
+  .marks :global(svg) {
     width: var(--font-size-caption);
     height: var(--font-size-caption);
-    fill: currentColor;
   }
   :global([data-wallpaper]) .marks {
     padding: var(--space-within-run) var(--space-close);
@@ -772,10 +771,9 @@
   .hover-bar button:hover {
     background: var(--color-selected);
   }
-  .hover-bar svg {
+  .hover-bar :global(svg) {
     width: var(--size-icon);
     height: var(--size-icon);
-    fill: currentColor;
   }
   /* HTML сообщения: разметка Matrix, но в масштабе пузыря. */
   .html :global(p),

@@ -6,7 +6,7 @@
   `Esc` в непустом поле стирает запрос, в пустом — не его дело: закрывает окно, в котором поле.
 -->
 <script lang="ts">
-  import { ICON_VIEWBOX, icons } from '../../design/icons.ts';
+  import Icon from '../../design/Icon.svelte';
   import { t } from '../../i18n/index.svelte.ts';
 
   let { value = $bindable(''), label = t('roomList.searchPrompt'), autofocus = false }: { value: string; label?: string; autofocus?: boolean } = $props();
@@ -26,7 +26,7 @@
 </script>
 
 <div class="field" role="search">
-  <svg viewBox={ICON_VIEWBOX} aria-hidden="true"><path d={icons.search} /></svg>
+  <Icon name="search" />
   <input bind:this={input} bind:value type="search" aria-label={label} placeholder={label} autocomplete="off" enterkeyhint="search" spellcheck="false" {onkeydown} />
   {#if value.trim()}
     <button
@@ -38,7 +38,7 @@
         input?.focus();
       }}
     >
-      <svg viewBox={ICON_VIEWBOX} aria-hidden="true"><path d={icons.close} /></svg>
+      <Icon name="close" />
     </button>
   {/if}
 </div>
@@ -72,11 +72,10 @@
   input::-webkit-search-cancel-button {
     appearance: none;
   }
-  svg {
+  .field :global(svg) {
     flex: none;
     width: var(--size-icon);
     height: var(--size-icon);
-    fill: currentColor;
   }
   button {
     display: grid;

@@ -3,7 +3,7 @@
   «Скопировать» рядом. Ради этой строки страницу человека чаще всего и открывают.
 -->
 <script lang="ts">
-  import { ICON_VIEWBOX, icons } from '../../design/icons.ts';
+  import Icon from '../../design/Icon.svelte';
   import { t } from '../../i18n/index.svelte.ts';
 
   let { userId }: { userId: string } = $props();
@@ -30,7 +30,7 @@
     <span class="id">{userId}</span>
   </span>
   <button type="button" aria-label={t('message.menu.copy')} title={t('message.menu.copy')} onclick={() => void copy()}>
-    {#key copied}<svg class="icon-swap" viewBox={ICON_VIEWBOX} aria-hidden="true"><path d={copied ? icons.check : icons.copy} /></svg>{/key}
+    {#key copied}<Icon name={copied ? 'check' : 'copy'} class="icon-swap" />{/key}
   </button>
 </div>
 
@@ -70,9 +70,8 @@
     color: var(--accent);
     cursor: pointer;
   }
-  svg {
+  button :global(svg) {
     width: var(--size-icon-button);
     height: var(--size-icon-button);
-    fill: currentColor;
   }
 </style>

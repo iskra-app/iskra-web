@@ -17,7 +17,7 @@
   «Стекло» — навигационный слой: полупрозрачность и размытие, где браузер их тянет.
 -->
 <script lang="ts">
-  import { ICON_VIEWBOX, icons } from '../../design/icons.ts';
+  
   import { tick } from 'svelte';
   import Icon from '../../design/Icon.svelte';
   import Menu from '../../design/Menu.svelte';
@@ -480,9 +480,7 @@
 <div class="composer glass" onkeydown={recordingKey}>
 {#if context}
   <div class="context">
-    <svg viewBox={ICON_VIEWBOX} aria-hidden="true">
-      {#if context.kind === 'reply'}<path d={icons.reply} />{:else}<path d={icons.edit} />{/if}
-    </svg>
+    <Icon name={context.kind === 'reply' ? 'reply' : 'edit'} />
     <span class="what">
       <span class="title">
         <strong>{context.kind === 'reply' ? t('room.replyingTo') : t('room.editingMessage')}</strong>
@@ -491,7 +489,7 @@
       <span class="quote">{quote}</span>
     </span>
     <button type="button" class="cancel" aria-label={t('room.stopReplying')} title={t('room.stopReplying')} onclick={oncancelcontext}>
-      <svg viewBox={ICON_VIEWBOX} aria-hidden="true"><path d={icons.close} /></svg>
+      <Icon name="close" />
     </button>
   </div>
 {/if}
@@ -516,7 +514,7 @@
   {:else}
   {#if onfiles}
     <button type="button" class="attach" disabled={!canAttach} aria-label={t('room.attach')} title={t('room.attach')} aria-haspopup="menu" onclick={openAttachMenu}>
-      <svg viewBox={ICON_VIEWBOX} aria-hidden="true"><path d={icons.attach} /></svg>
+      <Icon name="attach" />
     </button>
     <input bind:this={picker} type="file" multiple hidden onchange={picked} />
   {/if}
@@ -559,14 +557,14 @@
         onstickers?.({ x: rect.left, y: rect.top });
       }}
     >
-      <svg viewBox={ICON_VIEWBOX} aria-hidden="true"><path d={icons.emojiSmileys} /></svg>
+      <Icon name="emojiSmileys" />
     </button>
   {/if}
   </span>
   {/if}
   {#if recorder.state === 'recording' && !press}
     <button type="button" class="stop" aria-label={t('voice.stop')} title={t('voice.stop')} onclick={stopRecording}>
-      <svg viewBox={ICON_VIEWBOX} aria-hidden="true"><path d={icons.stop} /></svg>
+      <Icon name="stop" />
     </button>
   {/if}
   {#if voiceMode}
@@ -574,8 +572,8 @@
       <span class="voice-slot">
         {#if press?.started && press.kind === 'voice' && recording}
           <span class="lock" aria-hidden="true">
-            <svg viewBox={ICON_VIEWBOX}><path d={icons.lock} /></svg>
-            <svg viewBox={ICON_VIEWBOX}><path d={icons.up} /></svg>
+            <Icon name="lock" />
+            <Icon name="up" />
           </span>
         {/if}
         <button
@@ -592,15 +590,13 @@
           onclick={(event) => recordClick(event, kind)}
           oncontextmenu={recordContext}
         >
-          <svg class="icon-swap" viewBox={ICON_VIEWBOX} aria-hidden="true">
-            {#if recording && !press}<path d={icons.send} />{:else if kind === 'video'}<path d={icons.video} />{:else}<path d={icons.mic} />{/if}
-          </svg>
+          <Icon name={recording && !press ? 'send' : kind === 'video' ? 'video' : 'mic'} class="icon-swap" />
         </button>
       </span>
     {/each}
   {:else}
     <button type="submit" class="send press" disabled={empty || disabled} aria-label={t('room.send')} title={t('room.send')}>
-      <svg class="icon-swap" viewBox={ICON_VIEWBOX} aria-hidden="true"><path d={icons.send} /></svg>
+      <Icon name="send" class="icon-swap" />
     </button>
   {/if}
 </form>
@@ -661,12 +657,11 @@
       transform: translateY(var(--motion-rise));
     }
   }
-  .context > svg,
-  .cancel svg {
+  .context > :global(svg),
+  .cancel :global(svg) {
     flex: none;
     width: var(--size-icon);
     height: var(--size-icon);
-    fill: currentColor;
   }
   .what {
     display: flex;
@@ -749,10 +744,9 @@
     color: var(--color-text-secondary);
     cursor: pointer;
   }
-  .stickers svg {
+  .stickers :global(svg) {
     width: var(--size-icon);
     height: var(--size-icon);
-    fill: currentColor;
   }
   textarea:focus-visible {
     outline: 2px solid var(--accent);
@@ -775,10 +769,9 @@
     opacity: 0.4;
     cursor: default;
   }
-  .attach svg {
+  .attach :global(svg) {
     width: var(--size-icon-button);
     height: var(--size-icon-button);
-    fill: currentColor;
   }
   .send {
     display: grid;
@@ -834,10 +827,9 @@
       transform: translateY(var(--motion-rise));
     }
   }
-  .lock svg {
+  .lock :global(svg) {
     width: var(--size-icon);
     height: var(--size-icon);
-    fill: currentColor;
   }
   .stop {
     display: grid;
@@ -851,18 +843,16 @@
     color: var(--color-danger);
     cursor: pointer;
   }
-  .stop svg {
+  .stop :global(svg) {
     width: var(--size-icon);
     height: var(--size-icon);
-    fill: currentColor;
   }
   .send:disabled {
     opacity: 0.4;
     cursor: default;
   }
-  .send svg {
+  .send :global(svg) {
     width: var(--size-icon);
     height: var(--size-icon);
-    fill: currentColor;
   }
 </style>

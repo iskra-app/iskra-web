@@ -4,7 +4,7 @@
   раскрывается в панель на том же месте. Под реакциями — действия, внизу — когда отправлено.
 -->
 <script lang="ts">
-  import { ICON_VIEWBOX, icons } from '../../design/icons.ts';
+  
   import { tick } from 'svelte';
   import Icon from '../../design/Icon.svelte';
   import Menu from '../../design/Menu.svelte';
@@ -102,7 +102,7 @@
           document.querySelector<HTMLElement>('.panel .cell')?.focus();
         }}
       >
-        <svg viewBox={ICON_VIEWBOX} aria-hidden="true"><path d={icons.plus} /></svg>
+        <Icon name="plus" />
       </button>
     </div>
     <!-- Группы, как в нативной: что делают с сообщением — красное, необратимое, — и факты. Между ними черта. -->
@@ -198,10 +198,9 @@
   .reactions .more {
     color: var(--color-text-secondary);
   }
-  .more svg {
+  .more :global(svg) {
     width: var(--size-icon);
     height: var(--size-icon);
-    fill: currentColor;
   }
   .reactions button.mine {
     background: var(--color-own-reaction);

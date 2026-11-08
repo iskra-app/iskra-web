@@ -6,7 +6,7 @@
   подгруженной истории. Новые входящие объявляет отдельная вежливая область.
 -->
 <script lang="ts">
-  import { ICON_VIEWBOX, icons } from '../../design/icons.ts';
+  import Icon from '../../design/Icon.svelte';
   import { onMount, tick } from 'svelte';
   import EmptyState from '../../design/EmptyState.svelte';
   import PrimaryButton from '../../design/PrimaryButton.svelte';
@@ -317,7 +317,7 @@
             onkeydown={(event) => toggleByKey(event, item.message)}
           >
             <span class="mark" class:on aria-hidden="true">
-              {#if on}<svg viewBox={ICON_VIEWBOX}><path d={icons.check} /></svg>{/if}
+              {#if on}<Icon name="check" />{/if}
             </span>
             <div class="chosen-row" inert>
               <MessageRow
@@ -365,7 +365,7 @@
     title={t('room.scrollToBottom')}
     onclick={() => anchor?.scrollToBottom()}
   >
-    <svg viewBox={ICON_VIEWBOX} aria-hidden="true"><path d={icons.down} /></svg>
+    <Icon name="down" />
     {#if unseenBelow > 0}<span class="unseen" aria-hidden="true">{new Intl.NumberFormat(i18n.locale).format(unseenBelow)}</span>{/if}
   </button>
 {/if}
@@ -467,10 +467,10 @@
     border-color: var(--accent);
     background: var(--accent);
   }
-  .mark svg {
+  .mark :global(svg) {
     width: 100%;
     height: 100%;
-    fill: var(--on-accent);
+    color: var(--on-accent);
   }
   .item.arrived {
     animation: arrive var(--timing-arrival) var(--ease-out);
@@ -558,9 +558,8 @@
     font-weight: 600;
     line-height: var(--size-unread-badge);
   }
-  .to-bottom svg {
+  .to-bottom :global(svg) {
     width: var(--size-icon);
     height: var(--size-icon);
-    fill: currentColor;
   }
 </style>

@@ -9,7 +9,7 @@
   Наборы читаются заново при каждом открытии: набор — чужой, и его меняют.
 -->
 <script lang="ts">
-  import { ICON_VIEWBOX, icons } from '../../design/icons.ts';
+  
   import Icon from '../../design/Icon.svelte';
   import Menu from '../../design/Menu.svelte';
   import { viewport } from '../../design/viewport.svelte.ts';
@@ -76,7 +76,7 @@
       <h3>{title}</h3>
       {#if subscribing}
         <button type="button" class="subscribe" onclick={() => void library.subscribe(subscribing)}>
-          <svg viewBox={ICON_VIEWBOX} aria-hidden="true"><path d={icons.plus} /></svg>
+          <Icon name="plus" />
           {t('stickers.subscribe')}
         </button>
       {/if}
@@ -108,7 +108,7 @@
   {#if empty}
     <div class="empty">
       {#if library.loaded && !library.loading}
-        <svg viewBox={ICON_VIEWBOX} aria-hidden="true"><path d={icons.emojiSmileys} /></svg>
+        <Icon name="emojiSmileys" />
         <strong>{t('stickers.empty.title')}</strong>
         <p>{t('stickers.empty.message')}</p>
       {/if}
@@ -119,12 +119,12 @@
     <div class="tabs" role="toolbar" aria-label={t('stickers.title')}>
       {#if library.recent.length}
         <button type="button" class:selected={selected === RECENT} aria-label={t('stickers.recent')} title={t('stickers.recent')} aria-pressed={selected === RECENT} onclick={() => jump(RECENT)}>
-          <svg viewBox={ICON_VIEWBOX} aria-hidden="true"><path d={icons.clock} /></svg>
+          <Icon name="clock" />
         </button>
       {/if}
       {#each library.packs as pack (pack.id)}
         <button type="button" class:selected={selected === pack.id} aria-label={nameOf(pack)} title={nameOf(pack)} aria-pressed={selected === pack.id} onclick={() => jump(pack.id)}>
-          {#if pack.icon}<StickerImage sticker={pack.icon} {media} size="tab" />{:else}<svg viewBox={ICON_VIEWBOX} aria-hidden="true"><path d={icons.emojiSmileys} /></svg>{/if}
+          {#if pack.icon}<StickerImage sticker={pack.icon} {media} size="tab" />{:else}<Icon name="emojiSmileys" />{/if}
         </button>
       {/each}
     </div>
@@ -195,10 +195,9 @@
     background: color-mix(in srgb, var(--accent) 16%, transparent);
     color: var(--accent);
   }
-  svg {
+  button :global(svg) {
     width: var(--size-icon);
     height: var(--size-icon);
-    fill: currentColor;
   }
   .scroller {
     height: var(--size-emoji-panel);
@@ -261,7 +260,7 @@
     padding: var(--space-roomy);
     text-align: center;
   }
-  .empty svg {
+  .empty :global(svg) {
     width: var(--size-icon-button);
     height: var(--size-icon-button);
     color: var(--color-text-secondary);

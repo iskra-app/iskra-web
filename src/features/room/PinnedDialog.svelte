@@ -9,7 +9,7 @@
   import Avatar from '../../design/Avatar.svelte';
   import Dialog from '../../design/Dialog.svelte';
   import EmptyState from '../../design/EmptyState.svelte';
-  import { ICON_VIEWBOX, icons } from '../../design/icons.ts';
+  import Icon from '../../design/Icon.svelte';
   import type { RoomDetailsStore } from '../../core/rooms/roomDetails.svelte.ts';
   import type { UserSession } from '../../core/session/userSession.svelte.ts';
   import { i18n, t } from '../../i18n/index.svelte.ts';
@@ -61,7 +61,7 @@
           </button>
           {#if canUnpin}
             <button type="button" class="unpin" aria-label={t('room.unpin')} title={t('room.unpin')} onclick={() => onunpin(pin.eventId)}>
-              <svg viewBox={ICON_VIEWBOX} aria-hidden="true"><path d={icons.close} /></svg>
+              <Icon name="close" />
             </button>
           {/if}
         </li>
@@ -154,9 +154,8 @@
     color: var(--color-text-secondary);
     cursor: pointer;
   }
-  svg {
+  button :global(svg) {
     width: var(--size-icon);
     height: var(--size-icon);
-    fill: currentColor;
   }
 </style>

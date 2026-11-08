@@ -6,7 +6,7 @@
   строк разной высоты читается так, будто список отсортирован по длине сообщения.
 -->
 <script lang="ts">
-  import { ICON_VIEWBOX, icons } from '../../design/icons.ts';
+  import Icon from '../../design/Icon.svelte';
   import UnreadBadge from '../../design/UnreadBadge.svelte';
   import { roomTimestamp } from '../../design/time';
   import { formatRoute } from '../../core/navigation/route';
@@ -78,22 +78,22 @@
     <span class="line">
       <span class="name">{roomName(room)}</span>
       {#if room.encrypted}
-        <svg class="lock" viewBox={ICON_VIEWBOX} aria-hidden="true"><path d={icons.lock} /></svg>
+        <Icon name="lock" class="row-lock" />
       {/if}
       <span class="spacer"></span>
       {#if room.isFavourite}
-        <svg class="pin" viewBox={ICON_VIEWBOX} aria-hidden="true"><path d={icons.pin} /></svg>
+        <Icon name="pin" class="row-pin" />
       {/if}
       {#if room.lastMark && !room.typing}
         <span class="mark" data-mark={room.lastMark}>
           {#if room.lastMark === 'sending'}
-            <svg viewBox={ICON_VIEWBOX} role="img" aria-label={t('message.delivery.sending')}><path d={icons.sending} /></svg>
+            <Icon name="sending" role="img" aria-label={t('message.delivery.sending')} />
           {:else if room.lastMark === 'read'}
-            <svg viewBox={ICON_VIEWBOX} role="img" aria-label={t('message.delivery.read')}><path d={icons.read} /></svg>
+            <Icon name="read" role="img" aria-label={t('message.delivery.read')} />
           {:else if room.lastMark === 'sent'}
-            <svg viewBox={ICON_VIEWBOX} role="img" aria-label={t('message.delivery.sent')}><path d={icons.check} /></svg>
+            <Icon name="check" role="img" aria-label={t('message.delivery.sent')} />
           {:else}
-            <svg viewBox={ICON_VIEWBOX} role="img" aria-label={t('message.delivery.failed')}><path d={icons.failed} /></svg>
+            <Icon name="failed" role="img" aria-label={t('message.delivery.failed')} />
           {/if}
         </span>
       {/if}
@@ -189,22 +189,20 @@
   .mark[data-mark='failed'] {
     color: var(--color-danger);
   }
-  .mark svg {
+  .mark :global(svg) {
     width: var(--font-size-caption);
     height: var(--font-size-caption);
-    fill: currentColor;
   }
-  .lock,
-  .pin {
+  :global(.row-lock),
+  :global(.row-pin) {
     flex: none;
     width: var(--font-size-caption);
     height: var(--font-size-caption);
-    fill: currentColor;
   }
-  .lock {
+  :global(.row-lock) {
     color: var(--color-text-secondary);
   }
-  .pin {
+  :global(.row-pin) {
     color: var(--accent);
   }
   .time {

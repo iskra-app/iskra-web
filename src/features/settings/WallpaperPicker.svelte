@@ -6,7 +6,7 @@
   «Осветление».
 -->
 <script lang="ts">
-  import { ICON_VIEWBOX, icons } from '../../design/icons.ts';
+  import Icon from '../../design/Icon.svelte';
   import PlainButton from '../../design/PlainButton.svelte';
   import { t, type TextKey } from '../../i18n/index.svelte.ts';
   import { MAX_DIMMING, preferences, wallpapers, type Wallpaper } from '../app/preferences.svelte.ts';
@@ -49,10 +49,10 @@
         {#if wallpaperPhoto.url}
           <img src={wallpaperPhoto.url} alt="" draggable="false" />
         {:else}
-          <svg viewBox={ICON_VIEWBOX} aria-hidden="true"><path d={icons.photo} /></svg>
+          <Icon name="photo" />
         {/if}
       {:else if w === 'none'}
-        <svg viewBox={ICON_VIEWBOX} aria-hidden="true"><path d={icons.none} /></svg>
+        <Icon name="none" />
       {/if}
     </button>
   {/each}
@@ -112,10 +112,9 @@
     height: 100%;
     object-fit: cover;
   }
-  .tile svg {
+  .tile :global(svg) {
     width: var(--size-icon-button);
     height: var(--size-icon-button);
-    fill: currentColor;
   }
   .dimming {
     display: flex;

@@ -94,6 +94,7 @@
   --size-video-note-camera-fit: 60dvh; /* кружок не выше, чем оставляют спуск и подсказка */
   --size-icon: 1.25rem; /* 20 — значок рядом с текстом */
   --size-icon-button: 1.5rem; /* 24 — значок в кнопке-иконке */
+  --icon-stroke: 1.75; /* толщина линии Lucide: 2 по умолчанию тяжеловата на 20–24 px */
   --size-switch-width: 3.25rem; /* 52 — тумблер, как UISwitch (51 × 31) по сетке 4 */
   --size-switch-height: 2rem; /* 32 */
   --size-switch-knob: 1.5rem; /* 24 — кружок с отступом --space-tight */

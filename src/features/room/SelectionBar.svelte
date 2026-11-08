@@ -7,7 +7,7 @@
   тихо пропустило бы чужие слова, — удаление, которое врёт о том, что сделало.
 -->
 <script lang="ts">
-  import { ICON_VIEWBOX, icons } from '../../design/icons.ts';
+  import Icon from '../../design/Icon.svelte';
   import { plural, t } from '../../i18n/index.svelte.ts';
 
   interface Props {
@@ -28,13 +28,13 @@
   <span class="count" aria-live="polite">{plural('message.selection.count', count)}</span>
   <span class="actions">
     <button type="button" aria-label={t('message.menu.copy')} title={t('message.menu.copy')} disabled={!canCopy || count === 0} onclick={oncopy}>
-      <svg viewBox={ICON_VIEWBOX} aria-hidden="true"><path d={icons.copy} /></svg>
+      <Icon name="copy" />
     </button>
     <button type="button" aria-label={t('message.menu.forward')} title={t('message.menu.forward')} disabled={!canForward || count === 0} onclick={onforward}>
-      <svg viewBox={ICON_VIEWBOX} aria-hidden="true"><path d={icons.forwardMessage} /></svg>
+      <Icon name="forwardMessage" />
     </button>
     <button type="button" class="danger" aria-label={t('message.menu.delete')} title={t('message.menu.delete')} disabled={!canDelete || count === 0} onclick={ondelete}>
-      <svg viewBox={ICON_VIEWBOX} aria-hidden="true"><path d={icons.delete} /></svg>
+      <Icon name="delete" />
     </button>
   </span>
 </div>
@@ -83,10 +83,9 @@
   .actions .danger:not(:disabled) {
     color: var(--color-danger);
   }
-  svg {
+  button :global(svg) {
     width: var(--size-icon);
     height: var(--size-icon);
-    fill: currentColor;
   }
   /* На место композера — снизу, как он сам. */
   @starting-style {

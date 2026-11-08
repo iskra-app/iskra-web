@@ -12,7 +12,7 @@
   Для скринридера значок молчит: строка читается одной фразой (см. `RoomRow`).
 -->
 <script lang="ts">
-  import { ICON_VIEWBOX, icons } from './icons.ts';
+  import Icon from './Icon.svelte';
 
   interface Props {
     count: number;
@@ -29,7 +29,7 @@
 
 <span class="badges" aria-hidden="true">
   {#if reacted}
-    <span class="reacted" class:muted><svg viewBox={ICON_VIEWBOX}><path d={icons.heart} /></svg></span>
+    <span class="reacted" class:muted><Icon name="heart" /></span>
   {/if}
   {#if mentioned}
     <span class="mention">@</span>
@@ -56,10 +56,10 @@
     border-radius: var(--radius-circle);
     background: var(--color-danger);
   }
-  .reacted svg {
+  .reacted :global(svg) {
     width: var(--size-unread-heart);
     height: var(--size-unread-heart);
-    fill: var(--color-on-danger);
+    color: var(--color-on-danger);
   }
   .reacted.muted {
     background: var(--color-muted-badge);

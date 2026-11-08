@@ -7,7 +7,7 @@
   добавить вариант до того, как начнёт печатать.
 -->
 <script lang="ts">
-  import { ICON_VIEWBOX, icons } from '../../design/icons.ts';
+  import Icon from '../../design/Icon.svelte';
   import Dialog from '../../design/Dialog.svelte';
   import PlainButton from '../../design/PlainButton.svelte';
   import PrimaryButton from '../../design/PrimaryButton.svelte';
@@ -70,9 +70,7 @@
               title={t('poll.removeAnswer')}
               onclick={() => (draft = withoutAnswer(draft, index))}
             >
-              <svg viewBox={ICON_VIEWBOX} aria-hidden="true">
-                <path d={icons.removeCircle} />
-              </svg>
+              <Icon name="removeCircle" />
             </button>
           {/if}
         </div>
@@ -138,10 +136,9 @@
     color: var(--color-text-secondary);
     cursor: pointer;
   }
-  .remove svg {
+  .remove :global(svg) {
     width: var(--size-icon);
     height: var(--size-icon);
-    fill: currentColor;
   }
   .add {
     align-self: flex-start;
