@@ -8,6 +8,7 @@
   import Icon from './Icon.svelte';
   import IconButton from './IconButton.svelte';
   import { backdropClose } from './backdropClose';
+  import { closingGhost } from './closingGhost.svelte.ts';
   import { whenClosed } from './motion';
 
   interface Props {
@@ -33,6 +34,9 @@
   const id = $props.id();
   /** Содержимое на месте, пока окно открыто и пока закрытое догорает (`whenClosed`). */
   let shown = $state(false);
+  let live: HTMLDivElement | undefined = $state();
+  let ghost: HTMLDivElement | undefined = $state();
+  closingGhost(() => open, () => live, () => ghost);
 
   $effect(() => {
     if (!dialog) return;
@@ -49,7 +53,7 @@
 
   /** Шапка — первая в разметке, но начинать окно надо с содержимого: иначе поле формы не получит фокус. */
   function focusContent(node: HTMLDialogElement) {
-    const heading = node.querySelector(':scope > .heading');
+    const heading = node.querySelector('.heading');
     if (!heading?.contains(document.activeElement)) return;
     [...node.querySelectorAll<HTMLElement>(FOCUSABLE)].find((element) => !heading.contains(element))?.focus();
   }
@@ -63,12 +67,15 @@
 
 <dialog bind:this={dialog} class:glass use:backdropClose={onclose} data-motion="pop" aria-labelledby="{id}-title" {onclose} {oncancel}>
   {#if open || shown}
+    <div class="live" bind:this={live}>
     <div class="heading" class:paged={!!back}>
       {#if back}<IconButton label={back.label} onclick={back.onclick}><Icon name="back" /></IconButton>{/if}
       <h2 id="{id}-title">{title}</h2>
       <IconButton label={closeLabel} onclick={onclose}><Icon name="close" /></IconButton>
     </div>
     {@render children()}
+    </div>
+    <div class="live" aria-hidden="true" inert hidden bind:this={ghost}></div>
   {/if}
 </dialog>
 
@@ -78,11 +85,17 @@
     max-height: calc(100dvh - 2 * var(--space-roomy));
     padding: var(--space-generous);
     border: var(--border-hairline) solid var(--color-dialog-edge);
-    border-radius: var(--radius-card);
+    border-radius: var(--radius-menu);
     background: var(--color-background);
     color: var(--color-text);
     box-shadow: 0 var(--space-close) var(--space-generous) rgb(0 0 0 / 0.25);
     overflow-y: auto;
+  }
+  .live {
+    display: contents;
+  }
+  .live[hidden] {
+    display: none;
   }
   @supports (backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px)) {
     dialog.glass {
@@ -122,6 +135,16 @@
     margin-block-start: calc(-1 * var(--space-close));
     margin-inline-end: calc(-1 * var(--space-close));
     background: var(--color-background);
+  }
+  /* Над прилипшей шапкой — отступ окна, и под ним проезжал текст: заливка шапки тянется вверх и
+     в стороны до краёв окна. */
+  .heading::before {
+    content: '';
+    position: absolute;
+    z-index: -1;
+    inset-block: calc(-1 * var(--space-generous)) 0;
+    inset-inline: calc(-1 * var(--space-generous));
+    background: inherit;
   }
   /* На стекле шапка без заливки, иначе на окне видна полоса. Содержимое под неё не уезжает:
      прокручивается оно само, а не окно (`ReactorsDialog`). */

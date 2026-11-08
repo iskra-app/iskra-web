@@ -77,7 +77,7 @@
     width: min(calc(100% - 2 * var(--space-roomy)), var(--size-sign-in-column));
     padding: var(--space-generous);
     border: var(--border-hairline) solid var(--color-dialog-edge);
-    border-radius: var(--radius-card);
+    border-radius: var(--radius-menu);
     background: var(--color-background);
     color: var(--color-text);
     box-shadow: 0 var(--space-close) var(--space-generous) rgb(0 0 0 / 0.25);

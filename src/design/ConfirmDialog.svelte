@@ -3,6 +3,7 @@
   возвращает его, когда закрыт, и закрывается по `Esc`.
 -->
 <script lang="ts">
+  import { closingGhost } from './closingGhost.svelte.ts';
   import DialogClose from './DialogClose.svelte';
   import { backdropClose } from './backdropClose';
   interface Props {
@@ -24,6 +25,9 @@
 
   let dialog: HTMLDialogElement | undefined = $state();
   const id = $props.id();
+  let live: HTMLDivElement | undefined = $state();
+  let ghost: HTMLDivElement | undefined = $state();
+  closingGhost(() => open, () => live, () => ghost);
 
   $effect(() => {
     if (!dialog) return;
@@ -33,18 +37,21 @@
 </script>
 
 <dialog bind:this={dialog} use:backdropClose={onclose} data-motion="pop" aria-labelledby="{id}-title" aria-describedby="{id}-message" {onclose}>
-  <h2 id="{id}-title">{title}</h2>
-  <p id="{id}-message">{message}</p>
-  {#if details.length}
-    <ul class="details">
-      {#each details as line, index (index)}<li>{line}</li>{/each}
-    </ul>
-  {/if}
-  <div class="actions">
-    <!-- Ни одна из двух не выделена как «правильная»: фокус — на отмене. -->
-    <button type="button" class="cancel press" onclick={onclose}>{cancelLabel}</button>
-    <button type="button" class="confirm press" class:destructive onclick={onconfirm}>{confirmLabel}</button>
+  <div class="live" bind:this={live}>
+    <h2 id="{id}-title">{title}</h2>
+    <p id="{id}-message">{message}</p>
+    {#if details.length}
+      <ul class="details">
+        {#each details as line, index (index)}<li>{line}</li>{/each}
+      </ul>
+    {/if}
+    <div class="actions">
+      <!-- Ни одна из двух не выделена как «правильная»: фокус — на отмене. -->
+      <button type="button" class="cancel press" onclick={onclose}>{cancelLabel}</button>
+      <button type="button" class="confirm press" class:destructive onclick={onconfirm}>{confirmLabel}</button>
+    </div>
   </div>
+  <div class="live" aria-hidden="true" inert hidden bind:this={ghost}></div>
   <DialogClose label={closeLabel} onclick={onclose} />
 </dialog>
 
@@ -53,10 +60,16 @@
     width: min(calc(100% - 2 * var(--space-roomy)), var(--size-sign-in-column));
     padding: var(--space-generous);
     border: var(--border-hairline) solid var(--color-dialog-edge);
-    border-radius: var(--radius-card);
+    border-radius: var(--radius-menu);
     background: var(--color-background);
     color: var(--color-text);
     box-shadow: 0 var(--space-close) var(--space-generous) rgb(0 0 0 / 0.25);
+  }
+  .live {
+    display: contents;
+  }
+  .live[hidden] {
+    display: none;
   }
   dialog::backdrop {
     background: var(--color-scrim);
