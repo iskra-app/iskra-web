@@ -280,6 +280,8 @@ test('заблокировать со страницы человека (имя 
   // Окно ещё догорает — у него свой «Закрыть»; нужен тот, что у панели.
   await expect(page.getByRole('dialog')).toHaveCount(0);
   await page.locator('aside.panel').getByRole('button', { name: 'Закрыть', exact: true }).click();
+  // Панель уезжает не мгновенно: её «Назад» нельзя принять за «Назад» чата.
+  await expect(page.locator('aside.panel')).toHaveCount(0);
   await expect(bubble).toHaveCount(0, { timeout: 10_000 });
   // Служебная строка о ней остаётся: блокировка прячет слова, а не факт, что человек в чате.
   await expect(page.getByRole('log')).toContainText('Повестка');
