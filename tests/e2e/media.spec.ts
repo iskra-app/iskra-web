@@ -78,8 +78,13 @@ test('фото в зашифрованный чат: выбрать → лото
   const sent = page.getByRole('log').getByRole('article').filter({ hasText: 'Смотри, какой закат' });
   await expect(sent.getByRole('button', { name: 'Фото' }).locator('img')).toHaveAttribute('src', /^blob:/, { timeout: 20_000 });
   await expect(page.getByRole('progressbar')).toHaveCount(0);
-  await sent.getByRole('button', { name: 'Фото' }).click();
-  await expect(page.getByRole('dialog', { name: 'Фото' }).locator('img')).toHaveAttribute('src', /^blob:/);
+  // Строка в миг подтверждения отправки пересоздаётся — щелчок по уходящей копии теряется (Firefox).
+  const viewer = page.getByRole('dialog', { name: 'Фото' });
+  await expect(async () => {
+    await sent.getByRole('button', { name: 'Фото' }).click({ timeout: 3000 });
+    await expect(viewer).toBeVisible({ timeout: 2000 });
+  }).toPass({ timeout: 15_000 });
+  await expect(viewer.locator('img')).toHaveAttribute('src', /^blob:/);
   expect(problems).toEqual([]);
 });
 
