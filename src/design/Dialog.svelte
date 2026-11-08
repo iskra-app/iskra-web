@@ -90,6 +90,8 @@
     color: var(--color-text);
     box-shadow: 0 var(--space-close) var(--space-generous) rgb(0 0 0 / 0.25);
     overflow-y: auto;
+    /* Подложка шапки (`.heading::before`) шире окна на отступ: вбок окно не прокручивается. */
+    overflow-x: hidden;
   }
   .live {
     display: contents;
