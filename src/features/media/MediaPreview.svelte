@@ -90,7 +90,7 @@
     {#if video && attachment.duration}<span class="duration">{duration(attachment.duration)}</span>{/if}
   </button>
 {:else}
-  <button type="button" class="media" class:round class:tile class:loading={!url && !failed} use:aspect={shape} aria-label={label} title={t('message.media.openFullScreen')} onclick={onopen}>
+  <button type="button" class="media" class:round class:tile class:captioned={!!attachment.caption} class:loading={!url && !failed} use:aspect={shape} aria-label={label} title={t('message.media.openFullScreen')} onclick={onopen}>
     {@render picture()}
   </button>
 {/if}
@@ -125,6 +125,11 @@
     width: var(--size-sticker);
     background: transparent;
     cursor: default;
+  }
+  /* Под снимком подпись: нижние углы острее, как у альбома. */
+  .captioned:not(.round):not(.tile) {
+    border-end-start-radius: var(--radius-album-bottom);
+    border-end-end-radius: var(--radius-album-bottom);
   }
   .round {
     width: var(--size-video-note);

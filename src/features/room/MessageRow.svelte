@@ -30,6 +30,7 @@
   import { preferences } from '../app/preferences.svelte.ts';
   import type { MessageActions } from './actions';
   import { longPress, touchGestures } from './gestures';
+  import { watchMultiline } from './multiline';
   import { matrixHtml } from './html';
   import LinkedText from './LinkedText.svelte';
   import PollView from './PollView.svelte';
@@ -66,6 +67,8 @@
   /** Меню — и у удалённого: действий в нём нет, но когда отправили и когда удалили — есть. */
   const hasMenu = $derived(!!message.eventId && kind.type !== 'service');
   /** Картинка во весь пузырь: отступы пузыря — тоньше, фон — у самой картинки. */
+  /** Больше одной строки (или ответ, пересылка): пузырю нужен воздух сверху и снизу. */
+  let multiline = $state(false);
   const visual = $derived(kind.type === 'image' || kind.type === 'video' || kind.type === 'videoNote' || kind.type === 'sticker');
 
   const selected = () => (window.getSelection()?.toString() ?? '') !== '';
@@ -210,6 +213,7 @@
         data-row-stop
         class="bubble"
         class:visual
+        class:roomy={multiline || !!message.replyTo || !!message.forwarded}
         class:bare={kind.type === 'sticker' || kind.type === 'videoNote'}
         role="article"
         class:notice={kind.type === 'notice'}
@@ -234,7 +238,7 @@
             {#if message.replyTo.text}<span>{message.replyTo.text}</span>{/if}
           </span>
         {/if}
-        <span class="content">
+        <span class="content" use:watchMultiline={(many) => (multiline = many)}>
           {#if (kind.type === 'text' || kind.type === 'notice') && kind.html}
             <span class="html" use:matrixHtml={kind.html}></span>
           {:else if kind.type === 'text' || kind.type === 'notice'}
@@ -257,7 +261,7 @@
             {#if albumCaption}<span class="caption album-caption text"><LinkedText text={albumCaption} /></span>{/if}
           {:else if kind.type === 'image' || kind.type === 'video' || kind.type === 'videoNote' || kind.type === 'sticker'}
             <MediaPreview kind={kind.type} attachment={kind.attachment} {media} own={message.own} onopen={() => actions.openMedia(message)} />
-            {#if kind.attachment.caption}<span class="caption text"><LinkedText text={kind.attachment.caption} /></span>{/if}
+            {#if kind.attachment.caption}<span class="caption album-caption text"><LinkedText text={kind.attachment.caption} /></span>{/if}
           {:else if kind.type === 'voice'}
             <VoiceMessage attachment={kind.attachment} {media} />
             {#if kind.attachment.caption}<span class="caption text"><LinkedText text={kind.attachment.caption} /></span>{/if}
@@ -402,6 +406,7 @@
     margin-inline-start: calc(var(--bubble-pad-x) - var(--space-close));
   }
   .bubble {
+    font-size: var(--font-size-text);
     max-width: 100%;
     padding: var(--bubble-pad-y) var(--bubble-pad-x);
     border-radius: var(--radius-bubble);
@@ -439,6 +444,11 @@
   /* В компактном столбце контура нет — слова серым, как у нативной в `.plain`. */
   .compact .bubble.deleted {
     border: none;
+  }
+  /* Радиус пузыря упирается в половину его высоты: у однострочного он ровно такой, а у высокого
+     был бы крупнее. Высокому — тот же, что у однострочного. */
+  .bubble.roomy:not(.visual):not(.bare) {
+    border-radius: calc((var(--font-size-text) * var(--line-height-body) + 2 * var(--bubble-pad-y)) / 2);
   }
   .quote {
     display: flex;
@@ -514,12 +524,6 @@
     padding: 0;
     border-radius: 0;
     background: transparent;
-  }
-  /* На обоях строка без пузыря потерялась бы на картинке — ей возвращается плашка. */
-  :global([data-wallpaper]) .compact .bubble:not(.visual) {
-    padding: var(--space-tight) var(--space-close);
-    border-radius: var(--radius-control);
-    background: var(--color-incoming-bubble);
   }
   .compact .bubble.visual {
     background: transparent;
@@ -676,7 +680,7 @@
   /* Подпись альбома — с воздухом над и под ней: под мозаикой из нескольких фото прижатая
      строка терялась. Сверху чуть меньше, чем снизу вместе с краем пузыря: подпись — к фото. */
   .bubble.visual .album-caption {
-    padding: var(--space-close) var(--space-close) var(--space-close);
+    padding: var(--space-close) var(--space-close) var(--space-tight);
   }
   /* Стикер и «кружочек» — без пузыря: у них своя форма. */
   .bubble.bare,

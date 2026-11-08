@@ -74,8 +74,8 @@
   }
   /* Под альбомом подпись: нижние углы — меньше, они уже не край пузыря, а граница с текстом. */
   .album.captioned {
-    border-end-start-radius: var(--radius-control);
-    border-end-end-radius: var(--radius-control);
+    border-end-start-radius: var(--radius-album-bottom);
+    border-end-end-radius: var(--radius-album-bottom);
   }
   .tile {
     position: absolute;
