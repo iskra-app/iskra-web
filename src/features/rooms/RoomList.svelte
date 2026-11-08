@@ -231,7 +231,7 @@
           {now}
           selected={room.id === selectedId}
           onopen={() => open(room)}
-          onmenu={(at, sheet) => (sheet && room.kind !== 'space' ? (peeking = room) : (menu = { room, at, sheet }))}
+          onmenu={(at, sheet) => (menu = { room, at, sheet })}
         />
       {/if}
     {/each}
