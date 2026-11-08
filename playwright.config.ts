@@ -27,6 +27,8 @@ const browsers = {
 export default defineConfig({
   testDir: 'tests/e2e',
   fullyParallel: true,
+  // Раннер GitHub — четыре ядра, а по умолчанию Playwright берёт половину.
+  workers: process.env['CI'] ? 4 : undefined,
   // В CI — ещё и `list`: он печатает консоль упавшего теста, а без неё падение в Firefox,
   // которого нет под рукой, — загадка.
   reporter: process.env['CI'] ? [['github'], ['list']] : 'list',
