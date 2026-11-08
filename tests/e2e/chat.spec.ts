@@ -589,7 +589,11 @@ test('подгрузка истории посреди инерции: мест�
     const found: string[] = [];
     let before = topmost();
     for (let frame = 0; frame < 300; frame++) {
-      await new Promise(requestAnimationFrame);
+      // Кадр, а если браузер под нагрузкой кадры придерживает (WebKit при нескольких страницах сразу) — по таймеру.
+      await new Promise((done) => {
+        requestAnimationFrame(done);
+        setTimeout(done, 50);
+      });
       scroller.scrollTop -= 40;
       const now = topmost();
       if (Math.abs(now - before) > 3) found.push(`${before} → ${now}`);
