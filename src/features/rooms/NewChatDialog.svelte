@@ -237,7 +237,7 @@
   />
 {/snippet}
 
-<Dialog {open} title={t(titles[page])} {onclose} back={page === 'home' ? undefined : { label: t('settings.back'), onclick: () => go('home') }}>
+<Dialog closeLabel={t('recovery.close')} {open} title={t(titles[page])} {onclose} back={page === 'home' ? undefined : { label: t('settings.back'), onclick: () => go('home') }}>
   {#if page === 'home'}
     <TextField bind:value={query} label={t('roomList.new.searchPrompt')} placeholder={t('roomList.new.searchPrompt')} autocomplete="off" autofocus />
     <div class="list" aria-busy={opening !== null}>

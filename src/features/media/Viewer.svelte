@@ -30,7 +30,7 @@
 </script>
 
 <script lang="ts">
-  import { ICON_VIEWBOX, icons } from '../../design/icons.ts';
+  import Icon from '../../design/Icon.svelte';
   import { onMount } from 'svelte';
   import { MediaError, type MediaLoader } from '../../core/media/media';
   import { viewport } from '../../design/viewport.svelte.ts';
@@ -412,15 +412,15 @@
 <dialog bind:this={dialog} class="viewer" class:blackened aria-label={label} {onclose} {onkeydown}>
   <div class="bar">
     <button type="button" aria-label={t('message.media.close')} title={t('message.media.close')} onclick={close}>
-      <svg viewBox={ICON_VIEWBOX} aria-hidden="true"><path d={icons.close} /></svg>
+      <Icon name="close" />
     </button>
     <span class="position" role="status">{items.length > 1 ? t('message.media.position', { index: index + 1, count: items.length }) : ''}</span>
     {#if !isVideo && viewport.finePointer}
       <button type="button" aria-label={t('message.media.zoomOut')} title={t('message.media.zoomOut')} onclick={() => zoomTo(view.scale / STEP)}>
-        <svg viewBox={ICON_VIEWBOX} aria-hidden="true"><path d={icons.minus} /></svg>
+        <Icon name="minus" />
       </button>
       <button type="button" aria-label={t('message.media.zoomIn')} title={t('message.media.zoomIn')} onclick={() => zoomTo(view.scale * STEP)}>
-        <svg viewBox={ICON_VIEWBOX} aria-hidden="true"><path d={icons.plus} /></svg>
+        <Icon name="plus" />
       </button>
       <button type="button" disabled={!full} onclick={copy}>{copied ? t('message.media.copied') : t('message.media.copy')}</button>
     {/if}
@@ -465,10 +465,10 @@
 
   {#if items.length > 1 && viewport.finePointer}
     <button type="button" class="side previous" disabled={index === 0} aria-label={t('message.media.previous')} title={t('message.media.previous')} onclick={() => go(-1)}>
-      <svg viewBox={ICON_VIEWBOX} aria-hidden="true"><path d={icons.previous} /></svg>
+      <Icon name="previous" />
     </button>
     <button type="button" class="side next" disabled={index === items.length - 1} aria-label={t('message.media.next')} title={t('message.media.next')} onclick={() => go(1)}>
-      <svg viewBox={ICON_VIEWBOX} aria-hidden="true"><path d={icons.forward} /></svg>
+      <Icon name="forward" />
     </button>
   {/if}
 
@@ -540,10 +540,9 @@
       background: rgb(255 255 255 / 0.12);
     }
   }
-  svg {
+  button :global(svg) {
     width: var(--size-icon-button);
     height: var(--size-icon-button);
-    fill: currentColor;
   }
   .stage {
     position: absolute;
@@ -569,7 +568,7 @@
     will-change: transform;
   }
   .frame.settling {
-    transition: transform var(--timing-chrome) ease-out;
+    transition: transform var(--timing-chrome) var(--ease-out);
   }
   img,
   video {

@@ -6,7 +6,7 @@
   подгруженной истории. Новые входящие объявляет отдельная вежливая область.
 -->
 <script lang="ts">
-  import { ICON_VIEWBOX, icons } from '../../design/icons.ts';
+  import Icon from '../../design/Icon.svelte';
   import { onMount, tick } from 'svelte';
   import EmptyState from '../../design/EmptyState.svelte';
   import PrimaryButton from '../../design/PrimaryButton.svelte';
@@ -317,7 +317,7 @@
             onkeydown={(event) => toggleByKey(event, item.message)}
           >
             <span class="mark" class:on aria-hidden="true">
-              {#if on}<svg viewBox={ICON_VIEWBOX}><path d={icons.check} /></svg>{/if}
+              {#if on}<Icon name="check" />{/if}
             </span>
             <div class="chosen-row" inert>
               <MessageRow
@@ -360,12 +360,12 @@
 {#if anchor && !anchor.atBottom}
   <button
     type="button"
-    class="to-bottom"
+    class="to-bottom press"
     aria-label={unseenBelow > 0 ? `${t('room.scrollToBottom')}, ${plural('roomList.unread', unseenBelow)}` : t('room.scrollToBottom')}
     title={t('room.scrollToBottom')}
     onclick={() => anchor?.scrollToBottom()}
   >
-    <svg viewBox={ICON_VIEWBOX} aria-hidden="true"><path d={icons.down} /></svg>
+    <Icon name="down" />
     {#if unseenBelow > 0}<span class="unseen" aria-hidden="true">{new Intl.NumberFormat(i18n.locale).format(unseenBelow)}</span>{/if}
   </button>
 {/if}
@@ -389,19 +389,21 @@
        прокрутки ленте от этого не положено. */
     overflow-x: hidden;
     overscroll-behavior: contain;
+    /* Ширина окна — для полосы «непрочитанные», которой тесна колонка `.content`. */
+    container-type: inline-size;
   }
   .content {
+    /* Поле от края окна до пузырей: гаттер или, на широком окне, остаток по бокам колонки. */
+    --edge: calc(var(--timeline-gutter) + max(0px, (100cqw - var(--column-timeline-max)) / 2));
     display: flex;
     flex-direction: column;
-    max-width: var(--column-timeline-max);
     min-height: 100%;
-    margin-inline: auto;
-    padding: var(--space-normal) var(--timeline-gutter);
+    padding: var(--space-normal) var(--edge);
     justify-content: flex-end;
   }
   .item:global(.flash) {
     border-radius: var(--radius-bubble);
-    animation: flash 1.6s ease-out;
+    animation: flash var(--timing-flash) var(--ease-out);
   }
   @keyframes flash {
     from {
@@ -465,10 +467,10 @@
     border-color: var(--accent);
     background: var(--accent);
   }
-  .mark svg {
+  .mark :global(svg) {
     width: 100%;
     height: 100%;
-    fill: var(--on-accent);
+    color: var(--on-accent);
   }
   .item.arrived {
     animation: arrive var(--timing-arrival) var(--ease-out);
@@ -482,7 +484,7 @@
   .unread {
     /* До краёв ленты, за поля, которые держат пузыри: полоса, остановившаяся там же, где они,
        была бы ещё одной фигурой в их столбце. */
-    margin: var(--space-roomy) calc(-1 * var(--timeline-gutter)) var(--space-close);
+    margin: var(--space-roomy) calc(-1 * var(--edge)) var(--space-close);
     padding: var(--space-tight) 0;
     background: var(--color-incoming-bubble);
     color: var(--color-text-secondary);
@@ -527,7 +529,8 @@
   .to-bottom {
     transition:
       opacity var(--timing-chrome) var(--ease-out),
-      transform var(--timing-chrome) var(--ease-out);
+      transform var(--timing-chrome) var(--ease-out),
+      scale var(--timing-chrome) var(--ease-out);
   }
   @starting-style {
     .to-bottom {
@@ -535,11 +538,14 @@
       transform: scale(var(--motion-menu-scale-from));
     }
     .unseen {
-      transform: scale(0);
+      opacity: 0;
+      transform: scale(var(--motion-menu-scale-from));
     }
   }
   .unseen {
-    transition: transform var(--timing-reaction) var(--ease-menu-open);
+    transition:
+      opacity var(--timing-reaction) var(--ease-out),
+      transform var(--timing-reaction) var(--ease-menu-open);
     position: absolute;
     inset-block-start: calc(-1 * var(--size-unread-badge) / 2);
     min-width: var(--size-unread-badge);
@@ -550,12 +556,10 @@
     color: var(--on-accent);
     font-size: var(--font-size-caption);
     font-weight: 600;
-    font-variant-numeric: tabular-nums;
     line-height: var(--size-unread-badge);
   }
-  .to-bottom svg {
+  .to-bottom :global(svg) {
     width: var(--size-icon);
     height: var(--size-icon);
-    fill: currentColor;
   }
 </style>

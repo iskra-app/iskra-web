@@ -97,7 +97,7 @@
   }
 </script>
 
-<Dialog {open} title={t('room.manage.editTitle')} {onclose}>
+<Dialog closeLabel={t('recovery.close')} {open} title={t('room.manage.editTitle')} {onclose}>
   <form onsubmit={save}>
     {#if details.direct}
       <TextField bind:value={localName} label={t('room.localName.header')} showLabel placeholder={details.serverName} />
@@ -196,7 +196,7 @@
 
 <AvatarCropper file={cropping} oncancel={() => (cropping = null)} ondone={(photo) => void setPicture(photo)} />
 
-<ConfirmDialog
+<ConfirmDialog closeLabel={t('recovery.close')}
   open={!!unbanning}
   title={t('room.access.unbanQuestion', { name: unbanning?.name ?? '' })}
   message={t('room.access.unbanHelp')}

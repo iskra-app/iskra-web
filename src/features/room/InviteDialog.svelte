@@ -116,7 +116,7 @@
   </li>
 {/snippet}
 
-<Dialog {open} title={t('room.manage.invite')} {onclose}>
+<Dialog closeLabel={t('recovery.close')} {open} title={t('room.manage.invite')} {onclose}>
   <TextField bind:value={query} label={t('roomList.new.searchPrompt')} placeholder={t('roomList.new.searchPrompt')} autocomplete="off" autofocus />
   <div class="list">
     {#if !term}

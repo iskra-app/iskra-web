@@ -1,7 +1,8 @@
 <!--
-  Кто отреагировал и чем — `ReactorsSheet` нативной. Открывается из «N реакций» в меню
-  сообщения в группе: в личном чате вопрос отвечает сам на себя. Сверху — «Все», потом по
-  эмодзи с числом; ниже — люди.
+  Кто отреагировал и чем — `ReactorsSheet` нативной. Открывается в группе из «N реакций» в меню
+  сообщения и правым щелчком или удержанием на самой реакции — сразу на её эмодзи: в личном чате
+  вопрос отвечает сам на себя. Сверху — «Все», потом по
+  эмодзи с числом; ниже — люди. На стекле, без карточки: простой список на самом окне.
 -->
 <script lang="ts">
   import Dialog from '../../design/Dialog.svelte';
@@ -13,16 +14,15 @@
   interface Props {
     /** `null` — окно закрыто. */
     reactors: Reactor[] | null;
+    /** На какой эмодзи открыть; `null` — «Все». */
+    initialFilter?: string | null;
     session: UserSession;
     onclose: () => void;
   }
-  let { reactors, session, onclose }: Props = $props();
+  let { reactors, initialFilter = null, session, onclose }: Props = $props();
 
-  /** Какой эмодзи показан; `null` — все. */
-  let filter = $state<string | null>(null);
-  $effect(() => {
-    if (!reactors) filter = null;
-  });
+  /** Какой эмодзи показан; `null` — все. Открылось заново — снова с того, с чего просили. */
+  let filter = $derived(reactors ? initialFilter : null);
 
   const keys = $derived.by(() => {
     const counts: Record<string, number> = {};
@@ -32,7 +32,7 @@
   const shown = $derived((reactors ?? []).filter((r) => filter === null || r.key === filter));
 </script>
 
-<Dialog open={!!reactors} title={plural('message.menu.reactors', reactors?.length ?? 0)} {onclose}>
+<Dialog glass closeLabel={t('recovery.close')} open={!!reactors} title={plural('message.menu.reactors', reactors?.length ?? 0)} {onclose}>
   {#if reactors}
     <div class="tabs" role="radiogroup" aria-label={plural('message.menu.reactors', reactors.length)}>
       <button type="button" role="radio" aria-checked={filter === null} onclick={() => (filter = null)}>
@@ -72,10 +72,10 @@
   }
   .list {
     margin: 0;
+    min-height: 0;
     padding: 0;
-    border-radius: var(--radius-card);
-    background: var(--color-surface);
     list-style: none;
-    overflow: hidden;
+    /* Прокручивается список, а не окно: шапка на стекле прозрачная, и строки шли бы сквозь заголовок. */
+    overflow-y: auto;
   }
 </style>

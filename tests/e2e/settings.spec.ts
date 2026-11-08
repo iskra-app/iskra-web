@@ -230,12 +230,11 @@ test('настройки по разделам: имя, язык, тема, шр
   expect(await bodyFont()).toMatch(/^"?Inter"?,/);
   expect(await page.evaluate(async () => (await document.fonts.load('1rem Inter', 'Привет, hello')).length)).toBeGreaterThan(0);
   expect(await page.evaluate(() => document.fonts.check('1rem Inter', 'Привет, hello'))).toBe(true);
-  // Фичи Inter (перечёркнутый ноль…) — только у него; у системного их нет.
-  expect(await page.evaluate(() => getComputedStyle(document.body).fontFeatureSettings)).toContain('"zero"');
+  // Без наборов начертаний: ни `zero`, ни `ss`, ни `tnum` тексту не заданы.
+  expect(await page.evaluate(() => getComputedStyle(document.body).fontFeatureSettings)).toBe('normal');
   await page.getByRole('radio', { name: 'Системный' }).click();
   await expect(page.locator('html')).toHaveAttribute('data-font', 'system');
   expect(await bodyFont()).toMatch(/^system-ui,/);
-  expect(await page.evaluate(() => getComputedStyle(document.body).fontFeatureSettings)).toBe('normal');
   await page.getByRole('radio', { name: 'Inter' }).click();
   await expect(page.locator('html')).not.toHaveAttribute('data-font');
 
@@ -278,7 +277,11 @@ test('заблокировать со страницы человека (имя 
   await expect(dialog).toContainText('Разблокировать можно в настройках');
   await dialog.getByRole('button', { name: 'Заблокировать' }).click();
   await expect(page.getByRole('button', { name: 'Разблокировать пользователя' })).toBeVisible({ timeout: 10_000 });
-  await page.getByRole('button', { name: 'Закрыть', exact: true }).click();
+  // Окно ещё догорает — у него свой «Закрыть»; нужен тот, что у панели.
+  await expect(page.getByRole('dialog')).toHaveCount(0);
+  await page.locator('aside.panel').getByRole('button', { name: 'Закрыть', exact: true }).click();
+  // Панель уезжает не мгновенно: её «Назад» нельзя принять за «Назад» чата.
+  await expect(page.locator('aside.panel')).toHaveCount(0);
   await expect(bubble).toHaveCount(0, { timeout: 10_000 });
   // Служебная строка о ней остаётся: блокировка прячет слова, а не факт, что человек в чате.
   await expect(page.getByRole('log')).toContainText('Повестка');
@@ -361,7 +364,9 @@ test('локальное имя личного чата: видно везде, 
   await page.getByRole('dialog', { name: 'Изменить чат' }).getByRole('button', { name: 'Вернуть «Аня»' }).click();
   await expect(panel.getByRole('heading', { name: 'Аня' })).toBeVisible();
   // На телефоне панель — лист поверх чата: сначала закрыть её.
-  await page.getByRole('button', { name: 'Закрыть', exact: true }).click();
+  // Окно ещё догорает — у него свой «Закрыть»; нужен тот, что у панели.
+  await expect(page.getByRole('dialog')).toHaveCount(0);
+  await page.locator('aside.panel').getByRole('button', { name: 'Закрыть', exact: true }).click();
   const back = page.getByRole('button', { name: 'Назад' });
   if (await back.isVisible()) await back.click();
   await expect(page.getByRole('link', { name: /^Аня/ })).toBeVisible();
@@ -599,7 +604,7 @@ test('«Об Iskra» — как в нативной: версия, сборка,
   await expect(page.getByRole('heading', { name: 'Лицензии', level: 1 })).toBeVisible();
   await page.getByRole('button', { name: /^Iskra Web/ }).click();
   await expect(page.getByRole('dialog', { name: 'Iskra Web' })).toContainText('GNU GENERAL PUBLIC LICENSE');
-  await page.getByRole('dialog', { name: 'Iskra Web' }).getByRole('button', { name: 'Готово' }).click();
+  await page.getByRole('dialog', { name: 'Iskra Web' }).getByRole('button', { name: 'Закрыть' }).click();
   await page.getByRole('button', { name: /^matrix-js-sdk/ }).click();
   await expect(page.getByRole('dialog', { name: 'matrix-js-sdk' })).toContainText('Apache License');
   await page.keyboard.press('Escape');

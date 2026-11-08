@@ -7,7 +7,7 @@
   спутать с одного взгляда. И кнопка у него не «Понятно»: она что-то меняет — снимает проверку.
 -->
 <script lang="ts">
-  import { ICON_VIEWBOX, icons } from '../../design/icons.ts';
+  import Icon from '../../design/Icon.svelte';
   import type { IdentityChange } from '../../core/encryption/identityChanges.svelte.ts';
   import { t } from '../../i18n/index.svelte.ts';
 
@@ -21,7 +21,7 @@
 </script>
 
 <div class="identity" class:serious role="status">
-  <svg viewBox={ICON_VIEWBOX} aria-hidden="true"><path d={serious ? icons.warning : icons.shield} /></svg>
+  <Icon name={serious ? 'warning' : 'shield'} />
   <div class="what">
     <strong>{t(serious ? 'room.identity.violationTitle' : 'room.identity.changedTitle', { name: change.name })}</strong>
     <p>{t(serious ? 'room.identity.violationBody' : 'room.identity.changedBody')}</p>
@@ -43,14 +43,14 @@
     --tint: var(--color-warning);
     background: color-mix(in srgb, var(--color-warning) var(--warning-wash), var(--color-background));
   }
-  svg {
+  .identity :global(svg) {
     flex: none;
     width: var(--size-icon);
     height: var(--size-icon);
-    fill: var(--color-text-secondary);
+    color: var(--color-text-secondary);
   }
-  .serious svg {
-    fill: var(--color-warning);
+  .serious :global(svg) {
+    color: var(--color-warning);
   }
   .what {
     display: flex;

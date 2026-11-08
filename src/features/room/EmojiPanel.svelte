@@ -11,7 +11,8 @@
   Колёсико листает панель, а не закрывает меню, как над остальным меню.
 -->
 <script lang="ts">
-  import { ICON_VIEWBOX, icons, type IconName } from '../../design/icons.ts';
+  import Icon from '../../design/Icon.svelte';
+  import type { IconName } from '../../design/icons.ts';
   import { t } from '../../i18n/index.svelte.ts';
   import { emojiCatalog, emojiCategories, type EmojiCategory } from './emojiCatalog';
 
@@ -117,7 +118,7 @@
   <div class="tabs" role="toolbar" aria-label={t('reactions.more')}>
     {#each emojiCategories as category (category)}
       <button type="button" class:selected={selected === category} aria-label={t(`reactions.${category}`)} title={t(`reactions.${category}`)} aria-pressed={selected === category} onclick={() => jump(category)}>
-        <svg viewBox={ICON_VIEWBOX} aria-hidden="true"><path d={icons[glyphs[category]]} /></svg>
+        <Icon name={glyphs[category]} />
       </button>
     {/each}
   </div>
@@ -190,9 +191,8 @@
   .tabs button.selected {
     color: var(--accent);
   }
-  .tabs svg {
+  .tabs :global(svg) {
     width: var(--size-icon);
     height: var(--size-icon);
-    fill: currentColor;
   }
 </style>

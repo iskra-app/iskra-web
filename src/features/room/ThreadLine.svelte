@@ -4,7 +4,7 @@
   пузырём это единственное, что куда-то ведёт.
 -->
 <script lang="ts">
-  import { ICON_VIEWBOX, icons } from '../../design/icons.ts';
+  import Icon from '../../design/Icon.svelte';
   import type { ThreadSummary } from '../../core/timeline/message';
   import { plural } from '../../i18n/index.svelte.ts';
   import { previewText } from '../rooms/text';
@@ -19,10 +19,10 @@
 </script>
 
 <button type="button" class="thread" onclick={onopen}>
-  <svg viewBox={ICON_VIEWBOX} aria-hidden="true"><path d={icons.forum} /></svg>
+  <Icon name="forum" />
   <strong>{plural('thread.replies', thread.replies)}</strong>
   {#if latest}<span class="latest">{latest}</span>{/if}
-  <svg class="chevron" viewBox={ICON_VIEWBOX} aria-hidden="true"><path d={icons.forward} /></svg>
+  <Icon name="forward" class="thread-chevron" />
 </button>
 
 <style>
@@ -47,11 +47,10 @@
       background: var(--color-selected);
     }
   }
-  svg {
+  .thread :global(svg) {
     flex: none;
     width: var(--size-icon);
     height: var(--size-icon);
-    fill: currentColor;
   }
   strong {
     flex: none;
@@ -64,7 +63,7 @@
     text-overflow: ellipsis;
     white-space: nowrap;
   }
-  .chevron {
+  .thread :global(.thread-chevron) {
     color: var(--color-text-secondary);
     opacity: 0.6;
   }

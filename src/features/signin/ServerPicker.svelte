@@ -4,9 +4,8 @@
   человеком.
 -->
 <script lang="ts">
-  import { ICON_VIEWBOX, icons } from '../../design/icons.ts';
+  import Icon from '../../design/Icon.svelte';
   import Dialog from '../../design/Dialog.svelte';
-  import QuietButton from '../../design/QuietButton.svelte';
   import { t } from '../../i18n/index.svelte.ts';
   import { OWN_SERVER_GUIDE, publicServers } from './servers';
 
@@ -15,7 +14,7 @@
   const servers = publicServers(typeof navigator === 'undefined' ? [] : (navigator.languages ?? [navigator.language]));
 </script>
 
-<Dialog {open} title={t('servers.title')} {onclose}>
+<Dialog closeLabel={t('recovery.close')} {open} title={t('servers.title')} {onclose}>
   <p class="secondary">{t('servers.intro')}</p>
   <ul>
     {#each servers as server (server.address)}
@@ -29,7 +28,7 @@
               <span class="warning small">{t(server.warning)}</span>
             {/if}
           </span>
-          <svg viewBox={ICON_VIEWBOX} aria-hidden="true"><path d={icons.forward} /></svg>
+          <Icon name="forward" />
         </button>
       </li>
     {/each}
@@ -39,11 +38,10 @@
           <strong>{t('servers.ownTitle')}</strong>
           <span class="about">{t('servers.ownAbout')}</span>
         </span>
-        <svg viewBox={ICON_VIEWBOX} aria-hidden="true"><path d={icons.external} /></svg>
+        <Icon name="external" />
       </a>
     </li>
   </ul>
-  <QuietButton onclick={onclose}>{t('recovery.close')}</QuietButton>
 </Dialog>
 
 <style>
@@ -96,12 +94,10 @@
     color: var(--color-warning);
     font-weight: 500;
   }
-  svg {
+  .card :global(svg) {
     flex: none;
     width: var(--space-roomy);
     height: var(--space-roomy);
     color: var(--color-text-secondary);
-    /* Без заливки путь чёрный при любой теме — в тёмной его не видно. */
-    fill: currentColor;
   }
 </style>

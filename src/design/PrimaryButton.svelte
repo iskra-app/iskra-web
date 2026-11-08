@@ -17,7 +17,7 @@
   let { onclick, type = 'button', disabled = false, busy = false, wide = false, children }: Props = $props();
 </script>
 
-<button {type} class="primary" class:wide disabled={disabled || busy} aria-busy={busy} {onclick}>
+<button {type} class="primary press" class:wide disabled={disabled || busy} aria-busy={busy} {onclick}>
   {#if busy}<span class="spinner" aria-hidden="true"></span>{/if}
   {@render children()}
 </button>
@@ -54,7 +54,7 @@
     border: 2px solid currentColor;
     border-inline-end-color: transparent;
     border-radius: var(--radius-circle);
-    animation: spin 0.8s linear infinite;
+    animation: spin var(--timing-spinner) linear infinite;
   }
   @keyframes spin {
     to {

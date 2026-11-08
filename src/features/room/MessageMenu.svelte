@@ -4,8 +4,9 @@
   раскрывается в панель на том же месте. Под реакциями — действия, внизу — когда отправлено.
 -->
 <script lang="ts">
-  import { ICON_VIEWBOX, icons } from '../../design/icons.ts';
+  
   import { tick } from 'svelte';
+  import Icon from '../../design/Icon.svelte';
   import Menu from '../../design/Menu.svelte';
   import type { Message } from '../../core/timeline/message';
   import { i18n, plural, t } from '../../i18n/index.svelte.ts';
@@ -76,7 +77,7 @@
     <p class="fact">{t('message.menu.sentAt', { time: exactly(message.ts) })}</p>
     {#if message.kind.at}<p class="fact">{t('message.menu.deletedAt', { time: exactly(message.kind.at) })}</p>{/if}
   {:else if message}
-    <div class="reactions" role="group" aria-label={t('message.menu.addReaction')}>
+    <div class="reactions" class:sheet role="group" aria-label={t('message.menu.addReaction')}>
       {#each quickReactions as emoji (emoji)}
         {@const mine = message.reactions.some((r) => r.key === emoji && r.mine)}
         <button
@@ -101,71 +102,71 @@
           document.querySelector<HTMLElement>('.panel .cell')?.focus();
         }}
       >
-        <svg viewBox={ICON_VIEWBOX} aria-hidden="true"><path d={icons.plus} /></svg>
+        <Icon name="plus" />
       </button>
     </div>
     <!-- Группы, как в нативной: что делают с сообщением — красное, необратимое, — и факты. Между ними черта. -->
     {#if actions.showsReactors && reactionCount > 0}
       <!-- Первым: кто что поставил — единственный вопрос, на который пилюля с числом не отвечает. -->
-      <button type="button" role="menuitem" onclick={() => run(actions.reactors)}>{plural('message.menu.reactors', reactionCount)}</button>
+      <button type="button" role="menuitem" onclick={() => run(actions.reactors)}><Icon name="reaction" />{plural('message.menu.reactors', reactionCount)}</button>
     {/if}
     {#if actions.canReply}
-      <button type="button" role="menuitem" onclick={() => run(actions.reply)}>{t('message.menu.reply')}</button>
+      <button type="button" role="menuitem" onclick={() => run(actions.reply)}><Icon name="reply" />{t('message.menu.reply')}</button>
     {/if}
     {#if actions.openThread && actions.canReply && message.eventId && !message.threadRootId}
       <!-- В треде, а не в чате: тот же тред, что открывает строка под сообщением; нет его — начнётся. -->
       {@const open = actions.openThread}
-      <button type="button" role="menuitem" onclick={() => run(open)}>{t('thread.replyInThread')}</button>
+      <button type="button" role="menuitem" onclick={() => run(open)}><Icon name="forum" />{t('thread.replyInThread')}</button>
     {/if}
     {#if message.canEdit}
-      <button type="button" role="menuitem" onclick={() => run(actions.edit)}>{t('message.menu.edit')}</button>
+      <button type="button" role="menuitem" onclick={() => run(actions.edit)}><Icon name="edit" />{t('message.menu.edit')}</button>
     {/if}
     {#if text}
       <button type="button" role="menuitem" onclick={() => run(() => void navigator.clipboard?.writeText(text).catch(() => {}))}>
-        {t('message.menu.copy')}
+        <Icon name="copy" />{t('message.menu.copy')}
       </button>
     {/if}
     {#if canForward(message)}
-      <button type="button" role="menuitem" onclick={() => run(actions.forward)}>{t('message.menu.forward')}</button>
+      <button type="button" role="menuitem" onclick={() => run(actions.forward)}><Icon name="forwardMessage" />{t('message.menu.forward')}</button>
     {/if}
     {#if actions.stickerIsMine(message) !== undefined}
       <!-- Свой набор пополняется ссылкой: картинка уже на сервере, загружать нечего. -->
       <button type="button" role="menuitem" onclick={() => run(actions.toggleSticker)}>
-        {actions.stickerIsMine(message) ? t('stickers.remove') : t('stickers.add')}
+        <Icon name={actions.stickerIsMine(message) ? 'delete' : 'plus'} />{actions.stickerIsMine(message) ? t('stickers.remove') : t('stickers.add')}
       </button>
     {/if}
     {#if actions.canPin}
       {#if message.pinned}
-        <button type="button" role="menuitem" onclick={() => run(actions.unpin)}>{t('message.menu.unpin')}</button>
+        <button type="button" role="menuitem" onclick={() => run(actions.unpin)}><Icon name="pin" />{t('message.menu.unpin')}</button>
       {:else}
-        <button type="button" role="menuitem" onclick={() => run(actions.pin)}>{t('message.menu.pin')}</button>
+        <button type="button" role="menuitem" onclick={() => run(actions.pin)}><Icon name="pin" />{t('message.menu.pin')}</button>
       {/if}
     {/if}
     {#if isSelectable(message)}
       <!-- Несколько сразу: скопировать одним куском, удалить пачку ошибок. -->
-      <button type="button" role="menuitem" onclick={() => run(actions.select)}>{t('message.menu.select')}</button>
+      <button type="button" role="menuitem" onclick={() => run(actions.select)}><Icon name="check" />{t('message.menu.select')}</button>
     {/if}
     {#if openPoll && openPoll.mine.length > 0}
       <!-- Пустой ответ — голоса нет (MSC3381). -->
-      <button type="button" role="menuitem" onclick={() => run((m) => actions.vote(m, []))}>{t('poll.retract')}</button>
+      <button type="button" role="menuitem" onclick={() => run((m) => actions.vote(m, []))}><Icon name="removeCircle" />{t('poll.retract')}</button>
     {/if}
     {#if openPoll && message.own}
       <!-- Закрыть может только автор: конец от другого комната не признаёт. -->
-      <button type="button" role="menuitem" onclick={() => run(actions.endPoll)}>{t('poll.end')}</button>
+      <button type="button" role="menuitem" onclick={() => run(actions.endPoll)}><Icon name="stop" />{t('poll.end')}</button>
     {/if}
     {#if message.canDelete || reportable}
       <div class="rule" role="separator"></div>
       {#if message.canDelete}
-        <button type="button" role="menuitem" class="danger" onclick={() => run(actions.remove)}>{t('message.menu.delete')}</button>
+        <button type="button" role="menuitem" class="danger" onclick={() => run(actions.remove)}><Icon name="delete" />{t('message.menu.delete')}</button>
       {/if}
       {#if reportable}
         <!-- Чужое, ушедшее: жалоба указывает на событие на сервере. -->
-        <button type="button" role="menuitem" class="danger" onclick={() => run(actions.report)}>{t('message.menu.report')}</button>
+        <button type="button" role="menuitem" class="danger" onclick={() => run(actions.report)}><Icon name="warning" />{t('message.menu.report')}</button>
       {/if}
     {/if}
     {#if actions.viewSource}
       {@const view = actions.viewSource}
-      <button type="button" role="menuitem" onclick={() => run(view)}>{t('beta.viewSource')}</button>
+      <button type="button" role="menuitem" onclick={() => run(view)}><Icon name="file" />{t('beta.viewSource')}</button>
     {/if}
     <!-- Точно, с датой и секундами: время у пузыря — только часы, а здесь — всё остальное. -->
     <div class="rule" role="separator"></div>
@@ -182,6 +183,11 @@
     margin-block-end: var(--space-tight);
     border-block-end: var(--border-hairline) solid var(--color-separator);
   }
+  /* Воздух вокруг эмодзи — один со всех сторон (`ReactionBar.inset` нативной): снизу столько же,
+     сколько у меню по краям. На листе этот край шире. */
+  .reactions.sheet {
+    padding-block-end: var(--space-close);
+  }
   .reactions button {
     justify-content: center;
     min-width: var(--tap-target);
@@ -192,10 +198,9 @@
   .reactions .more {
     color: var(--color-text-secondary);
   }
-  .more svg {
+  .more :global(svg) {
     width: var(--size-icon);
     height: var(--size-icon);
-    fill: currentColor;
   }
   .reactions button.mine {
     background: var(--color-own-reaction);

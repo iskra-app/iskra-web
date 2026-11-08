@@ -6,7 +6,8 @@
   Cinny. Убранный здесь стикер пропадает и там, и каждая перемена записывается сразу.
 -->
 <script lang="ts">
-  import { ICON_VIEWBOX, icons } from '../../design/icons.ts';
+  
+  import Icon from '../../design/Icon.svelte';
   import Menu from '../../design/Menu.svelte';
   import PlainButton from '../../design/PlainButton.svelte';
   import { viewport } from '../../design/viewport.svelte.ts';
@@ -56,7 +57,7 @@
     <ul class="list">
       {#each subscriptions as pack (pack.id)}
         <li class="row">
-          {#if pack.icon}<StickerImage sticker={pack.icon} media={session.media} size="tab" />{:else}<svg viewBox={ICON_VIEWBOX} aria-hidden="true"><path d={icons.emojiSmileys} /></svg>{/if}
+          {#if pack.icon}<StickerImage sticker={pack.icon} media={session.media} size="tab" />{:else}<Icon name="emojiSmileys" />{/if}
           <span class="what">
             <span class="name">{pack.name ?? t('stickers.roomPack')}</span>
             <span class="secondary">{plural('stickers.settings.count', pack.stickers.length)}</span>
@@ -104,7 +105,7 @@
       onclick={() => {
         menu = null;
         void library.remove(sticker);
-      }}>{t('stickers.remove')}</button
+      }}><Icon name="delete" />{t('stickers.remove')}</button
     >
   {/if}
 </Menu>
@@ -143,7 +144,7 @@
     align-items: center;
     justify-content: space-between;
     gap: var(--space-normal);
-    min-height: var(--tap-target);
+    min-height: var(--row-setting);
     padding: var(--space-close) var(--space-normal);
     border-radius: var(--radius-card);
     background: var(--color-surface);
@@ -168,10 +169,10 @@
   .row + .row {
     border-block-start: var(--border-hairline) solid var(--color-separator);
   }
-  .row svg {
+  .row :global(svg) {
     width: var(--size-sticker-tab);
     height: var(--size-sticker-tab);
-    fill: var(--color-text-secondary);
+    color: var(--color-text-secondary);
   }
   .what {
     display: flex;

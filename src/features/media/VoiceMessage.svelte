@@ -10,7 +10,7 @@
   раз (`speaker.ts`). Ушло с экрана — встало, расшифрованная копия отпущена.
 -->
 <script lang="ts">
-  import { ICON_VIEWBOX, icons } from '../../design/icons.ts';
+  import Icon from '../../design/Icon.svelte';
   import { MediaError, type MediaLoader } from '../../core/media/media';
   import type { Attachment } from '../../core/timeline/message';
   import Waveform from '../../design/Waveform.svelte';
@@ -127,9 +127,7 @@
     onclick={toggle}
   >
     <span class="glyph" class:loading>
-      <svg viewBox={ICON_VIEWBOX} aria-hidden="true">
-        {#if playing}<path d={icons.pause} />{:else}<path d={icons.play} />{/if}
-      </svg>
+      <Icon name={playing ? 'pause' : 'play'} />
     </span>
   </button>
   <span class="wave"><Waveform {samples} mode="fit" count={BARS} {progress} /></span>
@@ -171,10 +169,9 @@
   .glyph.loading {
     opacity: 0.5;
   }
-  .glyph svg {
+  .glyph :global(svg) {
     width: var(--size-icon);
     height: var(--size-icon);
-    fill: currentColor;
   }
   .wave {
     flex: none;
@@ -183,7 +180,6 @@
   .length {
     flex: none;
     font-size: var(--font-size-caption);
-    font-variant-numeric: tabular-nums;
   }
   .problem {
     display: block;

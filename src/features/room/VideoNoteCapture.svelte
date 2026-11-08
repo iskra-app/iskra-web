@@ -13,7 +13,7 @@
   прошлый щипок; второй рукой, пока первая держит кнопку, или обеими без рук.
 -->
 <script lang="ts">
-  import { ICON_VIEWBOX, icons } from '../../design/icons.ts';
+  import Icon from '../../design/Icon.svelte';
   import { tick } from 'svelte';
   import { viewport } from '../../design/viewport.svelte.ts';
   import { t, type TextKey } from '../../i18n/index.svelte.ts';
@@ -129,7 +129,7 @@
         </select>
       {:else if !viewport.finePointer && recorder.canFlip}
         <button type="button" class="flip" aria-label={t('videoNote.flipCamera')} title={t('videoNote.flipCamera')} onclick={() => void recorder.flip()}>
-          <svg viewBox={ICON_VIEWBOX} aria-hidden="true"><path d={icons.switchCamera} /></svg>
+          <Icon name="switchCamera" />
         </button>
       {/if}
       <RecordingStrip {recorder} onCamera {oncancel} />
@@ -137,8 +137,8 @@
     <div class="right">
       {#if holding && recording}
         <span class="lock" aria-hidden="true">
-          <svg viewBox={ICON_VIEWBOX}><path d={icons.lock} /></svg>
-          <svg viewBox={ICON_VIEWBOX}><path d={icons.up} /></svg>
+          <Icon name="lock" />
+          <Icon name="up" />
         </span>
       {/if}
       <button
@@ -151,9 +151,7 @@
         title={recording ? t('recording.send') : t('videoNote.holdToRecord')}
         onclick={press}
       >
-        <svg viewBox={ICON_VIEWBOX} aria-hidden="true">
-          {#if recording}<path d={icons.send} />{:else}<path d={icons.video} />{/if}
-        </svg>
+        <Icon name={recording ? 'send' : 'video'} />
       </button>
     </div>
   </div>
@@ -290,11 +288,10 @@
     color: inherit;
     font: inherit;
   }
-  .flip svg,
-  .lock svg {
+  .flip :global(svg),
+  .lock :global(svg) {
     width: var(--size-icon);
     height: var(--size-icon);
-    fill: currentColor;
   }
   .lock {
     display: flex;
@@ -334,9 +331,8 @@
     opacity: 0.4;
     cursor: default;
   }
-  .shutter svg {
+  .shutter :global(svg) {
     width: var(--size-icon-button);
     height: var(--size-icon-button);
-    fill: currentColor;
   }
 </style>

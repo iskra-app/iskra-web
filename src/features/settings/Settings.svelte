@@ -754,14 +754,13 @@
   {/if}
 </div>
 
-<Dialog open={reading !== null} title={reading?.licence.name ?? ''} onclose={() => (reading = null)}>
+<Dialog closeLabel={t('recovery.close')} open={reading !== null} title={reading?.licence.name ?? ''} onclose={() => (reading = null)}>
   {#if reading}
     <pre class="licence">{reading.text}</pre>
-    <PlainButton onclick={() => (reading = null)}>{t('folders.done')}</PlainButton>
   {/if}
 </Dialog>
 
-<ConfirmDialog
+<ConfirmDialog closeLabel={t('recovery.close')}
   open={confirmNewCode}
   title={t('recovery.new.title')}
   message={t('recovery.new.message')}
@@ -772,13 +771,13 @@
   onconfirm={() => void makeNewCode()}
 />
 
-<Dialog open={!!newCode} title={t('settings.recoveryCode')} onclose={() => (newCode = null)}>
+<Dialog closeLabel={t('recovery.close')} open={!!newCode} title={t('settings.recoveryCode')} onclose={() => (newCode = null)}>
   {#if newCode}
     <RecoveryCode code={newCode} userId={session.userId} onsaved={() => (newCode = null)} />
   {/if}
 </Dialog>
 
-<ConfirmDialog
+<ConfirmDialog closeLabel={t('recovery.close')}
   open={confirmClear}
   title={t('storage.confirm.title')}
   message={t('storage.confirm.body')}
@@ -788,7 +787,7 @@
   onconfirm={() => void clearCache()}
 />
 
-<ConfirmDialog
+<ConfirmDialog closeLabel={t('recovery.close')}
   open={confirmSearchClear}
   title={t('storage.search.confirm.title')}
   message={t('storage.search.confirm.body')}
@@ -799,7 +798,7 @@
   onconfirm={() => void clearSearchIndex()}
 />
 
-<ConfirmDialog
+<ConfirmDialog closeLabel={t('recovery.close')}
   open={confirmingSignOut}
   title={t('signOut.confirmTitle')}
   message={t('signOut.confirmMessage')}
@@ -865,7 +864,7 @@
     margin-block-start: var(--space-close);
     padding: var(--space-close) var(--space-normal);
     border: none;
-    border-radius: var(--radius-card);
+    border-radius: var(--radius-row);
     background: var(--color-surface);
     color: var(--accent);
     font: inherit;
@@ -880,7 +879,7 @@
     width: var(--size-avatar-profile);
     height: var(--size-avatar-profile);
     margin-block-end: var(--space-close);
-    border-radius: var(--radius-card);
+    border-radius: var(--radius-row);
     /* Касания подряд — счёт, а не зум двойным касанием; долгое — не меню «Сохранить фото». */
     touch-action: manipulation;
     -webkit-touch-callout: none;
@@ -897,7 +896,7 @@
   .readonly {
     margin: 0;
     padding: var(--space-close) var(--space-normal);
-    border-radius: var(--radius-card);
+    border-radius: var(--radius-row);
     background: var(--color-surface);
     color: var(--color-text-secondary);
   }
@@ -935,7 +934,7 @@
   }
   /* Список разделов — строки-ссылки, как `Form` нативной: значок акцентом, шеврон. */
   .rows {
-    border-radius: var(--radius-card);
+    border-radius: var(--radius-row);
     background: var(--color-surface);
   }
 
@@ -951,7 +950,7 @@
     display: flex;
     align-items: center;
     gap: var(--space-normal);
-    min-height: var(--tap-target);
+    min-height: var(--row-setting);
     padding: var(--space-close) var(--space-normal) var(--space-close) var(--space-roomy);
     color: inherit;
     text-decoration: none;
@@ -968,6 +967,11 @@
   .rows a:focus-visible,
   .row-button:focus-visible {
     outline-offset: calc(-1 * var(--space-tight));
+  }
+  .row-icon :global(svg),
+  .chevron :global(svg) {
+    width: 100%;
+    height: 100%;
   }
   .row-icon {
     display: flex;
@@ -1035,7 +1039,7 @@
     flex-direction: column;
     margin: 0;
     padding: 0;
-    border-radius: var(--radius-card);
+    border-radius: var(--radius-row);
     background: var(--color-surface);
     list-style: none;
   }
@@ -1062,14 +1066,14 @@
   .options {
     display: flex;
     flex-direction: column;
-    border-radius: var(--radius-card);
+    border-radius: var(--radius-row);
     background: var(--color-surface);
     overflow: hidden;
   }
   .options button {
     display: flex;
     align-items: center;
-    min-height: var(--tap-target);
+    min-height: var(--row-setting);
     padding: var(--space-close) var(--space-normal);
     border: none;
     background: transparent;
@@ -1107,9 +1111,9 @@
     align-items: center;
     justify-content: space-between;
     gap: var(--space-normal);
-    min-height: var(--tap-target);
-    padding: var(--space-close) var(--space-normal);
-    border-radius: var(--radius-card);
+    min-height: var(--row-setting);
+    padding: var(--space-tight) var(--space-normal);
+    border-radius: var(--radius-row);
     background: var(--color-surface);
     cursor: pointer;
   }

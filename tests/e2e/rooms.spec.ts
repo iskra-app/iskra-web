@@ -90,18 +90,18 @@ test('Alt ↓ — следующий чат', async ({ page }, info) => {
 async function rowActions(page: Page, name: RegExp, phone: boolean) {
   const row = page.getByRole('link', { name });
   if (phone) {
-    // Прошлая карточка ещё догорает — иначе «видна» сработало бы раньше нового нажатия.
-    await expect(page.getByRole('dialog')).toHaveCount(0);
+    // Прошлое меню ещё догорает — иначе «видно» сработало бы раньше нового нажатия.
+    await expect(page.getByRole('menu')).toHaveCount(0);
     const box = (await row.boundingBox())!;
     const at = { clientX: box.x + 20, clientY: box.y + 20, pointerId: 9, pointerType: 'touch', isPrimary: true };
     await row.dispatchEvent('pointerdown', at);
-    const peek = page.getByRole('dialog');
-    await expect(peek).toBeVisible();
+    const menu = page.getByRole('menu', { name: /^Действия с чатом/ });
+    await expect(menu).toBeVisible();
     await row.dispatchEvent('pointerup', at);
     // Отпущенный палец — не щелчок по ссылке: чат не открылся.
     await row.dispatchEvent('click', { button: 0 });
     await expect(page).not.toHaveURL(/#\/room\//);
-    return { item: (label: string) => peek.getByRole('button', { name: label, exact: true }), items: () => peek.getByRole('list').last().getByRole('button') };
+    return { item: (label: string) => menu.getByRole('menuitem', { name: label, exact: true }), items: () => menu.getByRole('menuitem') };
   }
   await row.click({ button: 'right' });
   const menu = page.getByRole('menu', { name: /^Действия с чатом/ });
@@ -118,9 +118,7 @@ test('действия строки: прочитано и непрочитан�
   let actions = await rowActions(page, /^Выходные/, phone);
   // Папок нет — нет и «В папку».
   await expect(actions.items()).toHaveText(
-    phone
-      ? ['Открыть чат', 'Отметить прочитанным', 'Закрепить', 'В архив', 'Удалить', 'Закрыть предпросмотр']
-      : ['Подглядеть', 'Открыть чат', 'Отметить прочитанным', 'Закрепить', 'В архив', 'Удалить'],
+    ['Подглядеть', 'Открыть чат', 'Отметить прочитанным', 'Закрепить', 'В архив', 'Удалить'],
   );
   await actions.item('Отметить прочитанным').click();
   await expect(weekend).not.toHaveAccessibleName(/непрочитанн/);
@@ -160,14 +158,8 @@ test('«Подглядеть»: последние сообщения — и ч�
   const weekend = page.getByRole('link', { name: /^Выходные/ });
   await expect(weekend).toHaveAccessibleName(/3 непрочитанных/);
 
-  if (!phone) {
-    await weekend.click({ button: 'right' });
-    await page.getByRole('menu', { name: /^Действия с чатом/ }).getByRole('menuitem', { name: 'Подглядеть' }).click();
-  } else {
-    await rowActions(page, /^Выходные/, phone);
-  }
+  await (await rowActions(page, /^Выходные/, phone)).item('Подглядеть').click();
   const peek = page.getByRole('dialog', { name: 'Выходные' });
-  await expect(peek).toContainText('Вы только подглядываете — прочитанным не отметится');
   await expect(peek.getByRole('log')).toContainText('Алиса, ты с нами?');
   // Посмотрели вдоволь — отметки нет.
   await page.waitForTimeout(1500);
@@ -202,7 +194,7 @@ test('«В папку» из меню строки: галочка — чат в
   await expect(personal).not.toBeChecked();
   await personal.check();
   await expect(personal).toBeChecked();
-  await sheet.getByRole('button', { name: 'Готово' }).click();
+  await sheet.getByRole('button', { name: 'Закрыть' }).click();
   await expect(sheet).toBeHidden();
 
   await tabs.getByRole('tab', { name: /^Личные/ }).click();
@@ -212,7 +204,7 @@ test('«В папку» из меню строки: галочка — чат в
   // Сняли галочку у личного чата — его в «Личных» нет, хоть он и подходит под правило.
   await (await rowActions(page, /^Аня/, phone)).item('В папку').click();
   await page.getByRole('dialog', { name: 'Аня' }).getByRole('switch', { name: 'Личные' }).uncheck();
-  await page.getByRole('dialog', { name: 'Аня' }).getByRole('button', { name: 'Готово' }).click();
+  await page.getByRole('dialog', { name: 'Аня' }).getByRole('button', { name: 'Закрыть' }).click();
   await expect(page.getByRole('link', { name: /^Аня/ })).toHaveCount(0);
   expect(problems).toEqual([]);
 });

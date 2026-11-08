@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { touchGestures } from '../../src/features/room/gestures';
+import { swipeOffset, touchGestures } from '../../src/features/room/gestures';
 import { CANCEL_PX, HOLD_MS, LOCK_PX, moveOf, releaseOf } from '../../src/features/room/recordGesture';
 
 const handlers = () => ({ ondoubletap: vi.fn(), onswipe: vi.fn(), onlongpress: vi.fn() });
@@ -10,6 +10,21 @@ function rightClick(node: HTMLElement): Event {
   node.dispatchEvent(event);
   return event;
 }
+
+describe('свайп ответа: сколько едет пузырь', () => {
+  it('до порога — вровень с пальцем, влево — никуда', () => {
+    expect(swipeOffset(-20)).toBe(0);
+    expect(swipeOffset(40)).toBe(40);
+    expect(swipeOffset(64)).toBe(64);
+  });
+
+  it('за порогом — всё туже и не дальше упора', () => {
+    const near = swipeOffset(74) - swipeOffset(64);
+    const far = swipeOffset(174) - swipeOffset(164);
+    expect(near).toBeGreaterThan(far);
+    expect(swipeOffset(10_000)).toBeLessThan(80);
+  });
+});
 
 describe('жесты над сообщением: contextmenu', () => {
   afterEach(() => vi.restoreAllMocks());

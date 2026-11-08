@@ -18,7 +18,6 @@
   import { NewSignIns } from '../../core/session/newSignIns.svelte.ts';
   import ProblemPanel from '../../design/ProblemPanel.svelte';
   import IconButton from '../../design/IconButton.svelte';
-  import Icon from '../../design/Icon.svelte';
   import { router } from '../../core/navigation/router.svelte.ts';
   import type { RoomSummary } from '../../core/rooms/types';
   import type { UserSession } from '../../core/session/userSession.svelte.ts';
@@ -29,6 +28,7 @@
   import { folderSelection } from './folderSelection.svelte.ts';
   import { roomsOf } from '../../core/rooms/folders';
   import { roomName } from './text';
+  import Icon from '../../design/Icon.svelte';
   import Menu from '../../design/Menu.svelte';
   import FolderMembership from './FolderMembership.svelte';
   import ChatPeek, { type PeekAction } from './ChatPeek.svelte';
@@ -136,11 +136,12 @@
       if (result && failed) void result.then((ok) => !ok && (failure = failed));
     };
     return [
-      { label: t('roomList.peek.open'), run: act(() => open(room)) },
+      { icon: 'chats', label: t('roomList.peek.open'), run: act(() => open(room)) },
       hasUnread(room)
-        ? { label: t('roomList.peek.markRead'), run: act(() => rooms.markRead(room.id), 'roomAction.readFailed') }
-        : { label: t('roomList.peek.markUnread'), run: act(() => rooms.markUnread(room.id), 'roomAction.readFailed') },
+        ? { icon: 'check', label: t('roomList.peek.markRead'), run: act(() => rooms.markRead(room.id), 'roomAction.readFailed') }
+        : { icon: 'bell', label: t('roomList.peek.markUnread'), run: act(() => rooms.markUnread(room.id), 'roomAction.readFailed') },
       {
+        icon: 'pin',
         label: t(room.isFavourite ? 'roomList.swipe.unpin' : 'roomList.swipe.pin'),
         run: act(() => rooms.setPinned(room.id, !room.isFavourite), 'roomAction.pinFailed'),
       },
@@ -148,13 +149,14 @@
         ? []
         : [
             {
+              icon: 'archive' as const,
               label: t(room.isLowPriority ? 'roomList.swipe.unarchive' : 'roomList.swipe.archive'),
               run: act(() => rooms.setArchived(room.id, !room.isLowPriority), 'roomAction.archiveFailed'),
             },
           ]),
-      ...(folders.length > 0 ? [{ label: t('folders.addToFolder'), run: act(() => void (choosingFolders = room)) }] : []),
+      ...(folders.length > 0 ? [{ icon: 'folder' as const, label: t('folders.addToFolder'), run: act(() => void (choosingFolders = room)) }] : []),
       // Смахивание «Удалить» нативной: единственное, что не отменить, — поэтому сначала вопрос.
-      { label: t('roomList.swipe.delete'), run: act(() => void (leaving = room)) },
+      { icon: 'delete', label: t('roomList.swipe.delete'), run: act(() => void (leaving = room)) },
     ];
   }
 
@@ -229,7 +231,7 @@
           {now}
           selected={room.id === selectedId}
           onopen={() => open(room)}
-          onmenu={(at, sheet) => (sheet && room.kind !== 'space' ? (peeking = room) : (menu = { room, at, sheet }))}
+          onmenu={(at, sheet) => (menu = { room, at, sheet })}
         />
       {/if}
     {/each}
@@ -247,17 +249,17 @@
   {#if menu}
     {@const room = menu.room}
     {#if room.kind !== 'space'}
-      <button type="button" role="menuitem" onclick={() => peekAt(room)}>{t('roomList.peek.peek')}</button>
+      <button type="button" role="menuitem" onclick={() => peekAt(room)}><Icon name="read" />{t('roomList.peek.peek')}</button>
     {/if}
     {#each rowActions(room) as action (action.label)}
-      <button type="button" role="menuitem" onclick={action.run}>{action.label}</button>
+      <button type="button" role="menuitem" onclick={action.run}><Icon name={action.icon} />{action.label}</button>
     {/each}
   {/if}
 </Menu>
 
-<ChatPeek room={peeking} {session} actions={peeking ? rowActions(peeking) : []} onclose={() => (peeking = null)} />
+<ChatPeek room={peeking} {session} onclose={() => (peeking = null)} />
 
-<ConfirmDialog
+<ConfirmDialog closeLabel={t('recovery.close')}
   open={!!leaving}
   title={t('roomList.swipe.leaveConfirmTitle')}
   message={t('roomList.swipe.leaveConfirmMessage')}
@@ -298,7 +300,7 @@
     margin: var(--space-close) var(--space-tight);
     padding: 0 var(--space-normal);
     border: none;
-    border-radius: var(--radius-control);
+    border-radius: var(--radius-row);
     background: transparent;
     color: var(--color-text-secondary);
     font-weight: 500;

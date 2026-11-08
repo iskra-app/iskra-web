@@ -10,7 +10,6 @@
 <script lang="ts">
   import Avatar from '../../design/Avatar.svelte';
   import Dialog from '../../design/Dialog.svelte';
-  import PlainButton from '../../design/PlainButton.svelte';
   import PrimaryButton from '../../design/PrimaryButton.svelte';
   import QrCode from '../../design/QrCode.svelte';
   import { qrCard } from '../../design/qrCard';
@@ -55,7 +54,7 @@
   }
 </script>
 
-<Dialog {open} title={t('qr.title')} {onclose}>
+<Dialog closeLabel={t('recovery.close')} {open} title={t('qr.title')} {onclose}>
   <div class="sheet">
     <span class="face"><Avatar {name} {seed} {photo} mode={preferences.faces} /></span>
     <strong class="name">{name}</strong>
@@ -63,7 +62,6 @@
     <span class="subtitle selectable">{subtitle}</span>
   </div>
   <PrimaryButton wide busy={sharing} onclick={() => void share()}>{t('profile.share')}</PrimaryButton>
-  <PlainButton onclick={onclose}>{t('recovery.close')}</PlainButton>
 </Dialog>
 
 <style>

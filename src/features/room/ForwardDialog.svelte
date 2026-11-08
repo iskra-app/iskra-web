@@ -7,7 +7,7 @@
   пересланном было негде.
 -->
 <script lang="ts">
-  import { ICON_VIEWBOX, icons } from '../../design/icons.ts';
+  import Icon from '../../design/Icon.svelte';
   import Dialog from '../../design/Dialog.svelte';
   import PlainButton from '../../design/PlainButton.svelte';
   import PrimaryButton from '../../design/PrimaryButton.svelte';
@@ -55,7 +55,7 @@
   }
 </script>
 
-<Dialog {open} title={t('message.forward.title')} {onclose}>
+<Dialog closeLabel={t('recovery.close')} {open} title={t('message.forward.title')} {onclose}>
   <TextField bind:value={query} label={t('message.forward.prompt')} placeholder={t('message.forward.prompt')} autofocus />
   <ul class="grid" aria-label={t('message.forward.title')}>
     {#each shown as room (room.id)}
@@ -65,7 +65,7 @@
           <span class="face">
             <RoomFace {room} {session} />
             {#if on}
-              <span class="tick" aria-hidden="true"><svg viewBox={ICON_VIEWBOX}><path d={icons.check} /></svg></span>
+              <span class="tick" aria-hidden="true"><Icon name="check" /></span>
             {/if}
           </span>
           <span class="name">{roomName(room)}</span>
@@ -132,10 +132,10 @@
     border-radius: var(--radius-circle);
     background: var(--accent);
   }
-  .tick svg {
+  .tick :global(svg) {
     width: 100%;
     height: 100%;
-    fill: var(--on-accent);
+    color: var(--on-accent);
   }
   .name {
     display: -webkit-box;

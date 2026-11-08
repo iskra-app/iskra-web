@@ -4,12 +4,12 @@
   Красная, на своей панели, и объявляется скринридеру (`role="alert"`), а не просто есть.
 -->
 <script lang="ts">
-  import { ICON_VIEWBOX, icons } from './icons.ts';
+  import Icon from './Icon.svelte';
   let { title, message, detail }: { title?: string; message: string; detail?: string } = $props();
 </script>
 
 <div class="problem" role="alert">
-  <svg viewBox={ICON_VIEWBOX} aria-hidden="true"><path d={icons.warning} /></svg>
+  <Icon name="warning" />
   <div>
     {#if title}<strong>{title}</strong>{/if}
     <p>{message}</p>
@@ -28,11 +28,10 @@
     color: var(--color-danger);
     font-weight: 500;
   }
-  svg {
+  .problem :global(svg) {
     flex: none;
     width: var(--size-icon);
     height: var(--size-icon);
-    fill: currentColor;
   }
   strong {
     display: block;

@@ -6,7 +6,7 @@
   строк разной высоты читается так, будто список отсортирован по длине сообщения.
 -->
 <script lang="ts">
-  import { ICON_VIEWBOX, icons } from '../../design/icons.ts';
+  import Icon from '../../design/Icon.svelte';
   import UnreadBadge from '../../design/UnreadBadge.svelte';
   import { roomTimestamp } from '../../design/time';
   import { formatRoute } from '../../core/navigation/route';
@@ -78,22 +78,22 @@
     <span class="line">
       <span class="name">{roomName(room)}</span>
       {#if room.encrypted}
-        <svg class="lock" viewBox={ICON_VIEWBOX} aria-hidden="true"><path d={icons.lock} /></svg>
+        <Icon name="lock" class="row-lock" />
       {/if}
       <span class="spacer"></span>
       {#if room.isFavourite}
-        <svg class="pin" viewBox={ICON_VIEWBOX} aria-hidden="true"><path d={icons.pin} /></svg>
+        <Icon name="pin" class="row-pin" />
       {/if}
       {#if room.lastMark && !room.typing}
         <span class="mark" data-mark={room.lastMark}>
           {#if room.lastMark === 'sending'}
-            <svg viewBox={ICON_VIEWBOX} role="img" aria-label={t('message.delivery.sending')}><path d={icons.sending} /></svg>
+            <Icon name="sending" role="img" aria-label={t('message.delivery.sending')} />
           {:else if room.lastMark === 'read'}
-            <svg viewBox={ICON_VIEWBOX} role="img" aria-label={t('message.delivery.read')}><path d={icons.read} /></svg>
+            <Icon name="read" role="img" aria-label={t('message.delivery.read')} />
           {:else if room.lastMark === 'sent'}
-            <svg viewBox={ICON_VIEWBOX} role="img" aria-label={t('message.delivery.sent')}><path d={icons.check} /></svg>
+            <Icon name="check" role="img" aria-label={t('message.delivery.sent')} />
           {:else}
-            <svg viewBox={ICON_VIEWBOX} role="img" aria-label={t('message.delivery.failed')}><path d={icons.failed} /></svg>
+            <Icon name="failed" role="img" aria-label={t('message.delivery.failed')} />
           {/if}
         </span>
       {/if}
@@ -133,7 +133,8 @@
     min-height: var(--row-room);
     padding: var(--space-close) var(--space-normal);
     margin-inline: var(--space-tight);
-    border-radius: var(--radius-control);
+    border-radius: var(--radius-row);
+    font-size: var(--font-size-text);
     color: inherit;
     text-decoration: none;
     /* Пятьсот комнат — не беда: строки вне экрана не раскладываются и не рисуются. */
@@ -141,6 +142,14 @@
     contain-intrinsic-size: auto var(--row-room);
     /* Долгое нажатие — наше меню, а не системное «Открыть ссылку» поверх (iOS). */
     -webkit-touch-callout: none;
+    transition:
+      background-color var(--timing-chrome) var(--ease-out),
+      scale var(--timing-chrome) var(--ease-out);
+  }
+  @media (prefers-reduced-motion: no-preference) {
+    .row:active {
+      scale: var(--motion-press-scale);
+    }
   }
   /* Наведение — только там, где указатель умеет наводиться: на телефоне тап оставлял бы «залипшую» подсветку. */
   @media (hover: hover) {
@@ -148,6 +157,7 @@
       background: var(--color-incoming-bubble);
     }
   }
+  .row:active,
   .row[aria-current='page'] {
     background: var(--color-selected);
   }
@@ -188,22 +198,20 @@
   .mark[data-mark='failed'] {
     color: var(--color-danger);
   }
-  .mark svg {
+  .mark :global(svg) {
     width: var(--font-size-caption);
     height: var(--font-size-caption);
-    fill: currentColor;
   }
-  .lock,
-  .pin {
+  :global(.row-lock),
+  :global(.row-pin) {
     flex: none;
     width: var(--font-size-caption);
     height: var(--font-size-caption);
-    fill: currentColor;
   }
-  .lock {
+  :global(.row-lock) {
     color: var(--color-text-secondary);
   }
-  .pin {
+  :global(.row-pin) {
     color: var(--accent);
   }
   .time {

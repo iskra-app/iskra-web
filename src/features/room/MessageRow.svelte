@@ -1,9 +1,12 @@
 <!--
   Одна строка ленты: пузырь, служебная строка или разделитель дней.
 
-  Пузырь — непрозрачная заливка (стекло — только в навигационном слое). Своё — справа, в
-  акценте; чужое — слева, нейтральной заливкой. В группе у первой строки серии — имя, у
-  последней — лицо; в личном чате ни того, ни другого: и так понятно, кто говорит.
+  Пузырь — непрозрачная заливка (стекло — только в навигационном слое и у реакции на его углу).
+  Своё — справа, в акценте; чужое — слева, нейтральной заливкой. В группе у первой строки серии —
+  имя, у последней — лицо; в личном чате ни того, ни другого: и так понятно, кто говорит.
+
+  Реакции (`BubbleReactions` нативной) — кружки на нижнем углу пузыря: у чужого справа, у своего
+  слева; эмодзи наклонены. В компактном виде пузыря нет — там плоские пилюли под строкой.
 
   Компактный вид (`CompactMessageRow` нативной Искры) — те же строки без пузырей и без
   сторон: своё выглядит как чужое, и имя над серией — единственное, что говорит, кто
@@ -16,15 +19,18 @@
   выделенным текстом правый щелчок остаётся браузеру: его меню там нужнее нашего.
 -->
 <script lang="ts">
-  import { ICON_VIEWBOX, icons } from '../../design/icons.ts';
+  import Icon from '../../design/Icon.svelte';
   import Avatar from '../../design/Avatar.svelte';
+  import { reactionLeaves, reactionPops, reactionSlides } from '../../design/motion';
+  import { reactionTilt } from '../../design/reactionTilt';
   import { clock } from '../../design/time';
   import { viewport } from '../../design/viewport.svelte.ts';
   import type { Message } from '../../core/timeline/message';
   import { i18n, plural, t } from '../../i18n/index.svelte.ts';
   import { preferences } from '../app/preferences.svelte.ts';
   import type { MessageActions } from './actions';
-  import { touchGestures } from './gestures';
+  import { longPress, touchGestures } from './gestures';
+  import { watchMultiline } from './multiline';
   import { matrixHtml } from './html';
   import LinkedText from './LinkedText.svelte';
   import PollView from './PollView.svelte';
@@ -61,6 +67,8 @@
   /** Меню — и у удалённого: действий в нём нет, но когда отправили и когда удалили — есть. */
   const hasMenu = $derived(!!message.eventId && kind.type !== 'service');
   /** Картинка во весь пузырь: отступы пузыря — тоньше, фон — у самой картинки. */
+  /** Больше одной строки (или ответ, пересылка): пузырю нужен воздух сверху и снизу. */
+  let multiline = $state(false);
   const visual = $derived(kind.type === 'image' || kind.type === 'video' || kind.type === 'videoNote' || kind.type === 'sticker');
 
   const selected = () => (window.getSelection()?.toString() ?? '') !== '';
@@ -112,12 +120,47 @@
     barInside = room < bar.offsetWidth + gap;
   }
 
+  /** Кто поставил эту реакцию — удержанием и правым щелчком, как в нативной. Нажатие — поставить или снять. */
+  const asksReactors = $derived(interactive && actions.showsReactors);
+  function showReactors(key: string) {
+    if (asksReactors) actions.reactors(message, key);
+  }
+  function reactionMenu(event: MouseEvent, key: string) {
+    if (!asksReactors) return;
+    event.preventDefault();
+    showReactors(key);
+  }
+
   const gestures = $derived({
     ondoubletap: () => interactive && actions.react(message, preferences.quickReaction),
     onswipe: () => interactive && actions.canReply && actions.reply(message),
     onlongpress: (at: { x: number; y: number }) => hasMenu && actions.openMenu(message, at, true),
   });
 </script>
+
+<!-- Список есть и пустым: у первой реакции должно быть, в чём появиться, а у последней — откуда
+     уйти (`.reactions:empty`). Под `{#if}` они возникали и пропадали вместе с ним, без масштаба. -->
+{#snippet reactionList()}
+  <ul class="reactions" class:corner={!compact} aria-label={message.reactions.length ? t('message.reactions') : undefined}>
+    {#each message.reactions as reaction (reaction.key)}
+      <li in:reactionPops out:reactionLeaves animate:reactionSlides>
+        <!-- Число — когда есть что считать: одного человека и так говорит эмодзи. -->
+        <button
+          type="button"
+          class:mine={reaction.mine}
+          class:counted={reaction.count > 1}
+          aria-pressed={reaction.mine}
+          aria-label={plural('message.menu.reaction', reaction.count, { emoji: reaction.key })}
+          disabled={!interactive}
+          onclick={() => actions.react(message, reaction.key)}
+          oncontextmenu={(event) => reactionMenu(event, reaction.key)}
+          use:longPress={() => showReactors(reaction.key)}
+          ><span class="emoji" style:--tilt="{reactionTilt(message.key + reaction.key)}deg">{reaction.key}</span>{#if reaction.count > 1}<span class="count">{reaction.count}</span>{/if}</button
+        >
+      </li>
+    {/each}
+  </ul>
+{/snippet}
 
 {#if kind.type === 'service'}
   <p class="service">{serviceText(kind.event)}</p>
@@ -131,6 +174,7 @@
     class:first={firstInRun}
     class:grouped={withFace}
     class:interactive
+    class:hung={!compact && message.reactions.length > 0}
     onpointerenter={placeHoverBar}
     onfocusin={placeHoverBar}
   >
@@ -161,12 +205,15 @@
         {/if}
       {/if}
       <div class="bubble-wrap">
+      <!-- Рамка ровно по пузырю: от неё кружки реакций отмеряют его угол. -->
+      <div class="bubble-anchor">
       <!-- Пузырь — `article`: запись в `role="log"` ленты и её остановка с клавиатуры
            (`rovingFocus.ts`): стрелки ходят по сообщениям, Enter открывает меню. -->
       <div
         data-row-stop
         class="bubble"
         class:visual
+        class:roomy={multiline || !!message.replyTo || !!message.forwarded}
         class:bare={kind.type === 'sticker' || kind.type === 'videoNote'}
         role="article"
         class:notice={kind.type === 'notice'}
@@ -191,7 +238,7 @@
             {#if message.replyTo.text}<span>{message.replyTo.text}</span>{/if}
           </span>
         {/if}
-        <span class="content">
+        <span class="content" use:watchMultiline={(many) => (multiline = many)}>
           {#if (kind.type === 'text' || kind.type === 'notice') && kind.html}
             <span class="html" use:matrixHtml={kind.html}></span>
           {:else if kind.type === 'text' || kind.type === 'notice'}
@@ -214,7 +261,7 @@
             {#if albumCaption}<span class="caption album-caption text"><LinkedText text={albumCaption} /></span>{/if}
           {:else if kind.type === 'image' || kind.type === 'video' || kind.type === 'videoNote' || kind.type === 'sticker'}
             <MediaPreview kind={kind.type} attachment={kind.attachment} {media} own={message.own} onopen={() => actions.openMedia(message)} />
-            {#if kind.attachment.caption}<span class="caption text"><LinkedText text={kind.attachment.caption} /></span>{/if}
+            {#if kind.attachment.caption}<span class="caption album-caption text"><LinkedText text={kind.attachment.caption} /></span>{/if}
           {:else if kind.type === 'voice'}
             <VoiceMessage attachment={kind.attachment} {media} />
             {#if kind.attachment.caption}<span class="caption text"><LinkedText text={kind.attachment.caption} /></span>{/if}
@@ -228,20 +275,24 @@
           {/if}
         </span>
       </div>
+      <!-- После пузыря и вне его: нажатие на эмодзи — эмодзи, а не меню или жест сообщения; и
+           скринридер доходит до каждого кружка кнопкой, а не слышит всё одной фразой. -->
+      {#if !compact}{@render reactionList()}{/if}
+      </div>
       <!-- Время, «изменено», закреп и доставка — рядом с пузырём, а не в его углу, как
            `MessageMarks` нативной Искры: в углу время дерётся с последней строкой за место. -->
       <span class="marks">
         {#if message.pinned}
-          <svg class="pin" viewBox={ICON_VIEWBOX} role="img" aria-label={t('room.pinned')}><path d={icons.pin} /></svg>
+          <Icon name="pin" role="img" aria-label={t('room.pinned')} />
         {/if}
         {#if message.edited}<span>{t('message.edited')}</span>{/if}
         <time>{clock(message.ts, i18n.locale)}</time>
         {#if message.delivery.state === 'sending'}
-          <svg viewBox={ICON_VIEWBOX} role="img" aria-label={t('message.delivery.sending')}><path d={icons.sending} /></svg>
+          <Icon name="sending" role="img" aria-label={t('message.delivery.sending')} />
         {:else if message.own && message.readMark}
-          <svg viewBox={ICON_VIEWBOX} role="img" aria-label={t('message.delivery.read')}><path d={icons.read} /></svg>
+          <Icon name="read" role="img" aria-label={t('message.delivery.read')} />
         {:else if message.own && !message.read && message.delivery.state === 'sent' && message.eventId}
-          <svg viewBox={ICON_VIEWBOX} role="img" aria-label={t('message.delivery.sent')}><path d={icons.check} /></svg>
+          <Icon name="check" role="img" aria-label={t('message.delivery.sent')} />
         {/if}
       </span>
         {#if interactive && viewport.finePointer}
@@ -251,11 +302,11 @@
             <button type="button" tabindex="-1" aria-label={t('message.menu.react', { emoji: preferences.quickReaction })} title={t('message.menu.react', { emoji: preferences.quickReaction })} onclick={() => actions.react(message, preferences.quickReaction)}>{preferences.quickReaction}</button>
             {#if actions.canReply}
               <button type="button" tabindex="-1" aria-label={t('message.menu.reply')} title={t('message.menu.reply')} onclick={() => actions.reply(message)}>
-                <svg viewBox={ICON_VIEWBOX} aria-hidden="true"><path d={icons.reply} /></svg>
+                <Icon name="reply" />
               </button>
             {/if}
             <button type="button" aria-label={t('message.menu.more')} title={t('message.menu.more')} aria-haspopup="menu" onclick={more}>
-              <svg viewBox={ICON_VIEWBOX} aria-hidden="true"><path d={icons.more} /></svg>
+              <Icon name="more" />
             </button>
           </div>
         {/if}
@@ -264,24 +315,7 @@
         {@const open = actions.openThread}
         <ThreadLine thread={message.thread} onopen={() => open(message)} />
       {/if}
-      {#if message.reactions.length}
-        <ul class="reactions" aria-label={t('message.reactions')}>
-          {#each message.reactions as reaction (reaction.key)}
-            <li>
-              <!-- Число — когда есть что считать: одного человека и так говорит эмодзи. -->
-              <button
-                type="button"
-                class:mine={reaction.mine}
-                aria-pressed={reaction.mine}
-                aria-label={plural('message.menu.reaction', reaction.count, { emoji: reaction.key })}
-                disabled={!interactive}
-                onclick={() => actions.react(message, reaction.key)}
-                >{reaction.key}{#if reaction.count > 1}<span class="count">{reaction.count}</span>{/if}</button
-              >
-            </li>
-          {/each}
-        </ul>
-      {/if}
+      {#if compact}{@render reactionList()}{/if}
       {#if failed}
         <div class="failure" role="alert">
           <strong>{t('message.delivery.failed')}</strong>
@@ -372,6 +406,7 @@
     margin-inline-start: calc(var(--bubble-pad-x) - var(--space-close));
   }
   .bubble {
+    font-size: var(--font-size-text);
     max-width: 100%;
     padding: var(--bubble-pad-y) var(--bubble-pad-x);
     border-radius: var(--radius-bubble);
@@ -410,6 +445,11 @@
   .compact .bubble.deleted {
     border: none;
   }
+  /* Радиус пузыря упирается в половину его высоты: у однострочного он ровно такой, а у высокого
+     был бы крупнее. Высокому — тот же, что у однострочного. */
+  .bubble.roomy:not(.visual):not(.bare) {
+    border-radius: calc((var(--font-size-text) * var(--line-height-body) + 2 * var(--bubble-pad-y)) / 2);
+  }
   .quote {
     display: flex;
     flex-direction: column;
@@ -443,13 +483,11 @@
     font-size: var(--font-size-caption);
     line-height: 1.2;
     color: var(--color-text-secondary);
-    font-variant-numeric: tabular-nums;
     white-space: nowrap;
   }
-  .marks svg {
+  .marks :global(svg) {
     width: var(--font-size-caption);
     height: var(--font-size-caption);
-    fill: currentColor;
   }
   :global([data-wallpaper]) .marks {
     padding: var(--space-within-run) var(--space-close);
@@ -479,19 +517,13 @@
     width: 100%;
   }
   /* Строка — во всю ширину, отметки — в конце неё. */
-  .compact .bubble {
+  .compact .bubble-anchor {
     flex: 1;
   }
   .compact .bubble:not(.visual) {
     padding: 0;
     border-radius: 0;
     background: transparent;
-  }
-  /* На обоях строка без пузыря потерялась бы на картинке — ей возвращается плашка. */
-  :global([data-wallpaper]) .compact .bubble:not(.visual) {
-    padding: var(--space-tight) var(--space-close);
-    border-radius: var(--radius-control);
-    background: var(--color-incoming-bubble);
   }
   .compact .bubble.visual {
     background: transparent;
@@ -503,6 +535,12 @@
     margin: 0;
     padding: 0;
     list-style: none;
+  }
+  .reactions:empty {
+    display: none;
+  }
+  .emoji {
+    display: block;
   }
   .reactions button {
     min-height: var(--size-unread-badge);
@@ -520,6 +558,7 @@
   }
   /* Нажатие — чуть вдавливается и отпружинивает: реакция ставится пальцем, и палец это видит. */
   .reactions button:active:not(:disabled) {
+    opacity: 1;
     transform: scale(var(--motion-scale-from));
   }
   /* Своя — тоном серого, а не рамкой: заметно, когда ищешь, и не кричит, когда нет. Число своей — акцентом. */
@@ -529,7 +568,6 @@
   .count {
     margin-inline-start: var(--space-tight);
     color: var(--color-text-secondary);
-    font-variant-numeric: tabular-nums;
     font-weight: 500;
   }
   .mine .count {
@@ -537,6 +575,84 @@
   }
   .reactions button:disabled {
     cursor: default;
+  }
+  /* Кружки на углу пузыря (`ReactionCluster` нативной). Шириной не меньше пузыря и прижаты к углу:
+     пока помещаются, стоят от него на отступ; не помещаются — начинаются от другого края и уходят
+     за этот, в пустую сторону строки. Часть кружка лежит на пузыре — меньше его отступа, поэтому
+     на слова не заходит; остальное свисает вниз, туда, где `.hung` оставляет место. */
+  .reactions.corner {
+    position: absolute;
+    inset-block-end: calc(-1 * var(--reaction-overhang));
+    inset-inline-start: 0;
+    flex-wrap: nowrap;
+    justify-content: flex-end;
+    width: max-content;
+    min-width: 100%;
+    padding-inline-end: var(--space-tight);
+    z-index: 1;
+    /* Между кружками пусто: там нажатие — ещё пузырю и его соседям. */
+    pointer-events: none;
+  }
+  .own .reactions.corner {
+    inset-inline: auto 0;
+    justify-content: flex-start;
+    padding-inline: var(--space-tight) 0;
+  }
+  .corner button {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--space-tight);
+    min-width: var(--size-reaction-circle);
+    min-height: var(--size-reaction-circle);
+    padding: 0;
+    border-color: var(--color-separator);
+    background: var(--color-glass-opaque);
+    color: var(--color-text);
+    pointer-events: auto;
+  }
+  @supports (backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px)) {
+    .corner button {
+      background: var(--color-glass);
+      -webkit-backdrop-filter: saturate(180%) blur(var(--backdrop-blur));
+      backdrop-filter: saturate(180%) blur(var(--backdrop-blur));
+    }
+  }
+  /* Число делает кружок капсулой: ему надо где-то стоять. */
+  .corner button.counted {
+    padding-inline: var(--space-close);
+  }
+  /* Своя — то же стекло, на тон тяжелее. */
+  .reactions.corner button.mine {
+    background-image: linear-gradient(var(--color-own-reaction-glass), var(--color-own-reaction-glass));
+  }
+  .corner .emoji {
+    rotate: var(--tilt);
+  }
+  .corner .count,
+  .corner .mine .count {
+    margin: 0;
+    color: var(--color-text);
+    font-size: var(--font-size-caption2);
+    font-weight: 600;
+  }
+  /* Кружки свисают с пузыря. Место под ними — у обёртки, а не у пузыря: форма пузыря не меняется,
+     а лицо и отметки остаются вровень с его нижним краем, а не с нижним краем кружков. */
+  .row.hung .bubble-wrap,
+  .row.hung .face {
+    padding-block-end: var(--reaction-overhang);
+  }
+  /* Отметки стоят рядом с пузырём — и над кружками, если те вышли за его край. */
+  .row.hung .marks {
+    margin-block-end: calc(var(--size-reaction-circle) - var(--reaction-overhang));
+  }
+  /* Удержание на реакции — наш список, а не системное меню и не выделение эмодзи. */
+  @media (pointer: coarse) {
+    .reactions button {
+      -webkit-user-select: none;
+      user-select: none;
+      -webkit-touch-callout: none;
+    }
   }
   /* Палец: без выделения текста и системного меню по долгому нажатию — там наше меню,
      и «Скопировать» в нём есть. Горизонтальный жест — наш, вертикальный — прокрутке. */
@@ -548,8 +664,9 @@
       touch-action: pan-y;
     }
   }
-  .bubble {
-    transition: transform var(--timing-chrome) ease-out;
+  /* Отпущенное после свайпа возвращается на место; под пальцем переход снимает `touchGestures`. */
+  .stack {
+    transition: transform var(--timing-chrome) var(--ease-out);
   }
   /* По ширине картинки: подпись переносится под неё, а не растягивает пузырь. */
   .bubble.visual {
@@ -563,7 +680,7 @@
   /* Подпись альбома — с воздухом над и под ней: под мозаикой из нескольких фото прижатая
      строка терялась. Сверху чуть меньше, чем снизу вместе с краем пузыря: подпись — к фото. */
   .bubble.visual .album-caption {
-    padding: var(--space-close) var(--space-close) var(--space-close);
+    padding: var(--space-close) var(--space-close) var(--space-tight);
   }
   /* Стикер и «кружочек» — без пузыря: у них своя форма. */
   .bubble.bare,
@@ -583,7 +700,8 @@
   .own .bubble-wrap {
     flex-direction: row-reverse;
   }
-  .bubble-wrap > .bubble {
+  .bubble-anchor {
+    position: relative;
     min-width: 0;
   }
   /* Сбоку от пузыря, по его середине, — в пустоте ленты: не закрывает ни имя, ни текст,
@@ -630,10 +748,18 @@
     outline: 2px solid var(--accent);
     outline-offset: 2px;
   }
-  .row:hover .hover-bar,
-  .row:focus-within .hover-bar {
+  /* Фокус — только с клавиатуры: после закрытия меню он возвращается на «ещё» или пузырь,
+     и `:focus-within` держал бы панель открытой. Наведение — только у настоящей мыши: на
+     касании `:hover` залипает после нажатия. */
+  .row:has(:focus-visible) .hover-bar {
     opacity: 1;
     pointer-events: auto;
+  }
+  @media (hover: hover) {
+    .row:hover .hover-bar {
+      opacity: 1;
+      pointer-events: auto;
+    }
   }
   .hover-bar button {
     display: grid;
@@ -649,10 +775,9 @@
   .hover-bar button:hover {
     background: var(--color-selected);
   }
-  .hover-bar svg {
+  .hover-bar :global(svg) {
     width: var(--size-icon);
     height: var(--size-icon);
-    fill: currentColor;
   }
   /* HTML сообщения: разметка Matrix, но в масштабе пузыря. */
   .html :global(p),
@@ -694,7 +819,7 @@
   .html :global(.spoiler) {
     background: currentColor;
     border-radius: var(--radius-control);
-    transition: background var(--timing-chrome);
+    transition: background var(--timing-chrome) var(--ease-out);
   }
   .html :global(.spoiler:hover),
   .html :global(.spoiler:focus) {

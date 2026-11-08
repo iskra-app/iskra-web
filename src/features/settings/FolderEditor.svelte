@@ -72,7 +72,7 @@
   }
 </script>
 
-<Dialog open={true} title={isNew ? t('folders.new') : t('folders.edit')} {onclose}>
+<Dialog closeLabel={t('recovery.close')} open={true} title={isNew ? t('folders.new') : t('folders.edit')} {onclose}>
   <div class="editor">
     <TextField bind:value={folder.name} label={t('folders.namePlaceholder')} placeholder={t('folders.namePlaceholder')} autofocus={isNew} />
 
@@ -118,7 +118,7 @@
   </div>
 </Dialog>
 
-<Dialog open={choosing !== null} title={t('folders.chooseChats')} onclose={() => (choosing = null)}>
+<Dialog closeLabel={t('recovery.close')} open={choosing !== null} title={t('folders.chooseChats')} onclose={() => (choosing = null)}>
   <div class="editor">
     <TextField bind:value={query} label={t('folders.searchWeb')} placeholder={t('folders.searchWeb')} />
     <ul class="group choices">
@@ -139,7 +139,7 @@
   </div>
 </Dialog>
 
-<ConfirmDialog
+<ConfirmDialog closeLabel={t('recovery.close')}
   open={confirmingDelete}
   title={t('folders.deleteQuestion', { name: folder.name })}
   message={t('folders.deleteHelp')}
@@ -189,7 +189,7 @@
     display: flex;
     align-items: center;
     gap: var(--space-normal);
-    min-height: var(--tap-target);
+    min-height: var(--row-setting);
     padding: var(--space-tight) var(--space-normal);
     cursor: pointer;
   }

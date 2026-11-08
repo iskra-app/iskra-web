@@ -149,7 +149,7 @@
   }
 </script>
 
-<Dialog open={file !== null} title={t('avatarCrop.title')} onclose={oncancel}>
+<Dialog closeLabel={t('recovery.close')} open={file !== null} title={t('avatarCrop.title')} onclose={oncancel}>
   <!-- Своё управление внутри — стрелки и `+`/`-`: скринридеру это `application`, а не картинка. -->
   <!-- svelte-ignore a11y_no_noninteractive_tabindex, a11y_no_noninteractive_element_interactions -->
   <div

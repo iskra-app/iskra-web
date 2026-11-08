@@ -5,7 +5,7 @@
 -->
 <script lang="ts">
   import Avatar from '../../design/Avatar.svelte';
-  import { ICON_VIEWBOX, icons } from '../../design/icons.ts';
+  import Icon from '../../design/Icon.svelte';
   import type { UserSession } from '../../core/session/userSession.svelte.ts';
   import { preferences } from '../app/preferences.svelte.ts';
   import { Photo, pixelsFor } from './faces.svelte.ts';
@@ -38,7 +38,7 @@
   </span>
   {#if checked !== undefined}
     <span class="mark" class:on={checked} aria-hidden="true">
-      {#if checked}<svg viewBox={ICON_VIEWBOX}><path d={icons.check} /></svg>{/if}
+      {#if checked}<Icon name="check" />{/if}
     </span>
   {/if}
 </button>
@@ -52,7 +52,7 @@
     min-height: var(--tap-target);
     padding: var(--space-close) var(--space-normal);
     border: none;
-    border-radius: var(--radius-control);
+    border-radius: var(--radius-row);
     background: transparent;
     color: inherit;
     font: inherit;
@@ -96,10 +96,9 @@
     background: var(--accent);
     color: var(--on-accent);
   }
-  .mark svg {
+  .mark :global(svg) {
     width: var(--size-icon);
     height: var(--size-icon);
-    fill: currentColor;
   }
   .name,
   .subtitle {

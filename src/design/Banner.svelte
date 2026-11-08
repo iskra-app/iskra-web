@@ -1,10 +1,11 @@
 <!-- Тихая плашка поверх: «Доступна новая версия», «Нет сети». Не модальная, не мигает. -->
 <script lang="ts">
   import type { Snippet } from 'svelte';
+  import { riseInOut } from './motion';
   let { message, action }: { message: string; action?: Snippet } = $props();
 </script>
 
-<div class="banner" role="status">
+<div class="banner" role="status" transition:riseInOut>
   <span>{message}</span>
   {#if action}{@render action()}{/if}
 </div>

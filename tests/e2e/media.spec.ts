@@ -46,14 +46,17 @@ test('фото в ленте: место отведено до загрузки,
   expect(problems).toEqual([]);
 });
 
-test('файл: «Сохранить» скачивает его с исходным именем', async ({ page }) => {
+test('файл: «Сохранить» скачивает его с исходным именем', async ({ page, browserName }) => {
   await signInToDemo(page);
   await openRoom(page, /^Выходные/);
   const card = page.getByRole('log').getByRole('article').filter({ hasText: 'Что взять.txt' });
   await expect(card).toContainText('96');
   const download = page.waitForEvent('download');
   await card.getByRole('button', { name: 'Сохранить' }).click();
-  expect((await download).suggestedFilename()).toBe('Что взять.txt');
+  // WebKit под Linux с ubuntu-26.04 сам меняет пробел в имени на «_»: `download` у ссылки верный,
+  // и в остальных браузерах имя доходит как есть.
+  const spaces = browserName === 'webkit' && process.platform === 'linux' ? '_' : ' ';
+  expect((await download).suggestedFilename()).toBe(`Что${spaces}взять.txt`);
 });
 
 test('фото в зашифрованный чат: выбрать → лоток → подпись → ушло и открывается', async ({ page }) => {
@@ -75,8 +78,13 @@ test('фото в зашифрованный чат: выбрать → лото
   const sent = page.getByRole('log').getByRole('article').filter({ hasText: 'Смотри, какой закат' });
   await expect(sent.getByRole('button', { name: 'Фото' }).locator('img')).toHaveAttribute('src', /^blob:/, { timeout: 20_000 });
   await expect(page.getByRole('progressbar')).toHaveCount(0);
-  await sent.getByRole('button', { name: 'Фото' }).click();
-  await expect(page.getByRole('dialog', { name: 'Фото' }).locator('img')).toHaveAttribute('src', /^blob:/);
+  // Строка в миг подтверждения отправки пересоздаётся — щелчок по уходящей копии теряется (Firefox).
+  const viewer = page.getByRole('dialog', { name: 'Фото' });
+  await expect(async () => {
+    await sent.getByRole('button', { name: 'Фото' }).click({ timeout: 3000 });
+    await expect(viewer).toBeVisible({ timeout: 2000 });
+  }).toPass({ timeout: 15_000 });
+  await expect(viewer.locator('img')).toHaveAttribute('src', /^blob:/);
   expect(problems).toEqual([]);
 });
 

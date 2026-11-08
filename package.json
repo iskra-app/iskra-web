@@ -15,6 +15,7 @@
     "e2e": "playwright test"
   },
   "dependencies": {
+    "@lucide/svelte": "1.70.0",
     "blobatar": "2.7.0",
     "commonmark": "0.31.2",
     "dompurify": "3.4.16",

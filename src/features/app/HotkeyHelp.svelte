@@ -6,6 +6,7 @@
 <script lang="ts">
   import { backdropClose } from '../../design/backdropClose';
   import { describe, hotkeys } from '../../design/hotkeys';
+  import DialogClose from '../../design/DialogClose.svelte';
   import { t, type TextKey } from '../../i18n/index.svelte.ts';
 
   let { open, onclose }: { open: boolean; onclose: () => void } = $props();
@@ -31,7 +32,7 @@
       <dd>{t(`hotkey.${hotkey.id}` as TextKey)}</dd>
     {/each}
   </dl>
-  <button type="button" onclick={onclose}>{t('hotkeys.close')}</button>
+  <DialogClose label={t('hotkeys.close')} onclick={onclose} />
 </dialog>
 
 <style>
@@ -49,13 +50,14 @@
   }
   h2 {
     margin: 0 0 var(--space-roomy);
+    padding-inline-end: var(--tap-target);
     font-size: var(--font-size-title);
   }
   dl {
     display: grid;
     grid-template-columns: auto 1fr;
     gap: var(--space-close) var(--space-roomy);
-    margin: 0 0 var(--space-generous);
+    margin: 0;
   }
   dt {
     display: flex;
@@ -75,17 +77,5 @@
     font-family: var(--font-code);
     font-size: var(--font-size-caption);
     white-space: nowrap;
-  }
-  button {
-    display: block;
-    min-height: var(--tap-target);
-    margin-inline-start: auto;
-    padding: 0 var(--space-roomy);
-    border: none;
-    border-radius: var(--radius-circle);
-    background: var(--accent);
-    color: var(--on-accent);
-    font-weight: 600;
-    cursor: pointer;
   }
 </style>

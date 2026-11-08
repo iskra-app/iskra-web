@@ -77,6 +77,10 @@
     border: var(--border-hairline) solid var(--color-separator);
     border-radius: var(--radius-control);
     background: var(--color-background);
+    transition:
+      border-color var(--timing-chrome) var(--ease-out),
+      outline-color var(--timing-chrome) var(--ease-out);
+    outline: 2px solid transparent;
   }
   input:focus-visible {
     outline: 2px solid var(--accent);

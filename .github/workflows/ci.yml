@@ -5,8 +5,48 @@ on:
     branches: [main, dev]
   pull_request:
 
+# Новый пуш в ту же ветку отменяет прогон, который уже не нужен. В main не отменяем: каждый
+# зелёный коммит там уходит на боевой адрес, и пропущенный прогон пропустил бы выкладку.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+
 jobs:
+  # Слияние dev в main — тот же код, что уже прошёл CI в dev: хеш коммита другой, а дерево файлов
+  # то же. Нашли в успешных прогонах dev коммит с таким деревом — проверки не гоняем заново (ни
+  # на PR, ни на пуше в main), и deploy идёт сразу. Не нашли — как обычно, полный прогон.
+  verified:
+    if: github.event_name == 'pull_request' || github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      actions: read
+    outputs:
+      ok: ${{ steps.find.outputs.ok }}
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          # Деревья чужих коммитов сравнивать можно только имея их.
+          fetch-depth: 0
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - id: find
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          tree=$(git rev-parse 'HEAD^{tree}')
+          ok=false
+          for sha in $(gh run list --workflow CI --branch dev --status success --limit 50 --json headSha --jq '.[].headSha'); do
+            if [ "$(git rev-parse "$sha^{tree}" 2>/dev/null)" = "$tree" ]; then
+              echo "Дерево $tree уже прошло CI в dev на $sha"
+              ok=true
+              break
+            fi
+          done
+          echo "ok=$ok" >> "$GITHUB_OUTPUT"
+
   check:
+    needs: verified
+    if: ${{ !cancelled() && needs.verified.outputs.ok != 'true' }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
@@ -22,11 +62,15 @@ jobs:
       - run: pnpm build
 
   e2e:
+    needs: verified
+    if: ${{ !cancelled() && needs.verified.outputs.ok != 'true' }}
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
         engine: [chromium, firefox, webkit]
+        # Каждый движок — тремя частями по трети тестов: одна часть идёт минуты три, а не десять.
+        shard: [1, 2, 3]
     steps:
       - uses: actions/checkout@v5
       - uses: pnpm/action-setup@v4
@@ -44,7 +88,7 @@ jobs:
           sudo apt-get install -y --no-install-recommends pulseaudio
           pulseaudio --start --exit-idle-time=-1
           pactl info | grep 'Default Sink'
-      - run: pnpm e2e
+      - run: pnpm e2e --shard=${{ matrix.shard }}/3
         env:
           PW_ENGINES: ${{ matrix.engine }}
       # Артефакты из CI достать не всегда можно — снимок страницы на момент падения
@@ -61,7 +105,7 @@ jobs:
       - uses: actions/upload-artifact@v5
         if: failure()
         with:
-          name: playwright-${{ matrix.engine }}
+          name: playwright-${{ matrix.engine }}-${{ matrix.shard }}
           path: test-results/
 
   # Ночная сборка на GitHub Pages: каждый зелёный пуш в dev, по адресу
@@ -117,8 +161,9 @@ jobs:
   # nginx -t не принял новые заголовки, ссылка возвращается на прежнюю. Как поднять сервер —
   # deploy/README.md. Пока он не поднят (нет переменной DEPLOY_HOST), job пропускается.
   deploy:
-    needs: [check, e2e]
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main' && vars.DEPLOY_HOST != ''
+    needs: [verified, check, e2e]
+    # Проверки зелёные или пропущены за ненадобностью (`verified`); упавшие — не пропуск.
+    if: ${{ !cancelled() && github.event_name == 'push' && github.ref == 'refs/heads/main' && vars.DEPLOY_HOST != '' && (needs.verified.outputs.ok == 'true' || (needs.check.result == 'success' && needs.e2e.result == 'success')) }}
     runs-on: ubuntu-latest
     permissions:
       contents: read

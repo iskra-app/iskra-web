@@ -116,7 +116,7 @@
     align-items: center;
     gap: var(--space-normal);
     min-width: 0;
-    min-height: var(--tap-target);
+    min-height: var(--row-setting);
     padding: var(--space-close) var(--space-roomy);
     border: none;
     background: transparent;
@@ -144,7 +144,6 @@
   }
   .count {
     color: var(--color-text-secondary);
-    font-variant-numeric: tabular-nums;
   }
   h3 {
     margin: var(--space-close) 0 0;

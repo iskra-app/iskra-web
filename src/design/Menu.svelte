@@ -7,6 +7,7 @@
 -->
 <script lang="ts">
   import type { Snippet } from 'svelte';
+  import { closingGhost } from './closingGhost.svelte.ts';
 
   interface Props {
     open: boolean;
@@ -22,6 +23,9 @@
   let { open, x = 0, y = 0, sheet = false, label, onclose, children }: Props = $props();
 
   let dialog: HTMLDialogElement | undefined = $state();
+  let live: HTMLDivElement | undefined = $state();
+  let ghost: HTMLDivElement | undefined = $state();
+  closingGhost(() => open, () => live, () => ghost);
 
   $effect(() => {
     if (!dialog) return;
@@ -92,9 +96,10 @@
 </script>
 
 <dialog bind:this={dialog} class:sheet data-motion={sheet ? 'sheet' : 'menu'} aria-label={label} {onclose} {onkeydown} {onclick} {onwheel}>
-  <div class="menu" role="menu" aria-label={label}>
+  <div class="menu" role="menu" aria-label={label} bind:this={live}>
     {@render children()}
   </div>
+  <div class="menu" aria-hidden="true" inert hidden bind:this={ghost}></div>
 </dialog>
 
 <style>
@@ -106,7 +111,7 @@
     min-width: var(--size-menu-width);
     max-width: calc(100vw - 2 * var(--space-close));
     border: var(--border-hairline) solid var(--color-separator);
-    border-radius: var(--radius-card);
+    border-radius: var(--radius-row);
     background: var(--color-glass-opaque);
     color: var(--color-text);
     box-shadow: 0 var(--space-close) var(--space-generous) rgb(0 0 0 / 0.2);
@@ -128,6 +133,9 @@
     display: flex;
     flex-direction: column;
   }
+  .menu[hidden] {
+    display: none;
+  }
   /* Пункты — кнопки с `role="menuitem"` у того, кто меню наполняет. */
   .menu :global([role^='menuitem']) {
     display: flex;
@@ -136,12 +144,23 @@
     min-height: var(--tap-target);
     padding: 0 var(--space-normal);
     border: none;
-    border-radius: var(--radius-control);
+    border-radius: var(--radius-card);
     background: transparent;
     color: inherit;
     font: inherit;
+    font-size: var(--font-size-text);
     text-align: start;
     cursor: pointer;
+  }
+  /* Иконка перед названием: цвет пункта (красный у «danger»), не сжимается. */
+  .menu :global([role^='menuitem'] > svg) {
+    flex: none;
+    width: var(--size-icon);
+    height: var(--size-icon);
+    color: var(--color-text-secondary);
+  }
+  .menu :global([role^='menuitem'].danger > svg) {
+    color: inherit;
   }
   .menu :global([role^='menuitem']:focus-visible) {
     outline: 2px solid var(--accent);
@@ -151,6 +170,11 @@
     .menu :global([role^='menuitem']:hover) {
       background: var(--color-selected);
     }
+  }
+  /* Нажатый пункт — подсветкой, как `MessageMenuRowStyle` нативной, а не потускнением. */
+  .menu :global([role^='menuitem']:active) {
+    background: var(--color-selected);
+    opacity: 1;
   }
   .menu :global([role^='menuitem'].danger) {
     color: var(--color-danger);

@@ -60,7 +60,7 @@
   }
 </script>
 
-<Dialog {open} title={t(person ? 'openLink.writeQuestion' : 'openLink.joinQuestion', { name })} {onclose}>
+<Dialog closeLabel={t('recovery.close')} {open} title={t(person ? 'openLink.writeQuestion' : 'openLink.joinQuestion', { name })} {onclose}>
   <div class="sheet">
     <span class="face"><Avatar {name} seed={target} mode={preferences.faces} /></span>
     {#if name !== target}<strong class="name">{name}</strong>{/if}

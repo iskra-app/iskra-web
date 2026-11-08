@@ -127,9 +127,14 @@
   .bar {
     display: block;
     height: 100%;
-    width: calc(var(--ratio, 0) * 100%);
+    width: 100%;
     background: currentColor;
-    transition: width var(--timing-chrome);
+    transform: scaleX(var(--ratio, 0));
+    transform-origin: left;
+    transition: transform var(--timing-chrome) linear;
+  }
+  .bar:dir(rtl) {
+    transform-origin: right;
   }
   .status {
     display: flex;

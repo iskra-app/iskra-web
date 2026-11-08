@@ -25,7 +25,7 @@
   });
 </script>
 
-<Dialog open={!!message} title={t('message.report.title')} {onclose}>
+<Dialog closeLabel={t('recovery.close')} open={!!message} title={t('message.report.title')} {onclose}>
   {#if message}
     <div class="report">
       <TextField bind:value={reason} label={t('message.report.reasonPrompt')} placeholder={t('message.report.reasonPrompt')} autofocus />

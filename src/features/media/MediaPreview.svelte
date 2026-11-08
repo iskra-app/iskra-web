@@ -6,7 +6,7 @@
   и нажатие сначала загружает. Своё и стикеры — всегда.
 -->
 <script lang="ts">
-  import { ICON_VIEWBOX, icons } from '../../design/icons.ts';
+  import Icon from '../../design/Icon.svelte';
   import type { MediaLoader } from '../../core/media/media';
   import type { Attachment } from '../../core/timeline/message';
   import { t } from '../../i18n/index.svelte.ts';
@@ -77,7 +77,7 @@
     <span class="failed">{t('message.media.failed')}</span>
   {/if}
   {#if video}
-    <span class="play" aria-hidden="true"><svg viewBox={ICON_VIEWBOX}><path d={icons.play} /></svg></span>
+    <span class="play" aria-hidden="true"><Icon name="play" /></span>
     {#if attachment.duration}<span class="duration">{duration(attachment.duration)}</span>{/if}
   {/if}
 {/snippet}
@@ -86,16 +86,20 @@
   <span class="media sticker" use:aspect={shape}>{@render picture()}</span>
 {:else if !allowed}
   <button type="button" class="media waiting" class:round class:tile use:aspect={shape} aria-label={`${label}: ${t('media.download')}`} title={t('media.download')} onclick={() => (requested = true)}>
-    <span class="download" aria-hidden="true"><svg viewBox={ICON_VIEWBOX}><path d={icons.download} /></svg></span>
+    <span class="download" aria-hidden="true"><Icon name="download" /></span>
     {#if video && attachment.duration}<span class="duration">{duration(attachment.duration)}</span>{/if}
   </button>
 {:else}
-  <button type="button" class="media" class:round class:tile class:loading={!url && !failed} use:aspect={shape} aria-label={label} title={t('message.media.openFullScreen')} onclick={onopen}>
+  <button type="button" class="media" class:round class:tile class:captioned={!!attachment.caption} class:loading={!url && !failed} use:aspect={shape} aria-label={label} title={t('message.media.openFullScreen')} onclick={onopen}>
     {@render picture()}
   </button>
 {/if}
 
 <style>
+  /* Долгое нажатие на сообщении — меню, и пока палец решает, снимок под ним не меняется (`menuLift` нативной). */
+  .media:active {
+    opacity: 1;
+  }
   .media {
     position: relative;
     display: block;
@@ -122,12 +126,17 @@
     background: transparent;
     cursor: default;
   }
+  /* Под снимком подпись: нижние углы острее, как у альбома. */
+  .captioned:not(.round):not(.tile) {
+    border-end-start-radius: var(--radius-album-bottom);
+    border-end-end-radius: var(--radius-album-bottom);
+  }
   .round {
     width: var(--size-video-note);
     border-radius: var(--radius-circle);
   }
   .loading {
-    animation: pulse 1.4s ease-in-out infinite;
+    animation: pulse var(--timing-placeholder) ease-in-out infinite;
   }
   @keyframes pulse {
     50% {
@@ -168,14 +177,13 @@
     background: rgb(0 0 0 / 0.5);
     color: white;
   }
-  .download svg {
+  .download :global(svg) {
     width: var(--size-icon);
     height: var(--size-icon);
   }
-  .play svg {
+  .play :global(svg) {
     width: var(--size-icon);
     height: var(--size-icon);
-    fill: currentColor;
   }
   .duration {
     position: absolute;

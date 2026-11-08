@@ -14,12 +14,23 @@
 const DOUBLE_TAP_MS = 300;
 const TAP_SLOP_PX = 10;
 const SWIPE_PX = 64;
+/** Сколько пузырь ещё проходит за порогом — всё туже, до упора. */
+const SWIPE_STRETCH_PX = SWIPE_PX * 0.25;
+/** Сопротивление за порогом: чем меньше, тем раньше пузырь упирается. */
+const SWIPE_RESISTANCE = 0.55;
 const LONG_PRESS_MS = 500;
 
 export interface GestureHandlers {
   ondoubletap: () => void;
   onswipe: () => void;
   onlongpress: (at: { x: number; y: number }) => void;
+}
+
+/** Где пузырь, когда палец прошёл `x`: до порога — вровень с пальцем, дальше — всё туже. */
+export function swipeOffset(x: number): number {
+  if (x <= SWIPE_PX) return Math.max(0, x);
+  const past = x - SWIPE_PX;
+  return SWIPE_PX + (1 - 1 / ((past * SWIPE_RESISTANCE) / SWIPE_STRETCH_PX + 1)) * SWIPE_STRETCH_PX;
 }
 
 export function touchGestures(node: HTMLElement, handlers: GestureHandlers) {
@@ -76,7 +87,7 @@ export function touchGestures(node: HTMLElement, handlers: GestureHandlers) {
     if (Math.hypot(x, y) > TAP_SLOP_PX) clearTimeout(pressTimer);
     if (!horizontal && Math.abs(x) > TAP_SLOP_PX && Math.abs(x) > Math.abs(y) * 2 && x > 0) horizontal = true;
     if (!horizontal) return;
-    dx = Math.max(0, Math.min(x, SWIPE_PX * 1.25));
+    dx = swipeOffset(x);
     const moving = carrier();
     moving.style.transition = 'none';
     moving.style.transform = `translateX(${dx}px)`;

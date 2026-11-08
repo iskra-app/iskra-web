@@ -9,8 +9,7 @@
   import Avatar from '../../design/Avatar.svelte';
   import Dialog from '../../design/Dialog.svelte';
   import EmptyState from '../../design/EmptyState.svelte';
-  import { ICON_VIEWBOX, icons } from '../../design/icons.ts';
-  import PlainButton from '../../design/PlainButton.svelte';
+  import Icon from '../../design/Icon.svelte';
   import type { RoomDetailsStore } from '../../core/rooms/roomDetails.svelte.ts';
   import type { UserSession } from '../../core/session/userSession.svelte.ts';
   import { i18n, t } from '../../i18n/index.svelte.ts';
@@ -41,7 +40,7 @@
   const day = (ts: number) => new Intl.DateTimeFormat(i18n.locale, { day: 'numeric', month: 'short' }).format(ts);
 </script>
 
-<Dialog {open} title={t('room.pinnedTitle')} {onclose}>
+<Dialog closeLabel={t('room.searchClose')} {open} title={t('room.pinnedTitle')} {onclose}>
   {#if details && details.pinned.length === 0}
     <EmptyState title={t('room.pinnedEmpty')} />
   {:else if details}
@@ -62,14 +61,13 @@
           </button>
           {#if canUnpin}
             <button type="button" class="unpin" aria-label={t('room.unpin')} title={t('room.unpin')} onclick={() => onunpin(pin.eventId)}>
-              <svg viewBox={ICON_VIEWBOX} aria-hidden="true"><path d={icons.close} /></svg>
+              <Icon name="close" />
             </button>
           {/if}
         </li>
       {/each}
     </ul>
   {/if}
-  <PlainButton onclick={onclose}>{t('room.searchClose')}</PlainButton>
 </Dialog>
 
 <style>
@@ -156,9 +154,8 @@
     color: var(--color-text-secondary);
     cursor: pointer;
   }
-  svg {
+  button :global(svg) {
     width: var(--size-icon);
     height: var(--size-icon);
-    fill: currentColor;
   }
 </style>

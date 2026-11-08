@@ -5,7 +5,7 @@
   везде — по ссылке в OpenStreetMap, Яндекс или Google, в новой вкладке.
 -->
 <script lang="ts">
-  import { ICON_VIEWBOX, icons } from '../../design/icons.ts';
+  import Icon from '../../design/Icon.svelte';
   import { viewport } from '../../design/viewport.svelte.ts';
   import type { Place } from '../../core/timeline/location';
   import { i18n, t } from '../../i18n/index.svelte.ts';
@@ -29,7 +29,7 @@
 
 <span class="place">
   <span class="head">
-    <svg viewBox={ICON_VIEWBOX} aria-hidden="true"><path d={icons.location} /></svg>
+    <Icon name="location" />
     <strong>{t('location.title')}</strong>
   </span>
   <span class="coords">
@@ -57,13 +57,9 @@
     align-items: center;
     gap: var(--space-tight);
   }
-  .head svg {
+  .head :global(svg) {
     width: var(--size-icon);
     height: var(--size-icon);
-    fill: currentColor;
-  }
-  .coords {
-    font-variant-numeric: tabular-nums;
   }
   .within {
     margin-inline-start: var(--space-close);

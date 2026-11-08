@@ -4,7 +4,7 @@
   («Закреплённые»). Число — когда закреплено больше одного: «Закреплённое 1» никто не спрашивал.
 -->
 <script lang="ts">
-  import { ICON_VIEWBOX, icons } from '../../design/icons.ts';
+  import Icon from '../../design/Icon.svelte';
   import { firstLineOf } from '../../core/timeline/words';
   import type { Message } from '../../core/timeline/message';
   import { t } from '../../i18n/index.svelte.ts';
@@ -31,14 +31,14 @@
 
 <div class="pinned">
   <button type="button" class="jump" aria-label={t('room.pinnedJump')} title={t('room.pinnedJump')} onclick={onjump} disabled={!message}>
-    <svg viewBox={ICON_VIEWBOX} aria-hidden="true"><path d={icons.pin} /></svg>
+    <Icon name="pin" />
     <span class="what">
       <span class="title"><strong>{t('room.pinned')}</strong>{#if count > 1}<span class="count">{count}</span>{/if}</span>
       <span class="text">{text}</span>
     </span>
   </button>
   <button type="button" class="list" aria-label={t('room.pinnedTitle')} title={t('room.pinnedTitle')} onclick={onlist}>
-    <svg viewBox={ICON_VIEWBOX} aria-hidden="true"><path d={icons.forward} /></svg>
+    <Icon name="forward" />
   </button>
 </div>
 
@@ -67,13 +67,12 @@
   .jump:disabled {
     cursor: default;
   }
-  svg {
+  button :global(svg) {
     flex: none;
     width: var(--size-icon);
     height: var(--size-icon);
-    fill: currentColor;
   }
-  .jump svg {
+  .jump :global(svg) {
     color: var(--accent);
   }
   .what {
@@ -99,7 +98,6 @@
   }
   .count {
     color: var(--color-text-secondary);
-    font-variant-numeric: tabular-nums;
   }
   .list {
     display: grid;

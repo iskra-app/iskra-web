@@ -12,7 +12,6 @@
   import ConfirmDialog from '../../design/ConfirmDialog.svelte';
   import type { UnsignedDevice } from '../../core/encryption/sendAnyway';
   import Dialog from '../../design/Dialog.svelte';
-  import PlainButton from '../../design/PlainButton.svelte';
   import type { OutgoingFile } from '../../core/media/upload';
   import { fileSize } from '../media/files';
   import { MetadataNotRemovedError, prepareFile, stickerFile } from '../media/prepare';
@@ -97,6 +96,7 @@
   let deleting = $state<Message | null>(null);
   /** Кто отреагировал — открытое окно; `null` — закрыто. */
   let reactorsOf = $state<Reactor[] | null>(null);
+  let reactorsFilter = $state<string | null>(null);
   /** На что жалуются; `null` — окно закрыто. */
   let reporting = $state<Message | null>(null);
   /** «Просмотреть JSON»: событие текстом; `json` пусто — на сервере его ещё нет. */
@@ -497,7 +497,10 @@
     get openThread() {
       return usesThreads ? (message: Message) => message.eventId && router.go({ name: 'room', roomId, thread: message.eventId }) : undefined;
     },
-    reactors: (message) => (reactorsOf = store?.reactors(message) ?? []),
+    reactors: (message, filter) => {
+      reactorsFilter = filter ?? null;
+      reactorsOf = store?.reactors(message) ?? [];
+    },
     report: (message) => (reporting = message),
     get viewSource() {
       return preferences.showsEventSource ? (message: Message) => (source = { json: store?.sourceJSON(message) }) : undefined;
@@ -709,7 +712,7 @@
 
 <MessageMenu message={menu?.message ?? null} at={menu?.at ?? { x: 0, y: 0 }} sheet={menu?.sheet ?? false} {actions} onclose={() => (menu = null)} />
 
-<ConfirmDialog
+<ConfirmDialog closeLabel={t('recovery.close')}
   open={!!trusting}
   title={t('sendAnyway.trustTitle')}
   message={t('sendAnyway.trustMessage')}
@@ -723,7 +726,7 @@
   }}
 />
 
-<ConfirmDialog
+<ConfirmDialog closeLabel={t('recovery.close')}
   open={!!deleting}
   title={t('message.menu.deleteConfirmTitle')}
   message={t('message.menu.deleteConfirmMessage')}
@@ -737,7 +740,7 @@
   }}
 />
 
-<ConfirmDialog
+<ConfirmDialog closeLabel={t('recovery.close')}
   open={deletingSelection}
   title={t('message.selection.deleteTitle')}
   message={t('message.selection.deleteMessage')}
@@ -752,12 +755,11 @@
   }}
 />
 
-<ReactorsDialog reactors={reactorsOf} {session} onclose={() => (reactorsOf = null)} />
+<ReactorsDialog reactors={reactorsOf} initialFilter={reactorsFilter} {session} onclose={() => (reactorsOf = null)} />
 
-<Dialog open={!!source} title={t('beta.viewSource')} onclose={() => (source = null)}>
+<Dialog closeLabel={t('beta.close')} open={!!source} title={t('beta.viewSource')} onclose={() => (source = null)}>
   {#if source}
     {#if source.json}<pre class="source">{source.json}</pre>{:else}<p>{t('beta.noSource')}</p>{/if}
-    <PlainButton onclick={() => (source = null)}>{t('beta.close')}</PlainButton>
   {/if}
 </Dialog>
 <ReportDialog message={reporting} onreport={(message, reason) => store?.report(message, reason)} onclose={() => (reporting = null)} />
@@ -775,7 +777,7 @@
   />
 {/if}
 
-<ConfirmDialog
+<ConfirmDialog closeLabel={t('recovery.close')}
   open={!!endingPoll}
   title={t('poll.endConfirmTitle')}
   message={t('poll.endConfirmMessage')}
@@ -789,7 +791,7 @@
   }}
 />
 
-<ConfirmDialog
+<ConfirmDialog closeLabel={t('recovery.close')}
   open={!!placing}
   title={t('location.confirm')}
   message={placing?.accuracy !== undefined ? t('location.accuracy', { distance: distance(placing.accuracy, i18n.locale) }) : t('location.accuracyUnknown')}
