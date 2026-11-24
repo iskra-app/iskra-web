@@ -70,6 +70,7 @@
     const bars = mode === 'live' ? samples.slice(-fitting) : fitted(count ?? fitting);
     // Заданное число столбиков — поровну по всей ширине; иначе — вплотную, с шагом столбика.
     const step = mode === 'fit' && count ? (width + GAP) / Math.max(1, count) : BAR + GAP;
+    const barWidth = Math.min(BAR, step / 2);
     const played = mode === 'fit' ? Math.ceil(progress * bars.length) : bars.length;
     bars.forEach((sample, index) => {
       // `live` — от правого края: новый звук стоит на месте, старый уезжает влево.
@@ -77,7 +78,7 @@
       const bar = Math.max(MIN_BAR, Math.min(1, sample) * height);
       context.globalAlpha = index < played ? 1 : UNPLAYED_ALPHA;
       context.beginPath();
-      context.roundRect(x, (height - bar) / 2, BAR, bar, BAR / 2);
+      context.roundRect(x, (height - bar) / 2, barWidth, bar, barWidth / 2);
       context.fill();
     });
   });

@@ -134,7 +134,7 @@
     padding: var(--space-close) var(--space-normal);
     margin-inline: var(--space-tight);
     border-radius: var(--radius-row);
-    font-size: var(--font-size-text);
+    font-size: var(--font-size-body);
     color: inherit;
     text-decoration: none;
     /* Пятьсот комнат — не беда: строки вне экрана не раскладываются и не рисуются. */
@@ -157,9 +157,14 @@
       background: var(--color-incoming-bubble);
     }
   }
-  .row:active,
-  .row[aria-current='page'] {
+  .row:focus-visible {
+    outline-offset: calc(-1 * var(--border-thick));
+  }
+  .row:active {
     background: var(--color-selected);
+  }
+  .row[aria-current='page'] {
+    background: var(--color-room-selection);
   }
   .body {
     display: flex;
@@ -216,6 +221,7 @@
   }
   .time {
     flex: none;
+    font-variant-numeric: tabular-nums;
     font-size: var(--font-size-caption);
     color: var(--color-text-secondary);
   }

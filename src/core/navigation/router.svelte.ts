@@ -5,6 +5,8 @@ import { formatRoute, parseRoute, type Route } from './route';
  * возвращает на корень — без адреса; ссылка ждёт в `sessionStorage` вкладки, пока не отработает.
  */
 const PENDING_OPEN = 'iskra.open.pending';
+const OVERLAY_ENTRY = 'iskraOverlay';
+const PREVIOUS_ENTRY = 'iskraPrevious';
 
 function rememberOpen(hash: string | null): void {
   try {
@@ -38,9 +40,8 @@ export interface Navigation {
 /**
  * Своя маршрутизация на History API — без библиотечного роутера.
  *
- * Стек того, что открыто поверх (листы, просмотрщик, меню), живёт здесь же на
- * следующих этапах: на Android системная «назад» закрывает последнее открытое,
- * на десктопе то же делает `Esc`.
+ * На сенсорном экране над маршрутом может быть ещё один шаг истории для верхнего слоя.
+ * Оболочка решает, какой слой закрыть, а адрес чата остаётся тем же.
  */
 class Router {
   route = $state<Route>({ name: 'home' });
@@ -49,6 +50,9 @@ class Router {
    * Ядро не знает, какой ширины окно и как оно движется: только даёт сменить маршрут внутри.
    */
   transition: ((apply: () => void, from: Route, to: Route, how: Navigation) => void) | null = null;
+  onOverlayBack: (() => void) | null = null;
+  private overlay: { hash: string; closing: boolean } | null = null;
+  private afterOverlay: (() => void) | null = null;
 
   /**
    * Последний `popstate` — шаг по истории («назад», «вперёд», свайп). Приходит раньше
@@ -78,27 +82,62 @@ class Router {
       if (route.name === 'open' || route.name === 'room') this.go(route);
     });
     window.addEventListener('popstate', (event: PopStateEvent & { hasUAVisualTransition?: boolean }) => {
+      const hash = window.location.hash;
+      const overlay = this.overlay;
+      this.overlay = null;
+      if (overlay?.hash === hash && !event.state?.[OVERLAY_ENTRY]) {
+        if (!overlay.closing) this.onOverlayBack?.();
+        const after = this.afterOverlay;
+        this.afterOverlay = null;
+        after?.();
+        return;
+      }
+      this.afterOverlay = null;
       // Шаг без смены адреса `hashchange` не даст — запомненное узнаётся по адресу.
-      this.traversal = { traversal: true, browserAnimated: event.hasUAVisualTransition === true, hash: window.location.hash };
+      this.traversal = { traversal: true, browserAnimated: event.hasUAVisualTransition === true, hash };
     });
     window.addEventListener('hashchange', () => {
-      const from = this.route;
-      const to = parseRoute(window.location.hash);
       const step = this.traversal?.hash === window.location.hash ? this.traversal : null;
-      const how = { traversal: !!step, browserAnimated: step?.browserAnimated ?? false };
       this.traversal = null;
-      if (to.name === 'open') rememberOpen(window.location.hash);
-      else if (from.name === 'open') rememberOpen(null);
-      const apply = () => (this.route = to);
-      if (this.transition) this.transition(apply, from, to, how);
-      else apply();
+      this.navigate(window.location.hash, { traversal: !!step, browserAnimated: step?.browserAnimated ?? false });
     });
   }
 
   go(route: Route): void {
     const hash = formatRoute(route);
     if (window.location.hash === hash) return;
-    window.location.hash = hash;
+    if (this.overlay?.closing) {
+      this.afterOverlay = () => this.go(route);
+      return;
+    }
+    const state = { [PREVIOUS_ENTRY]: window.location.hash };
+    if (this.overlay) window.history.replaceState(state, '', hash);
+    else window.history.pushState(state, '', hash);
+    this.overlay = null;
+    this.navigate(hash);
+  }
+
+  /** Назад внутри приложения. У прямой ссылки может не быть предыдущего экрана приложения. */
+  backTo(route: Route): void {
+    if (this.overlay?.closing) {
+      this.afterOverlay = () => this.backTo(route);
+      return;
+    }
+    if (!this.overlay && window.history.state?.[PREVIOUS_ENTRY] === formatRoute(route)) window.history.back();
+    else this.go(route);
+  }
+
+  showOverlay(): void {
+    if (this.overlay) return;
+    const hash = window.location.hash;
+    window.history.pushState({ [OVERLAY_ENTRY]: true }, '');
+    this.overlay = { hash, closing: false };
+  }
+
+  dismissOverlay(): void {
+    if (!this.overlay || this.overlay.closing) return;
+    this.overlay.closing = true;
+    window.history.back();
   }
 
   /**
@@ -108,12 +147,25 @@ class Router {
   replace(route: Route): void {
     const hash = formatRoute(route);
     if (window.location.hash === hash) return;
+    if (this.overlay) {
+      this.afterOverlay = () => this.replace(route);
+      this.dismissOverlay();
+      return;
+    }
     window.history.replaceState(window.history.state, '', hash);
+    this.navigate(hash);
+  }
+
+  private navigate(hash: string, how: Navigation = { traversal: false, browserAnimated: false }): void {
     const from = this.route;
-    if (from.name === 'open') rememberOpen(null);
     const to = parseRoute(hash);
-    const apply = () => (this.route = to);
-    if (this.transition) this.transition(apply, from, to, { traversal: false, browserAnimated: false });
+    if (to.name === 'open') rememberOpen(hash);
+    else if (from.name === 'open') rememberOpen(null);
+    const apply = () => {
+      // Колбэк снимка может прийти после следующего клика или шага истории.
+      if (window.location.hash === hash) this.route = to;
+    };
+    if (this.transition) this.transition(apply, from, to, how);
     else apply();
   }
 }

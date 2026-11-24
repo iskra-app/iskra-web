@@ -87,8 +87,8 @@
   --size-menu-width: 15rem; /* 240 */
   --size-recording-dot: 0.625rem; /* 10 — точка, а не сетка */
   --size-waveform: 1.5rem; /* 24 — Theme.Size.waveform: высота волны голосового */
-  --size-voice-waveform: 10rem; /* 160 — сорок столбиков волны в пузыре голосового */
-  --size-voice-button: 1.75rem; /* 28 — Theme.Size.voiceButton: «▶» в пузыре; нажимается на 44 */
+  --size-voice-waveform: 7.5rem; /* 120 — тридцать столбиков волны в пузыре голосового */
+  --size-voice-play: 3rem; /* 48 — круглая кнопка проигрывания */
   --size-video-note-camera: 27.5rem; /* 440 — Theme.Size.videoNoteCamera: кружок камеры */
   --size-video-note-hint: 18.75rem; /* 300 — Theme.Size.videoNoteHint */
   --size-recording-send: 4.5rem; /* 72 — Theme.Size.recordingSend: спуск под камерой */
@@ -161,17 +161,16 @@
   --scale-entrance: 1.2;
   --blur-entrance: 12px;
 
-  /* Движение — `Theme.Timing` нативной Искры. Пружина меню — Telegram'овская, число в число
-     (`menuOpens`: response 0.265, damping 0.775) по форме, разложенная в точки для `linear()`: CSS своей
-     пружины не знает. Легко перелетает на 2 % и садится — то, что поднимают, имеет вес. */
-  --timing-menu-open: 320ms;
-  --ease-menu-open: linear(0, 0.069, 0.222, 0.4, 0.569, 0.711, 0.822, 0.903, 0.957, 0.991, 1.01, 1.019, 1.021, 1.02, 1.016, 1.013, 1.009, 1.006, 1.004, 1.002, 1.001, 1);
-  /* Закрытие — без пружины: положенное не бросают (`menuCloses`, ease-in-out). */
-  --timing-menu-close: 150ms;
-  --ease-menu-close: ease-in-out;
-  /* Пункты меню проявляются почти сразу, когда стекло уже почти раскрылось (`menuListShows`, `menuFills`). */
+  /* Меню и боковые панели короткие. Полноэкранным листам нужно чуть больше времени. */
+  --timing-menu-open: 180ms;
+  --timing-menu-close: 145ms;
+  --timing-sheet-open: 240ms;
+  --timing-sheet-close: 190ms;
+  --timing-conversation: 120ms;
+  --ease-menu-open: var(--ease-out);
+  --ease-menu-close: cubic-bezier(0.4, 0, 1, 1);
   --timing-menu-list: 50ms;
-  --delay-menu-fills: 110ms;
+  --delay-menu-fills: 25ms;
   /* Смена экрана на телефоне — пуш, как в навигации iOS. */
   --timing-screen: 260ms;
   --ease-screen: cubic-bezier(0.2, 0.8, 0.2, 1);
@@ -181,7 +180,8 @@
   --motion-rise: 0.5rem; /* 8 */
   --motion-scale-from: 0.96;
   --motion-held-scale: 1.2; /* кнопка записи под пальцем — видно, что держит */
-  --motion-menu-scale-from: 0.8; /* меню растёт из угла заметнее окна */
+  --motion-menu-scale-from: 0.95;
+  --motion-conversation-opacity: 0.86;
   /* Нажатие — `PrimaryAction.pressed` и `Theme.Opacity.rowPressed` нативной. */
   --motion-press-scale: 0.97;
   --opacity-pressed: 0.6;
@@ -203,8 +203,10 @@
   --font-body: 'Inter', var(--font-system);
   /* Код восстановления: моноширинный, чтобы «0» и «O», «l» и «1» не спорили. */
   --font-code: ui-monospace, 'SF Mono', Menlo, Consolas, 'Liberation Mono', monospace;
-  --font-size-body: 0.95rem;
-  --font-size-text: 0.95rem; /* 95 % основного — текст сообщений, строки списков и пункты меню */
+  --font-size-body: 0.9375rem; /* 15 — заголовки шапок, имена чатов, пункты меню */
+  --font-size-message: 0.875rem; /* 14 — сообщения в пузырях и в компактной ленте */
+  --font-size-input: 1rem; /* 16 — поле ввода на телефоне */
+  --line-height-message: 1.45;
   --font-size-caption: 0.8125rem; /* 13 */
   --font-size-caption2: 0.6875rem; /* 11 — число в кружке реакции, как .caption2 */
   --line-height-bar: 1.2; /* заголовок с подписью в шапке — не выше её кнопок */
@@ -231,6 +233,7 @@
 
 @media (hover: hover) and (pointer: fine) {
   :root {
+    --font-size-input: var(--font-size-body);
     --tap-target: 2.25rem; /* 36 — мышь */
     --row-room: 3.5rem; /* 56 = лицо 40 + 2 × 8 */
     --size-room-avatar: 2.5rem; /* 40 — под мышью строка ниже, лицо тоже */
@@ -251,7 +254,7 @@
   --wallpaper-veil: white;
   --color-surface: #f2f2f7;
   --color-text: #000000;
-  --color-text-secondary: rgb(60 60 67 / 0.6);
+  --color-text-secondary: rgb(60 60 67 / 0.76);
   --color-separator: rgb(60 60 67 / 0.29);
   --color-glass: rgb(255 255 255 / 0.72);
   --color-glass-opaque: #f9f9f9;
@@ -280,7 +283,8 @@
   --color-muted-badge: #8e8e93;
   --color-on-muted-badge: #ffffff;
   --color-selected: rgb(0 0 0 / 0.06);
-  --color-focus: var(--accent);
+  --color-room-selection: color-mix(in srgb, var(--accent) 17%, var(--color-surface));
+  --color-focus: color-mix(in srgb, var(--color-text) 40%, var(--accent));
   /* Искра на пустом месте, где чата ещё не выбрали: видна, но ничего не говорит. */
   --color-watermark: rgb(0 0 0 / 0.06);
 }

@@ -16,15 +16,20 @@ import type { Route } from '../../core/navigation/route';
 import { router } from '../../core/navigation/router.svelte.ts';
 import { reducedMotion } from '../../design/motion';
 import { viewport } from '../../design/viewport.svelte.ts';
+import { settingsParent } from '../settings/sections';
 
 /** Что возвращает `startViewTransition` — только то, что здесь нужно. */
 interface ViewTransitionLike {
   ready: Promise<void>;
   finished: Promise<void>;
+  skipTransition(): void;
 }
 
-/** Глубина экрана: список — ноль, чат и настройки — над ним. Чужая ссылка — вопрос над списком. */
-const depth = (route: Route): number => (route.name === 'home' || route.name === 'open' ? 0 : 1);
+function depth(route: Route): number {
+  if (route.name === 'home' || route.name === 'open') return 0;
+  if (route.name !== 'settings' || !route.section) return 1;
+  return settingsParent[route.section] ? 3 : 2;
+}
 
 /** Ширина полосы у края, откуда Safari начинает свайп «назад» и «вперёд», px. */
 const EDGE_PX = 24;
@@ -33,6 +38,7 @@ const EDGE_SWIPE_MS = 1500;
 
 export function installScreenMotion(): () => void {
   let edgeTouch = -Infinity;
+  let active: ViewTransitionLike | undefined;
   const ontouchstart = (event: TouchEvent) => {
     const x = event.touches[0]?.clientX;
     if (x !== undefined && (x <= EDGE_PX || x >= window.innerWidth - EDGE_PX)) edgeTouch = event.timeStamp;
@@ -40,6 +46,7 @@ export function installScreenMotion(): () => void {
   document.addEventListener('touchstart', ontouchstart, { passive: true, capture: true });
 
   router.transition = (apply, from, to, how) => {
+    active?.skipTransition();
     const start = (document as Document & { startViewTransition?: (update: () => void) => ViewTransitionLike }).startViewTransition;
     const swiped = how.browserAnimated || (how.traversal && performance.now() - edgeTouch < EDGE_SWIPE_MS);
     if (!start || swiped || viewport.layout !== 'stack' || reducedMotion() || depth(from) === depth(to)) {
@@ -49,12 +56,16 @@ export function installScreenMotion(): () => void {
     document.documentElement.dataset['nav'] = depth(to) > depth(from) ? 'forward' : 'back';
     // Снимок «до» уже сделан; новое состояние должно лечь в DOM внутри колбэка — сразу.
     const transition = start.call(document, () => flushSync(apply));
+    active = transition;
     // Прерванный переход (окно сменило размер, вкладку спрятали) — не ошибка: экран всё равно
     // сменился, просто без движения. Его обещания отклоняются — ловим, чтобы не сыпать в консоль.
     transition.ready.catch(() => {});
-    transition.finished.catch(() => {});
+    void transition.finished.catch(() => {}).then(() => {
+      if (active === transition) active = undefined;
+    });
   };
   return () => {
+    active?.skipTransition();
     router.transition = null;
     document.removeEventListener('touchstart', ontouchstart, { capture: true });
   };

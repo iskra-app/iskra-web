@@ -969,8 +969,8 @@ export class TimelineStore {
    * Довести ленту до события — для полосы закреплённого. Листает назад, но не бесконечно:
    * закреплённое два года назад не стоит двадцати запросов. `false` — не нашли.
    */
-  async reveal(eventId: string): Promise<boolean> {
-    for (let pages = 0; pages <= JUMP_MAX_PAGES; pages++) {
+  async reveal(eventId: string, keepGoing: () => boolean = () => true): Promise<boolean> {
+    for (let pages = 0; pages <= JUMP_MAX_PAGES && keepGoing(); pages++) {
       if (this.messages.some((m) => m.eventId === eventId)) return true;
       if (this.destroyed || this.atStart) return false;
       const outcome = await this.page(true);

@@ -65,10 +65,8 @@ test('«О чате» там, где прав нет: шапка, кнопки, 
 
   const alerts = panel.getByRole('radiogroup', { name: 'Уведомления' });
   await expect(alerts.getByRole('radio', { name: 'Все сообщения' })).toHaveAttribute('aria-checked', 'true');
-  // «Без звука» под шапкой — то же, что «Выключены».
-  await panel.getByRole('button', { name: 'Без звука' }).click();
+  await alerts.getByRole('radio', { name: 'Выключены' }).click();
   await expect(alerts.getByRole('radio', { name: 'Выключены' })).toHaveAttribute('aria-checked', 'true');
-  await expect(panel.getByRole('button', { name: 'Со звуком' })).toBeVisible();
 
   // Закреплённых в панели нет, как в нативной: они — по шеврону на полосе над лентой.
   await expect(panel).not.toContainText('Кто что берёт на пикник?');
@@ -129,7 +127,7 @@ test('новая комната и новый чат — создаются и �
   await roomPage.getByRole('textbox', { name: 'Описание' }).fill('Что читаем');
   await roomPage.getByRole('button', { name: 'Создать' }).click();
   await expect(page.getByRole('heading', { name: 'Книги', level: 1 })).toBeVisible({ timeout: 10_000 });
-  await expect(page.getByRole('dialog')).toHaveCount(0);
+  await expect(page.locator('dialog:visible')).toHaveCount(0);
 
   // Кнопка — в шапке списка; на телефоне список — за «Назад».
   const back = page.getByRole('button', { name: 'Назад' });
@@ -278,7 +276,7 @@ test('заблокировать со страницы человека (имя 
   await dialog.getByRole('button', { name: 'Заблокировать' }).click();
   await expect(page.getByRole('button', { name: 'Разблокировать пользователя' })).toBeVisible({ timeout: 10_000 });
   // Окно ещё догорает — у него свой «Закрыть»; нужен тот, что у панели.
-  await expect(page.getByRole('dialog')).toHaveCount(0);
+  await expect(page.locator('dialog:visible')).toHaveCount(0);
   await page.locator('aside.panel').getByRole('button', { name: 'Закрыть', exact: true }).click();
   // Панель уезжает не мгновенно: её «Назад» нельзя принять за «Назад» чата.
   await expect(page.locator('aside.panel')).toHaveCount(0);
@@ -365,7 +363,7 @@ test('локальное имя личного чата: видно везде, 
   await expect(panel.getByRole('heading', { name: 'Аня' })).toBeVisible();
   // На телефоне панель — лист поверх чата: сначала закрыть её.
   // Окно ещё догорает — у него свой «Закрыть»; нужен тот, что у панели.
-  await expect(page.getByRole('dialog')).toHaveCount(0);
+  await expect(page.locator('dialog:visible')).toHaveCount(0);
   await page.locator('aside.panel').getByRole('button', { name: 'Закрыть', exact: true }).click();
   const back = page.getByRole('button', { name: 'Назад' });
   if (await back.isVisible()) await back.click();
@@ -541,7 +539,7 @@ test('«Реакции»: быстрая реакция — из пяти или
   expect(problems).toEqual([]);
 });
 
-test('«Папки»: подсказка — и вкладка над списком; своя папка из редактора; удалить — вкладки нет', async ({ page }) => {
+test('«Папки»: подсказка — и вкладка над списком; своя папка из редактора; удалить — вкладки нет', async ({ page }, info) => {
   const problems = watchForProblems(page);
   await signInToDemo(page);
   // Папок нет — нет и полосы вкладок.
@@ -579,6 +577,11 @@ test('«Папки»: подсказка — и вкладка над списк
   await tabs.getByRole('tab', { name: /^Личные/ }).click();
   await expect(page.getByRole('link', { name: /^Аня/ })).toBeVisible();
   await expect(page.getByRole('link', { name: /^Выходные/ })).toHaveCount(0);
+  if (!isPhone(info.project.name)) {
+    await page.keyboard.press('Alt+ArrowDown');
+    await expect(page.getByRole('heading', { name: /^Аня/ })).toBeVisible();
+    await expect(page.getByRole('textbox', { name: 'Сообщение' })).toBeFocused();
+  }
   await tabs.getByRole('tab', { name: /^Дача/ }).click();
   await expect(page.getByRole('link', { name: /^Выходные/ })).toBeVisible();
   await expect(page.getByRole('link', { name: /^Аня/ })).toBeVisible();
@@ -676,7 +679,7 @@ test('своя комната: история для новых, адрес (з�
   // Заблокировать Веру — и пустить обратно из настроек.
   await panel.getByRole('button', { name: /^Вера/ }).click();
   await panel.getByRole('button', { name: 'Заблокировать в чате' }).click();
-  await page.getByRole('dialog').getByRole('button', { name: 'Заблокировать в чате' }).click();
+  await page.locator('dialog[open]').getByRole('button', { name: 'Заблокировать в чате' }).click();
   await expect(panel.getByRole('button', { name: /^Вера/ })).toHaveCount(0, { timeout: 10_000 });
   edit = await openEdit();
   await edit.getByRole('button', { name: 'Разблокировать' }).click();

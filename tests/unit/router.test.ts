@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { router, type Navigation } from '../../src/core/navigation/router.svelte.ts';
 
 /** Сменить адрес так, как это делает браузер, — `popstate` (если шаг по истории), потом `hashchange`. */
@@ -33,5 +33,35 @@ describe('как сменился маршрут', () => {
     window.history.replaceState(null, '', '#/settings/about');
     window.dispatchEvent(Object.assign(new PopStateEvent('popstate'), { hasUAVisualTransition: true }));
     expect(await step('#/')).toEqual({ traversal: false, browserAnimated: false });
+  });
+
+  it('запоздалый снимок экрана не возвращает прежний чат', () => {
+    const updates: Array<() => void> = [];
+    router.transition = (apply) => { updates.push(apply); };
+    try {
+      router.go({ name: 'room', roomId: '!first:example.org' });
+      router.go({ name: 'room', roomId: '!last:example.org' });
+      updates[1]?.();
+      updates[0]?.();
+      expect(router.route).toEqual({ name: 'room', roomId: '!last:example.org' });
+    } finally {
+      router.transition = null;
+    }
+  });
+
+  it('назад с верхнего слоя закрывает только его и сохраняет адрес чата', async () => {
+    const close = vi.fn();
+    router.onOverlayBack = close;
+    const hash = window.location.hash;
+    try {
+      router.showOverlay();
+      const popped = new Promise((resolve) => window.addEventListener('popstate', resolve, { once: true }));
+      window.history.back();
+      await popped;
+      expect(close).toHaveBeenCalledTimes(1);
+      expect(window.location.hash).toBe(hash);
+    } finally {
+      router.onOverlayBack = null;
+    }
   });
 });

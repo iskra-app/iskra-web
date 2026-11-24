@@ -35,6 +35,7 @@
   import { hasUnread } from '../../core/rooms/types';
 
   let { session }: { session: UserSession } = $props();
+  let list: HTMLDivElement | undefined = $state();
 
   type View = { kind: 'all' } | { kind: 'archive' } | { kind: 'space'; id: string };
 
@@ -70,6 +71,15 @@
           ? roomsOf(folder, organized.list, organized.archived)
           : organized.list,
   );
+
+  export function visibleRooms(): RoomSummary[] {
+    return shown.filter((room) => room.membership !== 'invite' && room.kind !== 'space');
+  }
+
+  export function focusRoom(id?: string | null): void {
+    const row = id ? list?.querySelector<HTMLElement>(`[data-room-id="${CSS.escape(id)}"]`) : undefined;
+    (row ?? list?.querySelector<HTMLElement>('[aria-current="page"]') ?? list?.querySelector<HTMLElement>('[data-room-id]'))?.focus();
+  }
 
   const nothingAtAll = $derived(view.kind === 'all' && organized.list.length === 0 && organized.archived.length === 0);
 
@@ -203,7 +213,7 @@
 {/if}
 
 <!-- svelte-ignore a11y_no_static_element_interactions -->
-<div class="list" {onkeydown}>
+<div class="list" bind:this={list} {onkeydown}>
   {#if !session.ready && session.rooms.rooms.length === 0}
     <EmptyState title={t('roomList.loading')} />
   {:else if nothingAtAll}

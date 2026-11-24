@@ -10,15 +10,17 @@
     shortcut?: string;
     pressed?: boolean;
     disabled?: boolean;
+    element?: HTMLButtonElement;
     onclick: () => void;
     children: Snippet;
   }
-  let { label, shortcut, pressed, disabled = false, onclick, children }: Props = $props();
+  let { label, shortcut, pressed, disabled = false, element = $bindable(), onclick, children }: Props = $props();
 </script>
 
 <button
   type="button"
   class="icon-button"
+  bind:this={element}
   aria-label={label}
   aria-pressed={pressed}
   {disabled}

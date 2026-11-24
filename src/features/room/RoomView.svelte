@@ -45,7 +45,7 @@
   import PinnedDialog from './PinnedDialog.svelte';
   import IdentityBanner from './IdentityBanner.svelte';
   import type { IdentityChangesStore } from '../../core/encryption/identityChanges.svelte.ts';
-  import Timeline from './Timeline.svelte';
+  import Timeline, { type ReadingPosition } from './Timeline.svelte';
   import WallpaperBackdrop from './WallpaperBackdrop.svelte';
   import { distance } from './distance';
   import type { Place } from '../../core/timeline/location';
@@ -63,8 +63,11 @@
     store?: TimelineStore;
     /** Это тред под сообщением (ID корня), а не сам чат: та же лента, только его ответы. */
     thread?: string;
+    position?: ReadingPosition;
+    onposition?: (position: ReadingPosition) => void;
+    onthreadopen?: () => void;
   }
-  let { session, roomId, store = $bindable(), thread }: Props = $props();
+  let { session, roomId, store = $bindable(), thread, position, onposition, onthreadopen }: Props = $props();
   /** Черновик треда — свой, рядом с черновиком чата. */
   const draftKey = $derived(thread ? `${roomId}#${thread}` : roomId);
 
@@ -495,7 +498,12 @@
     },
     openProfile: (userId: string) => profileRequest.open(roomId, userId),
     get openThread() {
-      return usesThreads ? (message: Message) => message.eventId && router.go({ name: 'room', roomId, thread: message.eventId }) : undefined;
+      if (!usesThreads) return undefined;
+      return (message: Message) => {
+        if (!message.eventId) return;
+        onthreadopen?.();
+        router.go({ name: 'room', roomId, thread: message.eventId });
+      };
     },
     reactors: (message, filter) => {
       reactorsFilter = filter ?? null;
@@ -620,7 +628,7 @@
   {/if}
   {#if store}
     {#key store}
-      <Timeline bind:this={timeline} {store} {session} {openAt} showSenders={room?.kind !== 'direct'} {actions} {selection} ontoggle={toggleSelected} />
+      <Timeline bind:this={timeline} {store} {session} {openAt} {position} {onposition} showSenders={room?.kind !== 'direct'} {actions} {selection} ontoggle={toggleSelected} />
     {/key}
   {/if}
   {#if videoNote.open && VideoNoteCapture}

@@ -415,6 +415,20 @@
     void text;
     grow();
   });
+  $effect(() => {
+    if (!field) return;
+    const target = field;
+    let width = target.clientWidth;
+    let height = target.clientHeight;
+    const observer = new ResizeObserver(() => {
+      if (target.clientWidth === width && target.clientHeight === height) return;
+      grow();
+      width = target.clientWidth;
+      height = target.clientHeight;
+    });
+    observer.observe(target);
+    return () => observer.disconnect();
+  });
 
   function send() {
     if (empty || disabled) return;
@@ -638,7 +652,7 @@
     display: flex;
     align-items: flex-end;
     gap: var(--space-close);
-    max-width: var(--column-timeline-max);
+    max-width: calc(var(--column-timeline-max) - 2 * var(--timeline-gutter));
     margin-inline: auto;
   }
   .context {
@@ -723,11 +737,15 @@
     border-radius: var(--radius-bubble);
     background: var(--color-background);
     resize: none;
+    font-size: var(--font-size-input);
     line-height: var(--line-height-body);
     overflow-y: hidden;
   }
   textarea.with-stickers {
     padding-inline-end: var(--size-navigation-bar);
+  }
+  :global([data-keyboard-viewport]) textarea {
+    max-height: calc(var(--app-viewport-height) * 0.4);
   }
   .stickers {
     position: absolute;

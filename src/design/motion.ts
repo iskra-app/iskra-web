@@ -45,12 +45,18 @@ interface Motion {
 /** Плавный выход в покой — `--ease-out` для переходов, которые считает Svelte. */
 const easeOut = (t: number): number => 1 - Math.pow(1 - t, 3);
 
-/** Лист выезжает с края (справа — в письме слева направо) и уезжает туда же. */
-export function slideFromEnd(_node: Element, { duration = 220 }: { duration?: number } = {}): Motion {
-  const rtl = typeof document !== 'undefined' && document.dir === 'rtl';
+/** CSS хранит длительности общими для диалогов и панелей Svelte. */
+function overlayDuration(node: Element, kind: 'sheet' | 'menu', closing: boolean): number {
+  if (reducedMotion()) return 0;
+  const token = `--timing-${kind}-${closing ? 'close' : 'open'}`;
+  return Number.parseFloat(getComputedStyle(node).getPropertyValue(token)) || 0;
+}
+
+export function slideFromEnd(node: Element, { closing = false } = {}): Motion {
+  const rtl = document.dir === 'rtl';
   return {
-    duration: reducedMotion() ? 0 : duration,
-    easing: easeOut,
+    duration: overlayDuration(node, 'sheet', closing),
+    easing: closing ? (t) => t * t : easeOut,
     css: (_t, u) => `transform: translateX(${(rtl ? -u : u) * 100}%)`,
   };
 }
@@ -116,11 +122,11 @@ export function collapse(node: Element, { duration = 220 }: { duration?: number 
 }
 
 /** Боковая панель рядом с чатом: колонка встаёт сразу, а содержимое въезжает с края и проявляется. */
-export function panelSlides(_node: Element, { duration = 160 }: { duration?: number } = {}): Motion {
+export function panelSlides(node: Element, { closing = false } = {}): Motion {
   const rtl = typeof document !== 'undefined' && document.dir === 'rtl';
   return {
-    duration: reducedMotion() ? 0 : duration,
-    easing: easeOut,
+    duration: overlayDuration(node, 'menu', closing),
+    easing: closing ? (t) => t * t : easeOut,
     css: (t, u) => `opacity: ${t}; transform: translateX(${(rtl ? -u : u) * 2}rem)`,
   };
 }

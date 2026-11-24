@@ -5,6 +5,10 @@
   `role="log"` для скринридера — с `aria-live="off"`: иначе он зачитал бы каждую страницу
   подгруженной истории. Новые входящие объявляет отдельная вежливая область.
 -->
+<script lang="ts" module>
+  export type ReadingPosition = { eventId: string; offset: number } | 'bottom';
+</script>
+
 <script lang="ts">
   import Icon from '../../design/Icon.svelte';
   import { onMount, tick } from 'svelte';
@@ -39,8 +43,10 @@
     reads?: boolean;
     /** Открыть на этом сообщении, а не внизу, — так открывает найденное поиск. */
     openAt?: string;
+    position?: ReadingPosition;
+    onposition?: (position: ReadingPosition) => void;
   }
-  let { store, session, showSenders, actions, selection = null, ontoggle, reads = true, openAt }: Props = $props();
+  let { store, session, showSenders, actions, selection = null, ontoggle, reads = true, openAt, position, onposition }: Props = $props();
 
   /** Имя строки-галочки: содержимое под ней `inert` и скринридеру не видно. */
   function spoken(message: Message): string {
@@ -70,6 +76,12 @@
   let anchor: ScrollAnchor | undefined = $state();
   let announcement = $state('');
   let now = $state(Date.now());
+  let opening = $state(true);
+  let positioned = $state(false);
+  let destroyed = false;
+  let requested = 0;
+  let manualScroll = false;
+  let reading: ReadingPosition | undefined;
 
   // ————— Плавающая дата — `FloatingDate` нативной (Telegram) —————
   // Пока ленту листают, над ней — день того, что сейчас наверху: даты быстрой прокрутки
@@ -86,6 +98,8 @@
   const byHand = () => (handledAt = performance.now());
 
   function onscroll() {
+    if (performance.now() - handledAt <= 1000) manualScroll = true;
+    if (positioned || manualScroll) rememberPosition();
     if (performance.now() - handledAt > 1000 || floatFrame) return;
     floatFrame = requestAnimationFrame(() => {
       floatFrame = 0;
@@ -129,11 +143,61 @@
   /** Открытие закончилось: история под окно набрана, лента встала, где ей стоять. */
   let opened: Promise<void> = Promise.resolve();
 
+  const row = (key: string) => content?.querySelector<HTMLElement>(`[data-anchor="${CSS.escape(key)}"]`);
+
+  function rememberPosition() {
+    const p = anchor?.position();
+    if (!p || !store.messages.length) return;
+    if (p === 'bottom') reading = p;
+    else {
+      const item = store.items.find((entry) => entry.key === p.key);
+      if (item?.kind === 'message' && item.message.eventId) reading = { eventId: item.message.eventId, offset: p.offset };
+    }
+  }
+
+  function revealUnread(a: ScrollAnchor) {
+    const divider = row(UNREAD_DIVIDER_KEY);
+    if (divider && content && container && content.scrollHeight > container.clientHeight) a.reveal(divider, 'top');
+  }
+
+  async function retryOpen() {
+    if (!anchor) return;
+    const a = anchor;
+    opening = true;
+    try {
+      await store.retryOpen(() => a.needsMore());
+      await tick();
+      if (!destroyed && !manualScroll && !requested) revealUnread(a);
+    } finally {
+      opening = false;
+    }
+  }
+
+  async function restore(a: ScrollAnchor, saved: ReadingPosition | undefined) {
+    const pending = () => !destroyed && !manualScroll && !requested;
+    if (!pending()) return;
+    if (saved === 'bottom') {
+      a.scrollToBottom();
+      return;
+    }
+    if (saved && await store.reveal(saved.eventId, pending) && pending()) {
+      const element = await eventRow(saved.eventId);
+      if (element && pending()) {
+        a.reveal(element, saved.offset);
+        return;
+      }
+    }
+    if (pending()) revealUnread(a);
+  }
+
   onMount(() => {
     const a = new ScrollAnchor(container!, content!, {
       topReach: TOP_REACH,
       bottomReach: BOTTOM_REACH,
-      onNearTop: () => void store.loadMore(),
+      onNearTop: () => {
+        if (positioned || manualScroll) void store.loadMore();
+      },
+      onScroll: onscroll,
     });
     anchor = a;
     // Открытие: история просится явно, пока содержимого меньше, чем окно. Есть полоса
@@ -142,17 +206,25 @@
     // лента и так стоит у конца.
     opened = store.fill(() => a.needsMore()).then(async () => {
       await tick();
-      const divider = content?.querySelector<HTMLElement>(`[data-anchor="${UNREAD_DIVIDER_KEY}"]`);
-      if (divider && content && content.scrollHeight > container!.clientHeight) a.reveal(divider, 'top');
+      opening = false;
+      await restore(a, position);
     });
     if (openAt) void reveal(openAt);
+    void opened.then(() => {
+      if (!destroyed && !requested) {
+        positioned = true;
+        rememberPosition();
+      }
+    });
     // Окно выросло после открытия — развернули на весь экран — подгрузка продолжается.
     const grow = new ResizeObserver(() => {
-      if (a.needsMore()) void store.fill(() => a.needsMore());
+      if (!opening && a.needsMore()) void store.fill(() => a.needsMore());
     });
     grow.observe(container!);
     const minutes = setInterval(() => (now = Date.now()), 60_000);
     return () => {
+      destroyed = true;
+      if (reading) onposition?.(reading);
       grow.disconnect();
       a.destroy();
       clearInterval(minutes);
@@ -185,7 +257,7 @@
 
   // Прочитано: чат на экране, окно в фокусе, человек внизу.
   function maybeMarkRead() {
-    if (reads && anchor?.atBottom && document.visibilityState === 'visible' && document.hasFocus()) store.markRead();
+    if (reads && positioned && anchor?.atBottom && document.visibilityState === 'visible' && document.hasFocus()) store.markRead();
   }
   $effect(() => {
     void store.messages;
@@ -224,38 +296,51 @@
    * К сообщению — для полосы закреплённого. Нет среди загруженного — лента листает назад
    * (не бесконечно), потом прокрутка в середину экрана и короткая подсветка.
    */
-  export async function reveal(eventId: string): Promise<void> {
-    // Из поиска — сразу после открытия: иначе открытие поставило бы ленту вниз уже после.
-    await opened;
-    if (!(await store.reveal(eventId))) return;
+  async function eventRow(eventId: string): Promise<HTMLElement | undefined> {
     // Фото внутри альбома своей строки не имеет — строка альбома та, что у первого.
     const key = store.items.find(
       (item) => item.kind === 'message' && (item.message.album ?? [item.message]).some((m) => m.eventId === eventId),
     )?.key;
     if (!key) return;
-    // Лента пересобирается раз в кадр — строки может ещё не быть в DOM. Подождать несколько.
-    let element: HTMLElement | null = null;
-    for (let frame = 0; frame < 10 && !element; frame++) {
+    // Лента пересобирается раз в кадр — строки может ещё не быть в DOM.
+    for (let frame = 0; frame < 10 && !destroyed; frame++) {
       await tick();
-      element = content?.querySelector<HTMLElement>(`[data-anchor="${CSS.escape(key)}"]`) ?? null;
-      if (!element) await new Promise((resolve) => requestAnimationFrame(resolve));
+      const element = row(key);
+      if (element) return element;
+      await new Promise((resolve) => requestAnimationFrame(resolve));
     }
-    if (!element) return;
-    if (anchor) anchor.reveal(element);
-    else element.scrollIntoView({ block: 'center' });
-    element.classList.add('flash');
-    setTimeout(() => element.classList.remove('flash'), 1600);
+  }
+
+  export async function reveal(eventId: string): Promise<void> {
+    const request = ++requested;
+    const pending = () => !destroyed && requested === request;
+    await opened;
+    if (!pending()) return;
+    const element = await store.reveal(eventId, pending) ? await eventRow(eventId) : undefined;
+    if (!pending()) return;
+    if (element) {
+      anchor?.reveal(element);
+      element.classList.add('flash');
+      setTimeout(() => element.classList.remove('flash'), 1600);
+    } else if (anchor && !positioned && !manualScroll) {
+      revealUnread(anchor);
+    }
+    positioned = true;
+    rememberPosition();
   }
 
   /** Страница — чуть меньше экрана: последняя строка прошлой остаётся видна. */
   export function page(direction: -1 | 1): void {
     if (!container) return;
+    manualScroll = true;
     container.scrollBy({ top: direction * container.clientHeight * 0.85 });
   }
 
   /** `Esc` в чате: вниз, к последнему, — и прочитано. */
   export function toBottom(): void {
+    manualScroll = true;
     anchor?.scrollToBottom();
+    rememberPosition();
     maybeMarkRead();
   }
 
@@ -281,15 +366,17 @@
 {#if floating}
   <p class="day floating" class:shown={floatingShown} aria-hidden="true"><span>{floating}</span></p>
 {/if}
-<div class="scroller" bind:this={container} {onscroll}>
+<div class="scroller" bind:this={container}>
   <div class="content" bind:this={content} role="log" aria-live="off" aria-label={t('room.timeline')} use:rovingFocus={{ onmenu: menuByKey }}>
     {#if store.loadFailed}
       <div class="problem">
         <EmptyState title={t('room.loadFailedTitle')} message={t('room.loadFailedMessage')} />
-        <PrimaryButton onclick={() => void store.retryOpen(() => anchor?.needsMore() ?? true)}>{t('room.tryAgain')}</PrimaryButton>
+        <PrimaryButton onclick={() => void retryOpen()}>{t('room.tryAgain')}</PrimaryButton>
       </div>
     {:else if store.atStart && store.messages.every((m) => m.kind.type === 'service')}
       <EmptyState title={t('room.emptyTitle')} message={t('room.emptyMessage')} />
+    {:else if (opening || store.loadingMore) && !store.messages.length}
+      <p class="loading-history" role="status">{t('room.loadingHistory')}</p>
     {/if}
     {#each store.items as item (item.key)}
       <!-- Якорь — только сообщения. Разделитель дня — нет: подгруженная история того же дня
@@ -363,7 +450,7 @@
     class="to-bottom press"
     aria-label={unseenBelow > 0 ? `${t('room.scrollToBottom')}, ${plural('roomList.unread', unseenBelow)}` : t('room.scrollToBottom')}
     title={t('room.scrollToBottom')}
-    onclick={() => anchor?.scrollToBottom()}
+    onclick={toBottom}
   >
     <Icon name="down" />
     {#if unseenBelow > 0}<span class="unseen" aria-hidden="true">{new Intl.NumberFormat(i18n.locale).format(unseenBelow)}</span>{/if}
@@ -400,6 +487,11 @@
     min-height: 100%;
     padding: var(--space-normal) var(--edge);
     justify-content: flex-end;
+  }
+  .loading-history {
+    margin: auto;
+    color: var(--color-text-secondary);
+    font-size: var(--font-size-caption);
   }
   .item:global(.flash) {
     border-radius: var(--radius-bubble);

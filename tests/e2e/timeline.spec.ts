@@ -114,6 +114,11 @@ test('ширина окна меняется — место чтения ост�
       return document.querySelector(`[data-anchor="${key}"]`)!.getBoundingClientRect().top - box.top;
     }, before.key))
     .toBeCloseTo(before.offset, 0);
+
+  await openRoom(page, /^Аня/);
+  await openRoom(page, /^Длинная история/);
+  await expect.poll(async () => (await firstVisible()).key).toBe(before.key);
+  await expect.poll(async () => (await firstVisible()).offset).toBeCloseTo(before.offset, 0);
 });
 
 test('«@» в группе: список над полем, выбор — ссылкой на человека; Markdown — как в мессенджерах', async ({ page }) => {

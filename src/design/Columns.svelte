@@ -26,6 +26,8 @@
     /** Открыт ли чат — на стеке решает, какая колонка на экране. */
     showMain: boolean;
     panelOpen?: boolean;
+    backLayer?: boolean;
+    panelLabel?: string;
     onClosePanel?: () => void;
     /** Подпись границы для скринридера, например «Ширина списка чатов». */
     resizeLabel: string;
@@ -38,12 +40,20 @@
     listWidth = $bindable(LIST_IDEAL),
     showMain,
     panelOpen = false,
+    backLayer = false,
+    panelLabel,
     onClosePanel,
     resizeLabel,
   }: Props = $props();
 
   const layout = $derived(viewport.layout);
   const panelAsSheet = $derived(layout !== 'three');
+  const sheetOpen = $derived(panelAsSheet && panelOpen && !!panel);
+
+  function focusSheet(sheet: HTMLElement) {
+    // Не открывать клавиатуру при входе в лист; первым доступно закрытие.
+    if (!sheet.contains(document.activeElement)) sheet.querySelector<HTMLButtonElement>('header button')?.focus({ preventScroll: true });
+  }
 
   function remInPx(): number {
     return parseFloat(getComputedStyle(document.documentElement).fontSize) || 16;
@@ -97,7 +107,7 @@
   class:dragging
   style:--list-width="{listWidth}rem"
 >
-  <section class="list">
+  <section class="list" inert={sheetOpen}>
     {@render list()}
   </section>
 
@@ -112,6 +122,7 @@
       aria-valuemin={LIST_MIN}
       aria-valuemax={LIST_MAX}
       aria-valuenow={listWidth}
+      inert={sheetOpen}
       tabindex="0"
       onpointerdown={onPointerDown}
       onpointermove={onPointerMove}
@@ -122,7 +133,7 @@
     ></div>
   {/if}
 
-  <section class="main">
+  <section class="main" inert={sheetOpen}>
     {@render main()}
   </section>
 
@@ -132,11 +143,14 @@
       <div class="scrim" aria-hidden="true" onclick={() => onClosePanel?.()} transition:fadeInOut|global></div>
     {/if}
     {#if panelAsSheet}
-      <aside class="panel sheet" transition:slideFromEnd|global={{ duration: 220 }}>
-        {@render panel()}
+      <aside class="panel sheet" role="presentation" data-back-layer={backLayer ? '' : undefined}
+        use:focusSheet in:slideFromEnd|global out:slideFromEnd|global={{ closing: true }}>
+        <div class="sheet-content" role="dialog" aria-modal="true" aria-label={panelLabel}>
+          {@render panel()}
+        </div>
       </aside>
     {:else}
-      <aside class="panel" transition:panelSlides|global>
+      <aside class="panel" in:panelSlides|global out:panelSlides|global={{ closing: true }}>
         {@render panel()}
       </aside>
     {/if}
@@ -152,7 +166,7 @@
   }
 
   section,
-  aside {
+  .panel {
     min-width: 0;
     min-height: 0;
     overflow: hidden;
@@ -232,12 +246,21 @@
     user-select: none;
   }
 
-  /* Закрывающаяся панель уже без своей дорожки (`data-panel-open`): без явного места сетка
-     уронила бы её во вторую строку, и она догорала бы на нижней половине окна. */
   .panel:not(.sheet) {
     grid-column: 4;
     grid-row: 1;
     border-inline-start: var(--border-hairline) solid var(--color-separator);
+  }
+  /* При закрытии лента получает итоговую ширину сразу; панель догорает поверх неё. */
+  .columns[data-panel-open='false'] > .panel:not(.sheet) {
+    position: absolute;
+    inset-block: 0;
+    inset-inline-end: 0;
+    grid-column: auto;
+    grid-row: auto;
+    width: var(--column-panel);
+    background: var(--color-background);
+    pointer-events: none;
   }
 
   .scrim {
@@ -258,5 +281,8 @@
   }
   .columns[data-layout='stack'] .panel.sheet {
     width: 100%;
+  }
+  .sheet-content {
+    height: 100%;
   }
 </style>

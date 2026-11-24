@@ -1,5 +1,5 @@
 <!--
-  Голосовое в ленте — `VoiceMessageView` нативной Искры: «▶», форма звука и длительность.
+  Голосовое в ленте — круглая кнопка, волна с длительностью под ней и время в углу пузыря.
 
   Волна — отправителя, из события: получатель видит ту же картинку, что и тот, кто говорил, и
   ещё до того, как что-то скачал. Она же — полоса прогресса: позади играющего места столбики
@@ -10,6 +10,7 @@
   раз (`speaker.ts`). Ушло с экрана — встало, расшифрованная копия отпущена.
 -->
 <script lang="ts">
+  import type { Snippet } from 'svelte';
   import Icon from '../../design/Icon.svelte';
   import { MediaError, type MediaLoader } from '../../core/media/media';
   import type { Attachment } from '../../core/timeline/message';
@@ -17,15 +18,18 @@
   import { duration as formatDuration } from '../../design/time';
   import { t } from '../../i18n/index.svelte.ts';
   import { claimSpeaker, releaseSpeaker } from './speaker';
+  import { colorScheme } from '../app/colorScheme.svelte.ts';
+  import { preferences } from '../app/preferences.svelte.ts';
 
   interface Props {
     attachment: Attachment;
     media: MediaLoader;
+    own?: boolean;
+    marks?: Snippet;
   }
-  let { attachment, media }: Props = $props();
+  let { attachment, media, own = false, marks }: Props = $props();
 
-  /** Сорок столбиков, сколько бы точек ни прислали, — как в нативной. */
-  const BARS = 40;
+  const BARS = 30;
 
   let loading = $state(false);
   let playing = $state(false);
@@ -37,9 +41,11 @@
   let audio: HTMLAudioElement | null = null;
   let url: string | null = null;
   let frame = 0;
+  let destroyed = false;
 
   const listener = { pause: () => audio?.pause() };
   const samples = $derived(attachment.waveform?.length ? attachment.waveform : new Array<number>(BARS).fill(0));
+  const bars = $derived(Math.min(samples.length, BARS));
   const total = $derived(attachment.duration ?? measured);
 
   /** Прогресс — каждым кадром, пока играет: `timeupdate` приходит четыре раза в секунду, и волна шла бы рывками. */
@@ -57,6 +63,7 @@
     problem = null;
     try {
       const blob = await media.blob(attachment.source, attachment.mimetype);
+      if (destroyed) return null;
       url = URL.createObjectURL(blob);
       const created = new Audio(url);
       created.preload = 'auto';
@@ -96,7 +103,7 @@
       return;
     }
     const player = await load();
-    if (!player) return;
+    if (!player || destroyed) return;
     claimSpeaker(listener);
     await player.play().catch((error: unknown) => {
       // У плеера, а не вслепую: отказ прежнего `play()` (пауза раньше звука) Firefox может
@@ -108,6 +115,7 @@
   }
 
   $effect(() => () => {
+    destroyed = true;
     cancelAnimationFrame(frame);
     audio?.pause();
     audio?.removeAttribute('src');
@@ -117,21 +125,31 @@
   });
 </script>
 
-<div class="voice">
+<div class="voice" class:own>
   <button
     type="button"
-    class="play"
+    class="play press"
     disabled={loading || !attachment.source}
+    aria-busy={loading}
     aria-label={playing ? t('message.media.pause') : t('message.media.play')}
     title={playing ? t('message.media.pause') : t('message.media.play')}
     onclick={toggle}
   >
-    <span class="glyph" class:loading>
-      <Icon name={playing ? 'pause' : 'play'} />
-    </span>
+    {#if loading}
+      <span class="spinner" aria-hidden="true"></span>
+    {:else}
+      {#key playing}<Icon name={playing ? 'pause' : 'play'} class="icon-swap" />{/key}
+    {/if}
   </button>
-  <span class="wave"><Waveform {samples} mode="fit" count={BARS} {progress} /></span>
-  {#if total !== undefined}<span class="length">{formatDuration(total)}</span>{/if}
+  <div class="track">
+    <span class="wave" style:--voice-width-fraction={bars / BARS}>
+      {#key `${colorScheme.light}:${preferences.accent}`}
+        <Waveform {samples} mode="fit" count={bars} {progress} />
+      {/key}
+    </span>
+    {#if total !== undefined}<span class="length">{formatDuration(total)}</span>{/if}
+  </div>
+  {#if marks}<span class="meta">{@render marks()}</span>{/if}
 </div>
 {#if problem}
   <span class="problem" role="alert">{problem === 'tampered' ? t('message.media.tampered') : t('message.media.failed')}</span>
@@ -142,44 +160,61 @@
     display: flex;
     align-items: center;
     gap: var(--space-close);
+    color: color-mix(in srgb, var(--accent) 65%, var(--color-text));
   }
-  /* Нарисована на 28, нажимается на 44: «▶» в пузыре маленький, палец — нет. */
+  .voice.own {
+    color: var(--on-bubble-own);
+  }
   .play {
     display: grid;
     flex: none;
     place-items: center;
-    width: var(--tap-target);
-    height: var(--tap-target);
-    margin-inline: calc((var(--size-voice-button) - var(--tap-target)) / 2);
+    width: var(--size-voice-play);
+    height: var(--size-voice-play);
     padding: 0;
     border: none;
-    background: transparent;
-    color: inherit;
+    border-radius: var(--radius-circle);
+    background: var(--accent);
+    color: var(--on-accent);
     cursor: pointer;
+  }
+  .own .play {
+    background: var(--on-bubble-own);
+    color: var(--bubble-own);
   }
   .play:disabled {
     cursor: default;
   }
-  .glyph {
-    display: grid;
-    place-items: center;
-    width: var(--size-voice-button);
-    height: var(--size-voice-button);
-  }
-  .glyph.loading {
-    opacity: 0.5;
-  }
-  .glyph :global(svg) {
+  .play :global(svg) {
     width: var(--size-icon);
     height: var(--size-icon);
   }
+  .spinner {
+    width: var(--size-icon);
+    height: var(--size-icon);
+    border: var(--border-thick) solid currentColor;
+    border-inline-end-color: transparent;
+    border-radius: var(--radius-circle);
+    animation: spin var(--timing-spinner) linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(1turn); } }
+  .track {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-tight);
+    min-width: 0;
+  }
   .wave {
-    flex: none;
-    width: var(--size-voice-waveform);
+    width: calc(var(--size-voice-waveform) * var(--voice-width-fraction));
+    max-width: 100%;
   }
   .length {
-    flex: none;
     font-size: var(--font-size-caption);
+    font-variant-numeric: tabular-nums;
+  }
+  .meta {
+    align-self: end;
+    margin-inline-start: auto;
   }
   .problem {
     display: block;
