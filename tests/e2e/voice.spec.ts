@@ -181,8 +181,12 @@ test('голосовое в ленте: волна и длительность �
   await expect(reactions.filter({ hasText: '❤️' })).toHaveCount(1);
   await expect(reactions.filter({ hasText: '🔥' })).toHaveCount(1);
   await expect(bubble.locator('canvas')).toBeVisible();
+  const play = bubble.getByRole('button', { name: 'Слушать' });
+  await expect(play).toHaveCSS('width', '48px');
+  await expect(bubble.locator('.track')).toContainText('0:04');
+  await expect(bubble.locator('time')).toBeVisible();
 
-  await bubble.getByRole('button', { name: 'Слушать' }).click();
+  await play.click();
   const pause = bubble.getByRole('button', { name: 'Пауза' });
   await expect(pause).toBeVisible();
   await pause.click();

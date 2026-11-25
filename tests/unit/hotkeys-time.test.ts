@@ -44,8 +44,8 @@ describe('время в строке списка', () => {
 
   it('до шести дней — день недели, семь — уже дата', () => {
     expect(roomTimestamp(at(6), now, 'ru', 'Вчера')).toBe('вт');
-    expect(roomTimestamp(at(7), now, 'ru', 'Вчера')).toBe('21.09.26');
-    expect(roomTimestamp(at(7), now, 'en', 'Yesterday')).toBe('09/21/26');
+    expect(roomTimestamp(at(7), now, 'ru', 'Вчера')).toBe('21 сент.');
+    expect(roomTimestamp(at(7), now, 'en', 'Yesterday')).toBe('Sep 21');
   });
 
   it('полночь, а не 144 часа: вечер шестого дня — всё ещё день недели', () => {

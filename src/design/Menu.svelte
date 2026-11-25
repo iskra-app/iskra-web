@@ -25,17 +25,29 @@
   let dialog: HTMLDialogElement | undefined = $state();
   let live: HTMLDivElement | undefined = $state();
   let ghost: HTMLDivElement | undefined = $state();
+  let trigger: HTMLElement | undefined;
   closingGhost(() => open, () => live, () => ghost);
 
   $effect(() => {
     if (!dialog) return;
     if (open && !dialog.open) {
+      const focused = document.activeElement;
+      trigger = focused instanceof HTMLElement && focused !== document.body ? focused : undefined;
       dialog.showModal();
       place();
       items()[0]?.focus();
     }
-    if (!open && dialog.open) dialog.close();
+    if (!open && dialog.open) {
+      dialog.close();
+      restoreFocus();
+    }
   });
+
+  function restoreFocus() {
+    if (document.activeElement === document.body && trigger?.isConnected && !trigger.closest('[inert]')) {
+      trigger.focus({ preventScroll: true });
+    }
+  }
 
   // Содержимое поменяло размер (ряд реакций раскрылся в панель эмодзи) — заново уложить в окно.
   $effect(() => {
@@ -95,7 +107,12 @@
   }
 </script>
 
-<dialog bind:this={dialog} class:sheet data-motion={sheet ? 'sheet' : 'menu'} aria-label={label} {onclose} {onkeydown} {onclick} {onwheel}>
+<dialog bind:this={dialog} class:sheet data-motion={sheet ? 'sheet' : 'menu'} aria-label={label}
+  onclose={() => {
+    if (dialog?.open) return;
+    restoreFocus();
+    onclose();
+  }} {onkeydown} {onclick} {onwheel}>
   <div class="menu" role="menu" aria-label={label} bind:this={live}>
     {@render children()}
   </div>
@@ -112,9 +129,9 @@
     max-width: calc(100vw - 2 * var(--space-close));
     border: var(--border-hairline) solid var(--color-separator);
     border-radius: var(--radius-row);
-    background: var(--color-glass-opaque);
+    background: var(--ui-background);
     color: var(--color-text);
-    box-shadow: 0 var(--space-close) var(--space-generous) rgb(0 0 0 / 0.2);
+    box-shadow: var(--shadow-popover);
   }
   dialog::backdrop {
     background: transparent;
@@ -144,11 +161,11 @@
     min-height: var(--tap-target);
     padding: 0 var(--space-normal);
     border: none;
-    border-radius: var(--radius-card);
+    border-radius: var(--radius-control);
     background: transparent;
     color: inherit;
     font: inherit;
-    font-size: var(--font-size-text);
+    font-size: var(--font-size-body);
     text-align: start;
     cursor: pointer;
   }
@@ -163,7 +180,7 @@
     color: inherit;
   }
   .menu :global([role^='menuitem']:focus-visible) {
-    outline: 2px solid var(--accent);
+    outline: var(--focus-outline);
     outline-offset: -2px;
   }
   @media (hover: hover) {

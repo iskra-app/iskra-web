@@ -7,6 +7,7 @@
   добавить вариант до того, как начнёт печатать.
 -->
 <script lang="ts">
+  import Switch from '../../design/ui/Switch.svelte';
   import Icon from '../../design/Icon.svelte';
   import Dialog from '../../design/Dialog.svelte';
   import PlainButton from '../../design/PlainButton.svelte';
@@ -84,11 +85,11 @@
       <legend>{t('poll.settings')}</legend>
       <label class="toggle">
         <span>{t('poll.allowMultiple')}</span>
-        <input type="checkbox" role="switch" bind:checked={draft.multipleChoice} />
+        <Switch bind:checked={draft.multipleChoice} />
       </label>
       <label class="toggle">
         <span>{t('poll.anonymous')}</span>
-        <input type="checkbox" role="switch" bind:checked={draft.anonymous} />
+        <Switch bind:checked={draft.anonymous} />
       </label>
       {#if draft.anonymous}<p class="help">{t('poll.anonymousFooter')}</p>{/if}
     </fieldset>

@@ -5,6 +5,7 @@
   в неё никогда.
 -->
 <script lang="ts">
+  import Switch from '../../design/ui/Switch.svelte';
   import Dialog from '../../design/Dialog.svelte';
   import { contains } from '../../core/rooms/folders';
   import type { RoomSummary } from '../../core/rooms/types';
@@ -34,13 +35,10 @@
           <li>
             <label class="folder">
               <span class="name">{folder.name}</span>
-              <input
-                type="checkbox"
-                role="switch"
+              <Switch
                 checked={contains(folder, current)}
                 disabled={offline}
-                onchange={(event) => void store.setMembership(current.id, folder.id, event.currentTarget.checked)}
-              />
+                onchange={(event) => void store.setMembership(current.id, folder.id, event.currentTarget.checked)} />
             </label>
           </li>
         {/each}

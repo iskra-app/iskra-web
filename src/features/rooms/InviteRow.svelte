@@ -33,7 +33,7 @@
   }
 </script>
 
-<div class="invite" role="group" aria-label={roomName(room)}>
+<div class="invite" role="group" tabindex="-1" data-invite-id={room.id} aria-label={roomName(room)}>
   <RoomFace {room} {session} />
   <div class="body">
     <span class="name">{roomName(room)}</span>

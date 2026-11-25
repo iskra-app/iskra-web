@@ -2,6 +2,8 @@
 @import './accent.css';
 @import './wallpaper.css';
 @import './titlebar.css';
+@import './ui/theme.css';
+@import './accessibility.css';
 
 *,
 *::before,
@@ -38,12 +40,21 @@ body {
   height: 100%;
 }
 
-button,
-input,
-textarea,
-select {
-  font: inherit;
-  color: inherit;
+:root[data-keyboard-viewport] #app {
+  position: absolute;
+  inset-inline: 0;
+  inset-block-start: var(--app-viewport-top);
+  height: var(--app-viewport-height);
+}
+
+@layer base {
+  button,
+  input,
+  textarea,
+  select {
+    font: inherit;
+    color: inherit;
+  }
 }
 
 :focus {
@@ -51,8 +62,8 @@ select {
 }
 
 :focus-visible {
-  outline: 2px solid var(--color-focus);
-  outline-offset: 2px;
+  outline: var(--focus-outline);
+  outline-offset: var(--border-thick);
 }
 
 /*
@@ -67,27 +78,25 @@ select {
 }
 
 /*
- * Окна, меню и листы появляются и уходят (`data-motion` на `<dialog>`). Открытие — пружиной
- * меню Telegram, закрытие — ровным ease-in-out: положенное не бросают. Чистый CSS, без
- * скриптов: `@starting-style` даёт точку, откуда открываться, `overlay` и `display` с
- * `allow-discrete` держат закрывающееся окно в верхнем слое, пока оно не догорит. Где
- * браузер этого не знает, окно просто появляется и исчезает, как раньше.
+ * Окна, меню и листы остаются в верхнем слое до конца перехода.
+ * Если браузер не знает дискретных переходов, окно появляется и исчезает сразу.
  */
 dialog[data-motion] {
+  --dialog-open: var(--timing-menu-open);
+  --dialog-close: var(--timing-menu-close);
   transition:
-    opacity var(--timing-menu-close) var(--ease-menu-close),
-    transform var(--timing-menu-close) var(--ease-menu-close),
-    overlay var(--timing-menu-close) allow-discrete,
-    display var(--timing-menu-close) allow-discrete;
+    opacity var(--dialog-close) var(--ease-menu-close),
+    transform var(--dialog-close) var(--ease-menu-close),
+    overlay var(--dialog-close) allow-discrete,
+    display var(--dialog-close) allow-discrete;
 }
 dialog[data-motion][open] {
-  transition-duration: var(--timing-menu-open);
+  transition-duration: var(--dialog-open);
   transition-timing-function: var(--ease-menu-open);
 }
-/* Лист — без перелёта: пружина подняла бы его над нижним краем, и под ним мелькнула бы щель. */
-dialog[data-motion='sheet'][open] {
-  transition-duration: var(--timing-screen);
-  transition-timing-function: var(--ease-screen);
+dialog[data-motion='sheet'] {
+  --dialog-open: var(--timing-sheet-open);
+  --dialog-close: var(--timing-sheet-close);
 }
 dialog[data-motion='pop']:not([open]) {
   opacity: 0;
@@ -118,9 +127,9 @@ dialog[data-motion='sheet']:not([open]) {
 dialog[data-motion]::backdrop {
   opacity: 0;
   transition:
-    opacity var(--timing-menu-close) var(--ease-menu-close),
-    overlay var(--timing-menu-close) allow-discrete,
-    display var(--timing-menu-close) allow-discrete;
+    opacity var(--dialog-close) var(--ease-menu-close),
+    overlay var(--dialog-close) allow-discrete,
+    display var(--dialog-close) allow-discrete;
 }
 dialog[data-motion][open]::backdrop {
   opacity: 1;
@@ -231,12 +240,8 @@ dialog[data-motion][open]::backdrop {
   white-space: nowrap;
 }
 
-/*
- * Любой флажок — тумблер, как в нативной Искре: дорожка и кружок, включённое — акцентом.
- * Нарисован поверх настоящего `<input type="checkbox">`, поэтому `bind:checked`, клавиатура,
- * `disabled` и роль для чтеца экрана остаются его, а не самодельные.
- */
-input[type='checkbox'] {
+/* Переключатель на нативном checkbox сохраняет подпись label и клавиатурный ввод. */
+input[role='switch'] {
   appearance: none;
   position: relative;
   flex: none;
@@ -244,11 +249,11 @@ input[type='checkbox'] {
   height: var(--size-switch-height);
   margin: 0;
   border-radius: var(--radius-circle);
-  background: var(--color-separator);
+  background: var(--color-switch-track);
   cursor: pointer;
   transition: background-color var(--timing-chrome) var(--ease-out);
 }
-input[type='checkbox']::before {
+input[role='switch']::before {
   content: '';
   position: absolute;
   inset-block-start: var(--space-tight);
@@ -256,33 +261,34 @@ input[type='checkbox']::before {
   width: var(--size-switch-knob);
   height: var(--size-switch-knob);
   border-radius: var(--radius-circle);
-  background: var(--color-on-switch);
+  background: var(--color-background);
   box-shadow: var(--shadow-switch-knob);
   transition:
     translate var(--timing-chrome) var(--ease-out),
     scale var(--timing-chrome) var(--ease-out);
 }
-input[type='checkbox']:checked {
-  background: var(--accent);
+input[role='switch']:checked {
+  background: var(--ui-primary);
 }
-input[type='checkbox']:checked::before {
+input[role='switch']:checked::before {
+  background: var(--ui-primary-foreground);
   translate: calc(var(--size-switch-width) - var(--size-switch-knob) - 2 * var(--space-tight)) 0;
 }
-input[type='checkbox']:checked:dir(rtl)::before {
+input[role='switch']:checked:dir(rtl)::before {
   translate: calc(-1 * (var(--size-switch-width) - var(--size-switch-knob) - 2 * var(--space-tight))) 0;
 }
 @media (prefers-reduced-motion: no-preference) {
-  input[type='checkbox']:active:not(:disabled)::before {
+  input[role='switch']:active:not(:disabled)::before {
     scale: var(--motion-knob-stretch);
   }
 }
-input[type='checkbox']:disabled {
+input[role='switch']:disabled {
   opacity: 0.4;
   cursor: default;
 }
 @media (prefers-reduced-motion: reduce) {
-  input[type='checkbox'],
-  input[type='checkbox']::before {
+  input[role='switch'],
+  input[role='switch']::before {
     transition: none;
   }
 }

@@ -4,13 +4,14 @@ import type { TextKey } from '../../i18n/index.svelte.ts';
 /** Заголовок страницы раздела — тот же, что у строки, которая к ней ведёт. */
 /**
  * Куда ведёт «Назад»: «Лицензии» и «Бета-функции» открываются из «Об Iskra», устройства и
- * заблокированные — из «Безопасности», остальное — из списка.
+ * заблокированные — из «Безопасности», доступность — из внешнего вида.
  */
-export const settingsParent: Partial<Record<SettingsSection, SettingsSection>> = { licences: 'about', beta: 'about', devices: 'security', blocked: 'security' };
+export const settingsParent: Partial<Record<SettingsSection, SettingsSection>> = { accessibility: 'appearance', licences: 'about', beta: 'about', devices: 'security', blocked: 'security' };
 
 export const settingsTitles: Record<SettingsSection, TextKey> = {
   profile: 'account.editTitle',
   appearance: 'settings.appearance',
+  accessibility: 'settings.accessibility',
   reactions: 'settings.reactions',
   chats: 'settings.chats',
   folders: 'folders.title',

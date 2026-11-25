@@ -5,6 +5,7 @@
  * смыслу места, а не по картинке: одну и ту же картинку могут звать по-разному.
  */
 import type { Component } from 'svelte';
+import Accessibility from '@lucide/svelte/icons/accessibility';
 import Archive from '@lucide/svelte/icons/archive';
 import ArrowLeft from '@lucide/svelte/icons/arrow-left';
 import ArrowUp from '@lucide/svelte/icons/arrow-up';
@@ -35,6 +36,8 @@ import HardDrive from '@lucide/svelte/icons/hard-drive';
 import Heart from '@lucide/svelte/icons/heart';
 import Image from '@lucide/svelte/icons/image';
 import Info from '@lucide/svelte/icons/info';
+import PanelLeftClose from '@lucide/svelte/icons/panel-left-close';
+import PanelLeftOpen from '@lucide/svelte/icons/panel-left-open';
 import Languages from '@lucide/svelte/icons/languages';
 import Leaf from '@lucide/svelte/icons/leaf';
 import Lightbulb from '@lucide/svelte/icons/lightbulb';
@@ -77,6 +80,7 @@ import Volleyball from '@lucide/svelte/icons/volleyball';
 import X from '@lucide/svelte/icons/x';
 
 export const icons = {
+  accessibility: Accessibility,
   /** Сердечко непрочитанных реакций в строке списка — залитое. */
   heart: Heart,
   back: ArrowLeft,
@@ -148,6 +152,8 @@ export const icons = {
   emojiSymbols: Shapes,
   emojiFlags: Flag,
   people: Users,
+  sidebarClose: PanelLeftClose,
+  sidebarOpen: PanelLeftOpen,
   publicRooms: Globe,
   link: Link,
   language: Languages,

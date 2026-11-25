@@ -24,6 +24,7 @@ export const builtOn: Licence[] = [
   // Rust-крипто из matrix-rust-sdk в WebAssembly — под той же лицензией: один текст под двумя именами.
   { name: 'matrix-sdk-crypto-wasm', kind: 'Apache 2.0', text: raw(() => import('./licences/matrix-js-sdk.txt?raw')) },
   { name: 'matrix-encrypt-attachment', kind: 'Apache 2.0', text: raw(() => import('./licences/matrix-encrypt-attachment.txt?raw')) },
+  { name: 'shadcn-svelte', kind: 'MIT', text: raw(() => import('./licences/shadcn-svelte.txt?raw')) },
   { name: 'Svelte', kind: 'MIT', text: raw(() => import('./licences/svelte.txt?raw')) },
   { name: 'DOMPurify', kind: 'MPL-2.0 / Apache 2.0', text: raw(() => import('./licences/dompurify.txt?raw')) },
   { name: 'commonmark.js', kind: 'BSD-2-Clause', text: raw(() => import('./licences/commonmark.txt?raw')) },

@@ -16,6 +16,8 @@ test('«Новый чат»: свои собеседники по буквам; 
     await expect(dialog.getByRole('button', { name: action })).toBeVisible();
   }
   await expect(dialog.getByRole('button', { name: /QR/ })).toHaveCount(0);
+  await expect(dialog.getByRole('button', { name: 'Отмена', exact: true })).toHaveCount(0);
+  await expect(dialog.getByRole('button', { name: 'Закрыть', exact: true })).toBeVisible();
   await expect(dialog.getByRole('region', { name: 'А' }).getByRole('button', { name: /^Аня/ })).toBeVisible();
 
   const search = dialog.getByRole('textbox', { name: 'Поиск по пользователям' });

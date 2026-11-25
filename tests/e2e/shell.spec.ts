@@ -52,22 +52,83 @@ test('имя и подпись в шапке чата открывают «О ч
   const title = page.locator('.main-column .title-press');
   await title.click();
   await expect(page.locator('aside.panel')).toBeVisible();
-  await expect(page.getByRole('button', { name: 'О чате' })).toHaveAttribute('aria-pressed', 'true');
+  const info = page.getByRole('button', { name: 'О чате', includeHidden: true });
+  await expect(info).toHaveAttribute('aria-pressed', 'true');
   await page.locator('aside.panel').getByRole('button', { name: 'Закрыть' }).click();
   await expect(page.getByRole('button', { name: 'О чате' })).toHaveAttribute('aria-pressed', 'false');
 });
 
-test('телефон: «О чате» уходит вместе с чатом — и после системного «назад»', async ({ page }, info) => {
+test('телефон: системное «назад» закрывает просмотрщик и «О чате» раньше чата', async ({ page }, info) => {
   test.skip(!isPhone(info.project.name), 'только телефон');
   await signInToDemo(page);
   await page.getByRole('link', { name: /^Выходные/ }).click();
+  await page.getByRole('log').getByRole('button', { name: 'Фото' }).first().click();
+  await expect(page.getByRole('dialog', { name: 'Фото' })).toBeVisible();
+  await page.goBack();
+  await expect(page.getByRole('dialog', { name: 'Фото' })).toBeHidden();
+  await expect(page.getByRole('heading', { name: 'Выходные' })).toBeVisible();
   await page.getByRole('button', { name: 'О чате' }).click();
-  await expect(page.locator('aside.panel')).toBeVisible();
+  const panel = page.locator('aside.panel');
+  await expect(panel).toBeVisible();
+  await panel.getByRole('button', { name: 'Пригласить' }).click();
+  const invite = page.getByRole('dialog', { name: 'Пригласить', exact: true });
+  await expect(invite).toBeVisible();
+  await page.goBack();
+  await expect(invite).toBeHidden();
+  await expect(panel).toBeVisible();
+  await page.goBack();
+  await expect(panel).toBeHidden();
+  await expect(page.getByRole('heading', { name: 'Выходные' })).toBeVisible();
   await page.goBack();
   await expect(page.getByRole('heading', { name: 'Чаты', level: 1 })).toBeVisible();
   await page.getByRole('link', { name: /^Аня/ }).click();
   await expect(page.getByRole('heading', { name: /^Аня/, level: 1 })).toBeVisible();
   await expect(page.locator('aside.panel')).toBeHidden();
+});
+
+test('десктоп: панель показывает выбранный чат и Esc возвращает фокус', async ({ page }, info) => {
+  test.skip(isPhone(info.project.name), 'только десктоп');
+  await signInToDemo(page);
+  await openRoom(page, /^Выходные/);
+  const infoButton = page.getByRole('button', { name: 'О чате' });
+  await infoButton.click();
+  const panel = page.locator('aside.panel');
+  await expect(panel).toContainText('Выходные');
+  await openRoom(page, /^Аня/);
+  await expect(panel).toContainText('Аня');
+  await page.keyboard.press('Escape');
+  await expect(panel).toBeHidden();
+  await expect(infoButton).toBeFocused();
+  await expect(page.getByRole('heading', { name: /^Аня/ })).toBeVisible();
+});
+
+test('уменьшенное движение и единый текст сообщений', async ({ page }) => {
+  await signInToDemo(page);
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  await openRoom(page, /^Выходные/);
+  const conversation = page.locator('.conversation');
+  await expect(conversation).toHaveCSS('animation-name', 'none');
+  await expect(conversation.locator('.bubble').first()).toHaveCSS('font-size', '15px');
+  await expect(page.locator('.main-column header h1')).toHaveCSS('font-size', '15px');
+});
+
+test('телефон: видимая область с клавиатурой вмещает композер', async ({ page }, info) => {
+  test.skip(!isPhone(info.project.name), 'только телефон');
+  await signInToDemo(page);
+  await openRoom(page, /^Выходные/);
+  const composer = page.getByRole('textbox', { name: 'Сообщение' });
+  await composer.fill('Длинный черновик\n'.repeat(30));
+  const height = await page.evaluate(() => {
+    const viewport = window.visualViewport!;
+    const height = window.innerHeight - 300;
+    Object.defineProperty(viewport, 'height', { value: height });
+    viewport.dispatchEvent(new Event('resize'));
+    return height;
+  });
+  await expect(page.locator('#app')).toHaveCSS('height', `${height}px`);
+  await expect.poll(async () => (await composer.boundingBox())!.height).toBeLessThanOrEqual(height * 0.4 + 1);
+  await composer.blur();
+  await expect(page.locator('html')).not.toHaveAttribute('data-keyboard-viewport');
 });
 
 test('ширину списка можно менять с клавиатуры, и она запоминается', async ({ page }, info) => {

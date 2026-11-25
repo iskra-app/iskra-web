@@ -6,6 +6,7 @@
   Cinny. Убранный здесь стикер пропадает и там, и каждая перемена записывается сразу.
 -->
 <script lang="ts">
+  import Switch from '../../design/ui/Switch.svelte';
   
   import Icon from '../../design/Icon.svelte';
   import Menu from '../../design/Menu.svelte';
@@ -38,15 +39,15 @@
   <h3 id="sticker-sources-title">{t('stickers.settings.sheetSection')}</h3>
   <label class="switch">
     <span>{t('stickers.settings.builtIn')}</span>
-    <input type="checkbox" role="switch" bind:checked={preferences.stickersBuiltIn} />
+    <Switch bind:checked={preferences.stickersBuiltIn} />
   </label>
   <label class="switch">
     <span>{t('stickers.settings.mine')}</span>
-    <input type="checkbox" role="switch" bind:checked={preferences.stickersMine} />
+    <Switch bind:checked={preferences.stickersMine} />
   </label>
   <label class="switch">
     <span>{t('stickers.settings.roomPacks')}</span>
-    <input type="checkbox" role="switch" bind:checked={preferences.stickersRoomPack} />
+    <Switch bind:checked={preferences.stickersRoomPack} />
   </label>
   <p class="secondary">{t('stickers.settings.roomPacksHelp')}</p>
 </section>

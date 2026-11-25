@@ -21,7 +21,10 @@ export interface AnchorOptions {
   /** Сколько пикселей от низа — ещё «внизу». Theme.Size.newestReach — 80. */
   bottomReach: number;
   onNearTop: () => void;
+  onScroll?: () => void;
 }
+
+export type ScrollPosition = { key: string; offset: number } | 'bottom';
 
 export class ScrollAnchor {
   /** Человек внизу ленты: новое показываем, прочитанным отмечаем. */
@@ -33,7 +36,10 @@ export class ScrollAnchor {
   private anchorAt = 0;
   private seenTop = 0;
   private readonly observer: ResizeObserver;
-  private readonly onScroll = () => this.sync();
+  private readonly onScroll = () => {
+    this.sync();
+    this.options.onScroll?.();
+  };
 
   constructor(
     private readonly container: HTMLElement,
@@ -95,6 +101,11 @@ export class ScrollAnchor {
     this.sync();
   }
 
+  position(): ScrollPosition | undefined {
+    if (this.stick) return 'bottom';
+    return this.anchorKey ? { key: this.anchorKey, offset: this.anchorAt - this.seenTop } : undefined;
+  }
+
   private measure(): void {
     const { scrollTop, scrollHeight, clientHeight } = this.container;
     this.seenTop = scrollTop;
@@ -117,10 +128,8 @@ export class ScrollAnchor {
         lo = mid + 1;
       }
     }
-    if (found) {
-      this.anchorKey = found.dataset['anchor'] ?? null;
-      this.anchorAt = this.at(found);
-    }
+    this.anchorKey = found?.dataset['anchor'] ?? null;
+    if (found) this.anchorAt = this.at(found);
 
     if (scrollTop <= this.options.topReach) this.options.onNearTop();
   }
@@ -131,9 +140,10 @@ export class ScrollAnchor {
    * догрузилась картинка) до события прокрутки «возвращает» ленту вниз. Сразу, а не плавно:
    * плавная прокрутка — это десятки кадров, в каждый из которых раскладка может её перебить.
    */
-  reveal(element: HTMLElement, at: 'center' | 'top' = 'center'): void {
+  reveal(element: HTMLElement, at: 'center' | 'top' | number = 'center'): void {
     this.stick = false;
-    const shift = at === 'top' ? this.top(element) : this.top(element) + element.offsetHeight / 2 - this.container.clientHeight / 2;
+    const offset = typeof at === 'number' ? at : at === 'top' ? 0 : (this.container.clientHeight - element.offsetHeight) / 2;
+    const shift = this.top(element) - offset;
     this.container.scrollTop += shift;
     this.measure();
     // Якорь — само показанное, а не то, что оказалось верхним: раскладка держит на месте его.

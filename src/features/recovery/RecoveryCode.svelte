@@ -5,6 +5,7 @@
   не проверка, а пауза, чтобы прочитать предупреждение.
 -->
 <script lang="ts">
+  import Switch from '../../design/ui/Switch.svelte';
   import PrimaryButton from '../../design/PrimaryButton.svelte';
   import QuietButton from '../../design/QuietButton.svelte';
   import { t } from '../../i18n/index.svelte.ts';
@@ -65,7 +66,7 @@
 
   <label class="confirm">
     <span>{t('recovery.save.confirm')}</span>
-    <input type="checkbox" role="switch" bind:checked={confirmed} />
+    <Switch bind:checked={confirmed} />
   </label>
 
   <PrimaryButton wide disabled={!confirmed} onclick={onsaved}>{t('encryption.saved')}</PrimaryButton>

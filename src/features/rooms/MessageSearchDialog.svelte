@@ -129,11 +129,11 @@
     max-height: min(70vh, 40rem);
     margin-block-start: 12vh;
     padding: 0;
-    border: var(--border-hairline) solid var(--color-dialog-edge);
+    border: var(--border-hairline) solid var(--ui-border);
     border-radius: var(--radius-card);
     background: var(--color-background);
     color: var(--color-text);
-    box-shadow: 0 var(--space-close) var(--space-generous) rgb(0 0 0 / 0.3);
+    box-shadow: var(--shadow-popover);
     overflow: hidden;
   }
   /* Колонка — и у догорающего после закрытия окна (см. `Dialog`). */
@@ -163,7 +163,7 @@
     inset-inline-end: var(--space-close);
   }
   input:focus-visible {
-    outline: var(--border-thick) solid var(--accent);
+    outline: var(--focus-outline);
     outline-offset: 0;
   }
   ul {

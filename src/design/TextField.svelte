@@ -3,6 +3,7 @@
   подсказка внутри поля исчезает, как только в нём что-то появилось.
 -->
 <script lang="ts">
+  import Input from './ui/Input.svelte';
   import type { HTMLInputAttributes } from 'svelte/elements';
   interface Props {
     value: string;
@@ -44,8 +45,8 @@
 
 <div class="field">
   <label for={id} class:visually-hidden={!showLabel}>{label}</label>
-  <input
-    bind:this={input}
+  <Input
+    bind:element={input}
     bind:value
     {id}
     {type}
@@ -54,7 +55,7 @@
     {inputmode}
     {disabled}
     aria-invalid={invalid || undefined}
-    oninput={() => oninput?.(value)}
+    oninput={(event) => oninput?.(event.currentTarget.value)}
     autocapitalize="off"
     autocorrect="off"
     spellcheck="false"
@@ -70,24 +71,5 @@
   label {
     font-size: var(--font-size-caption);
     color: var(--color-text-secondary);
-  }
-  input {
-    min-height: max(var(--tap-target), var(--size-navigation-bar));
-    padding: 0 var(--space-roomy);
-    border: var(--border-hairline) solid var(--color-separator);
-    border-radius: var(--radius-control);
-    background: var(--color-background);
-    transition:
-      border-color var(--timing-chrome) var(--ease-out),
-      outline-color var(--timing-chrome) var(--ease-out);
-    outline: 2px solid transparent;
-  }
-  input:focus-visible {
-    outline: 2px solid var(--accent);
-    outline-offset: 0;
-    border-color: transparent;
-  }
-  input[aria-invalid='true'] {
-    border-color: var(--color-danger);
   }
 </style>

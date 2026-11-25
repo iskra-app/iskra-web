@@ -1,11 +1,10 @@
-<!--
-  Шапка колонки. «Стекло» — только в навигационном слое, и это он: полупрозрачность и
-  размытие, если браузер их тянет, иначе непрозрачная заливка.
--->
+<!-- Шапка колонки. Поверхность задаёт её контейнер. -->
 <script lang="ts">
   import type { Snippet } from 'svelte';
   interface Props {
     leading?: Snippet;
+    leadingOnly?: boolean;
+    seam?: boolean;
     title: string;
     /** Строка под заголовком — как у шапки чата в нативной: кто печатает, кто это, сколько их. */
     subtitle?: string;
@@ -16,22 +15,25 @@
      */
     ontitle?: () => void;
   }
-  let { leading, title, subtitle, trailing, ontitle }: Props = $props();
+  let { leading, title, subtitle, trailing, ontitle, seam = true, leadingOnly = false }: Props = $props();
 </script>
 
-<header class="bar glass" data-titlebar>
+<header class="bar" class:seam class:leading-only={leadingOnly} data-titlebar>
   <div class="side">{#if leading}{@render leading()}{/if}</div>
-  <div class="titles" class:pressable={!!ontitle}>
-    <h1>{title}</h1>
-    {#if subtitle}<p class="subtitle">{subtitle}</p>{/if}
-    <!-- Поверх заголовка, а не вокруг: `h1` внутри `<button>` — не HTML. -->
-    {#if ontitle}<button type="button" class="title-press" aria-hidden="true" tabindex="-1" onclick={ontitle}></button>{/if}
-  </div>
-  <div class="side end">{#if trailing}{@render trailing()}{/if}</div>
+  {#if !leadingOnly}
+    <div class="titles" class:pressable={!!ontitle}>
+      <h1>{title}</h1>
+      {#if subtitle}<p class="subtitle">{subtitle}</p>{/if}
+      <!-- Поверх заголовка, а не вокруг: `h1` внутри `<button>` — не HTML. -->
+      {#if ontitle}<button type="button" class="title-press" aria-hidden="true" tabindex="-1" onclick={ontitle}></button>{/if}
+    </div>
+    <div class="side end">{#if trailing}{@render trailing()}{/if}</div>
+  {/if}
 </header>
 
 <style>
   .bar {
+    background: var(--bar-surface, var(--color-background));
     position: sticky;
     top: 0;
     z-index: 1;
@@ -49,7 +51,16 @@
        отступ раздаёт `Columns`). */
     padding-inline: max(var(--space-close), env(safe-area-inset-left), var(--bar-inset-start, 0px))
       max(var(--space-close), env(safe-area-inset-right), var(--bar-inset-end, 0px));
-    border-block-end: var(--border-hairline) solid var(--color-separator);
+    border-block-end: var(--border-hairline) solid transparent;
+  }
+  .bar.leading-only {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .bar.leading-only .side {
+    justify-content: center;
+  }
+  .bar.seam {
+    border-block-end-color: var(--color-separator);
   }
   h1 {
     margin: 0;
@@ -92,15 +103,5 @@
   .side {
     display: flex;
     gap: var(--space-tight);
-  }
-  .glass {
-    background: var(--color-glass-opaque);
-  }
-  @supports (backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px)) {
-    .glass {
-      background: var(--color-glass);
-      -webkit-backdrop-filter: saturate(180%) blur(var(--backdrop-blur));
-      backdrop-filter: saturate(180%) blur(var(--backdrop-blur));
-    }
   }
 </style>

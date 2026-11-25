@@ -65,10 +65,8 @@ test('«О чате» там, где прав нет: шапка, кнопки, 
 
   const alerts = panel.getByRole('radiogroup', { name: 'Уведомления' });
   await expect(alerts.getByRole('radio', { name: 'Все сообщения' })).toHaveAttribute('aria-checked', 'true');
-  // «Без звука» под шапкой — то же, что «Выключены».
-  await panel.getByRole('button', { name: 'Без звука' }).click();
+  await alerts.getByRole('radio', { name: 'Выключены' }).click();
   await expect(alerts.getByRole('radio', { name: 'Выключены' })).toHaveAttribute('aria-checked', 'true');
-  await expect(panel.getByRole('button', { name: 'Со звуком' })).toBeVisible();
 
   // Закреплённых в панели нет, как в нативной: они — по шеврону на полосе над лентой.
   await expect(panel).not.toContainText('Кто что берёт на пикник?');
@@ -129,7 +127,7 @@ test('новая комната и новый чат — создаются и �
   await roomPage.getByRole('textbox', { name: 'Описание' }).fill('Что читаем');
   await roomPage.getByRole('button', { name: 'Создать' }).click();
   await expect(page.getByRole('heading', { name: 'Книги', level: 1 })).toBeVisible({ timeout: 10_000 });
-  await expect(page.getByRole('dialog')).toHaveCount(0);
+  await expect(page.locator('dialog:visible')).toHaveCount(0);
 
   // Кнопка — в шапке списка; на телефоне список — за «Назад».
   const back = page.getByRole('button', { name: 'Назад' });
@@ -182,6 +180,62 @@ test('фото профиля — через обрезку: масштаб, «�
   await expect.poll(() => face.evaluate((img: HTMLImageElement) => img.naturalWidth > 0 && img.naturalWidth === img.naturalHeight)).toBe(true);
 });
 
+test('доступность: обводка, анимации и контраст применяются и запоминаются', async ({ page }, info) => {
+  await signInToDemo(page);
+  await page.emulateMedia({ colorScheme: 'light', reducedMotion: 'no-preference' });
+  await openSettings(page, 'Внешний вид');
+  await page.getByRole('link', { name: 'Доступность' }).click();
+  await expect(page.getByRole('heading', { name: 'Доступность', level: 1 })).toBeVisible();
+  const root = page.locator('html');
+  const focus = page.getByRole('switch', { name: 'Обводка при фокусе' });
+  const motion = page.getByRole('switch', { name: 'Отключить анимации' });
+  const contrast = page.getByRole('switch', { name: 'Увеличенный контраст' });
+
+  await expect(focus).not.toBeChecked();
+  await expect(motion).not.toBeChecked();
+  await expect(contrast).not.toBeChecked();
+  await focus.focus();
+  await expect(focus).toHaveCSS('outline-style', 'none');
+  await focus.check();
+  await expect(root).toHaveAttribute('data-focus-outline', '');
+  await motion.check();
+  await expect(root).toHaveAttribute('data-no-motion', '');
+  await contrast.check();
+  const body = page.locator('body');
+  for (const colorScheme of ['light', 'dark'] as const) {
+    await page.emulateMedia({ colorScheme });
+    await expect(root).toHaveCSS('color-scheme', colorScheme);
+    // Системные CanvasText и Canvas могут отличаться по RGB в разных браузерах.
+    const systemColors = await body.evaluate((element) => {
+      const probe = document.createElement('span');
+      probe.style.color = 'CanvasText';
+      probe.style.backgroundColor = 'Canvas';
+      element.append(probe);
+      const style = getComputedStyle(probe);
+      const colors = { text: style.color, background: style.backgroundColor };
+      probe.remove();
+      return colors;
+    });
+    await expect(body).toHaveCSS('color', systemColors.text);
+    await expect(body).toHaveCSS('background-color', systemColors.background);
+  }
+
+  await page.reload();
+  await expect(focus).toBeChecked();
+  await expect(motion).toBeChecked();
+  await expect(contrast).toBeChecked();
+  await page.getByRole('button', { name: 'Назад', exact: true }).click();
+  await expect(page.getByRole('heading', { name: 'Внешний вид', level: 1 })).toBeVisible();
+  await openRoom(page, /^Выходные/);
+  await expect(page.locator('.conversation')).toHaveCSS('animation-name', 'none');
+  // В поле поиска браузеры показывают :focus-visible сразу: в нём ожидается ввод с клавиатуры.
+  if (isPhone(info.project.name)) await page.getByRole('button', { name: 'Назад', exact: true }).click();
+  await page.getByRole('button', { name: 'Поиск по сообщениям', exact: true }).click();
+  const search = page.getByRole('combobox', { name: 'Поиск по сообщениям' });
+  await expect(search).toBeFocused();
+  await expect(search).toHaveCSS('outline-style', 'solid');
+});
+
 test('настройки по разделам: имя, язык, тема, шрифт; устройство и хранилище видны', async ({ page }, info) => {
   await signInToDemo(page);
   await openSettings(page);
@@ -221,6 +275,7 @@ test('настройки по разделам: имя, язык, тема, шр
   await expect(tint).not.toBeChecked();
   await tint.check();
   await expect(page.locator('html')).toHaveAttribute('data-tint', '');
+  await expect(page.locator('html')).toHaveCSS('--tint-interface', '4%');
   await tint.uncheck();
   await expect(page.locator('html')).not.toHaveAttribute('data-tint');
   // Inter — по умолчанию и из своих файлов под боевой CSP: кириллица и латиница загрузились.
@@ -278,7 +333,7 @@ test('заблокировать со страницы человека (имя 
   await dialog.getByRole('button', { name: 'Заблокировать' }).click();
   await expect(page.getByRole('button', { name: 'Разблокировать пользователя' })).toBeVisible({ timeout: 10_000 });
   // Окно ещё догорает — у него свой «Закрыть»; нужен тот, что у панели.
-  await expect(page.getByRole('dialog')).toHaveCount(0);
+  await expect(page.locator('dialog:visible')).toHaveCount(0);
   await page.locator('aside.panel').getByRole('button', { name: 'Закрыть', exact: true }).click();
   // Панель уезжает не мгновенно: её «Назад» нельзя принять за «Назад» чата.
   await expect(page.locator('aside.panel')).toHaveCount(0);
@@ -365,7 +420,7 @@ test('локальное имя личного чата: видно везде, 
   await expect(panel.getByRole('heading', { name: 'Аня' })).toBeVisible();
   // На телефоне панель — лист поверх чата: сначала закрыть её.
   // Окно ещё догорает — у него свой «Закрыть»; нужен тот, что у панели.
-  await expect(page.getByRole('dialog')).toHaveCount(0);
+  await expect(page.locator('dialog:visible')).toHaveCount(0);
   await page.locator('aside.panel').getByRole('button', { name: 'Закрыть', exact: true }).click();
   const back = page.getByRole('button', { name: 'Назад' });
   if (await back.isVisible()) await back.click();
@@ -376,9 +431,17 @@ test('локальное имя личного чата: видно везде, 
 test('обои: градиент за перепиской и непрозрачные пузыри; своё фото — до выхода из аккаунта', async ({ page }) => {
   const problems = watchForProblems(page);
   await signInToDemo(page);
+  await page.emulateMedia({ colorScheme: 'light' });
   await openSettings(page, 'Внешний вид');
   const tiles = page.getByRole('radiogroup', { name: 'Обои' });
-  await expect(tiles.getByRole('radio', { name: 'Без обоев' })).toHaveAttribute('aria-checked', 'true');
+  const withoutWallpaper = tiles.getByRole('radio', { name: 'Без обоев' });
+  await expect(withoutWallpaper).toHaveAttribute('aria-checked', 'true');
+  await expect.poll(() => withoutWallpaper.evaluate((tile) => {
+    const style = getComputedStyle(tile);
+    const outset = Number.parseFloat(style.outlineWidth) + Number.parseFloat(style.outlineOffset);
+    const { left } = tile.getBoundingClientRect();
+    return left - tile.parentElement!.getBoundingClientRect().left >= outset;
+  })).toBe(true);
   await expect(page.getByRole('slider')).toHaveCount(0);
   await tiles.getByRole('radio', { name: 'Море' }).click();
   await expect(page.getByRole('slider')).toBeVisible();
@@ -388,7 +451,7 @@ test('обои: градиент за перепиской и непрозрач
   await expect(room).toHaveAttribute('data-wallpaper', '');
   // На обоях входящий пузырь — непрозрачный, а не восемь процентов чёрного.
   const bubble = page.getByRole('log').getByRole('article').filter({ hasText: 'Возьми плед' });
-  await expect.poll(() => bubble.evaluate((e) => getComputedStyle(e).backgroundColor)).toBe('rgb(252, 252, 252)');
+  await expect.poll(() => bubble.evaluate((e) => getComputedStyle(e).backgroundColor)).toBe('rgb(237, 237, 237)');
 
   // Своё фото: выбрать — и оно за перепиской, и переживает перезагрузку.
   const back = page.getByRole('button', { name: 'Назад' });
@@ -541,7 +604,7 @@ test('«Реакции»: быстрая реакция — из пяти или
   expect(problems).toEqual([]);
 });
 
-test('«Папки»: подсказка — и вкладка над списком; своя папка из редактора; удалить — вкладки нет', async ({ page }) => {
+test('«Папки»: подсказка — и вкладка над списком; своя папка из редактора; удалить — вкладки нет', async ({ page }, info) => {
   const problems = watchForProblems(page);
   await signInToDemo(page);
   // Папок нет — нет и полосы вкладок.
@@ -579,6 +642,11 @@ test('«Папки»: подсказка — и вкладка над списк
   await tabs.getByRole('tab', { name: /^Личные/ }).click();
   await expect(page.getByRole('link', { name: /^Аня/ })).toBeVisible();
   await expect(page.getByRole('link', { name: /^Выходные/ })).toHaveCount(0);
+  if (!isPhone(info.project.name)) {
+    await page.keyboard.press('Alt+ArrowDown');
+    await expect(page.getByRole('heading', { name: /^Аня/ })).toBeVisible();
+    await expect(page.getByRole('textbox', { name: 'Сообщение' })).toBeFocused();
+  }
   await tabs.getByRole('tab', { name: /^Дача/ }).click();
   await expect(page.getByRole('link', { name: /^Выходные/ })).toBeVisible();
   await expect(page.getByRole('link', { name: /^Аня/ })).toBeVisible();
@@ -676,7 +744,7 @@ test('своя комната: история для новых, адрес (з�
   // Заблокировать Веру — и пустить обратно из настроек.
   await panel.getByRole('button', { name: /^Вера/ }).click();
   await panel.getByRole('button', { name: 'Заблокировать в чате' }).click();
-  await page.getByRole('dialog').getByRole('button', { name: 'Заблокировать в чате' }).click();
+  await page.locator('dialog[open]').getByRole('button', { name: 'Заблокировать в чате' }).click();
   await expect(panel.getByRole('button', { name: /^Вера/ })).toHaveCount(0, { timeout: 10_000 });
   edit = await openEdit();
   await edit.getByRole('button', { name: 'Разблокировать' }).click();

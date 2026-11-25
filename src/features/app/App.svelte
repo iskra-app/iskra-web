@@ -11,6 +11,7 @@
   import { preferences } from './preferences.svelte.ts';
   import { wallpaperPhoto } from './wallpaperPhoto.svelte.ts';
   import { installScreenMotion } from './screenMotion';
+  import { installMobileViewport } from './mobileViewport';
   import { parseRoute } from '../../core/navigation/route';
   import { router } from '../../core/navigation/router.svelte.ts';
 
@@ -58,9 +59,11 @@
     // Возврат со страницы входа читается один раз.
     void app.boot(authCallback, { onFocusRequested: answerPing, onLinkPassed: openPassedLink });
     const stopMotion = installScreenMotion();
+    const stopViewport = installMobileViewport();
     const stopPersisting = preferences.persist();
     return () => {
       stopMotion();
+      stopViewport();
       stopPersisting();
     };
   });

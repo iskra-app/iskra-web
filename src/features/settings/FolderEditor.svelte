@@ -5,6 +5,7 @@
   которая до конца правки показывала бы не те чаты.
 -->
 <script lang="ts">
+  import Switch from '../../design/ui/Switch.svelte';
   import ConfirmDialog from '../../design/ConfirmDialog.svelte';
   import Dialog from '../../design/Dialog.svelte';
   import PlainButton from '../../design/PlainButton.svelte';
@@ -81,16 +82,16 @@
       {#each folderKinds as kind (kind)}
         <label class="switch">
           <span>{t(`folders.kind.${kind}`)}</span>
-          <input type="checkbox" role="switch" checked={folder.kinds.includes(kind)} onchange={(event) => toggleKind(kind, event.currentTarget.checked)} />
+          <Switch checked={folder.kinds.includes(kind)} onchange={(event) => toggleKind(kind, event.currentTarget.checked)} />
         </label>
       {/each}
     </div>
 
     <h3 id="folder-conditions">{t('folders.conditionsHeader')}</h3>
     <div class="group" role="group" aria-labelledby="folder-conditions">
-      <label class="switch"><span>{t('folders.onlyUnread')}</span><input type="checkbox" role="switch" bind:checked={folder.onlyUnread} /></label>
-      <label class="switch"><span>{t('folders.excludesMuted')}</span><input type="checkbox" role="switch" bind:checked={folder.excludesMuted} /></label>
-      <label class="switch"><span>{t('folders.includesArchived')}</span><input type="checkbox" role="switch" bind:checked={folder.includesArchived} /></label>
+      <label class="switch"><span>{t('folders.onlyUnread')}</span><Switch bind:checked={folder.onlyUnread} /></label>
+      <label class="switch"><span>{t('folders.excludesMuted')}</span><Switch bind:checked={folder.excludesMuted} /></label>
+      <label class="switch"><span>{t('folders.includesArchived')}</span><Switch bind:checked={folder.includesArchived} /></label>
     </div>
 
     {#each sides as side (side)}
@@ -196,7 +197,7 @@
   .switch {
     justify-content: space-between;
   }
-  .switch input,
+  .switch :global(input[role='switch']),
   .face {
     --avatar-size: var(--size-avatar-small);
     display: flex;

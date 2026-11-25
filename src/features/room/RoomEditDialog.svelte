@@ -8,6 +8,7 @@
   устройстве (`LocalNames`); сервер о нём не знает, поэтому и без сети оно работает.
 -->
 <script lang="ts">
+  import Switch from '../../design/ui/Switch.svelte';
   import { untrack } from 'svelte';
   import Dialog from '../../design/Dialog.svelte';
   import PlainButton from '../../design/PlainButton.svelte';
@@ -136,7 +137,7 @@
             <span class="help">{t('room.manage.openToAnyoneHelp')}</span>
             {#if isOpen && details.encrypted}<span class="help">{t('roomList.new.openMeansUnencrypted')}</span>{/if}
           </span>
-          <input type="checkbox" role="switch" bind:checked={isOpen} />
+          <Switch bind:checked={isOpen} />
         </label>
       {/if}
       {#if details.permissions.canChangeHistory}
@@ -162,7 +163,7 @@
               <strong>{t('room.access.inDirectory')}</strong>
               <span class="help">{t('room.access.inDirectoryHelp', { server: details.addressServer })}</span>
             </span>
-            <input type="checkbox" role="switch" bind:checked={listed} />
+            <Switch bind:checked={listed} />
           </label>
         {/if}
       {/if}
@@ -290,9 +291,8 @@
     resize: vertical;
   }
   textarea:focus-visible {
-    outline: 2px solid var(--accent);
+    outline: var(--focus-outline);
     outline-offset: 0;
-    border-color: transparent;
   }
   .toggle {
     display: flex;

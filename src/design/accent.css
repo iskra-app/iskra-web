@@ -1,35 +1,35 @@
-/*
- * Акцент — `AccentTheme` нативной Искры. Пара «акцент и то, что читается поверх него»:
- * `--accent` и `--on-accent`. Главная кнопка заливается `--accent`, надпись на ней —
- * всегда `--on-accent`, и никогда «основным цветом текста»: при монохромном акценте
- * это белая плашка с белой надписью в тёмной теме — урок нативной Искры.
- *
- * Цвета — системные цвета Apple (их берёт SwiftUI), светлый и тёмный вариант.
- * Выбирается атрибутом `data-accent` на <html>; по умолчанию — синий, как в Искре. На любом
- * другом элементе `data-accent` задаёт только пару `--accent-light/-dark` — так образец цвета в
- * настройках показывает свой цвет, а не выбранный.
- */
-
+/* Акцент хранится под теми же именами, чтобы существующие настройки продолжали работать. */
 :root,
-[data-accent='blue'] { --accent-light: #007aff; --accent-dark: #0a84ff; --on-accent: #ffffff; }
-[data-accent='red'] { --accent-light: #ff3b30; --accent-dark: #ff453a; --on-accent: #ffffff; }
-[data-accent='orange'] { --accent-light: #ff9500; --accent-dark: #ff9f0a; --on-accent: #ffffff; }
-/* Жёлтый — единственный цветной акцент с чёрной надписью. */
-[data-accent='yellow'] { --accent-light: #ffcc00; --accent-dark: #ffd60a; --on-accent: #000000; }
-[data-accent='green'] { --accent-light: #34c759; --accent-dark: #30d158; --on-accent: #ffffff; }
-[data-accent='cyan'] { --accent-light: #32ade6; --accent-dark: #64d2ff; --on-accent: #ffffff; }
-[data-accent='violet'] { --accent-light: #af52de; --accent-dark: #bf5af2; --on-accent: #ffffff; }
+[data-accent='blue'] { --accent-light: #205dcb; --accent-dark: #83adff; }
+[data-accent='red'] { --accent-light: #b82d43; --accent-dark: #ff8998; }
+[data-accent='orange'] { --accent-light: #9f4900; --accent-dark: #ffad70; }
+[data-accent='yellow'] { --accent-light: #f3c746; --accent-dark: #f3c746; --accent-ink-light: #251b00; }
+[data-accent='green'] { --accent-light: #15734c; --accent-dark: #73d6a5; }
+[data-accent='cyan'] { --accent-light: #09738a; --accent-dark: #70d0e2; }
+[data-accent='violet'] { --accent-light: #7946bf; --accent-dark: #c2a3f9; }
 
-:root { --accent: var(--accent-light); }
-:root[data-theme='dark'] { --accent: var(--accent-dark); }
-@media (prefers-color-scheme: dark) {
-  :root:not([data-theme='light']) { --accent: var(--accent-dark); }
+:root {
+  --accent: var(--accent-light);
+  --on-accent: var(--accent-ink-light, #fff);
+  --bubble-own: color-mix(in srgb, var(--accent) var(--own-bubble-tint), var(--color-background));
+  --on-bubble-own: var(--color-text);
 }
 
-/* Свой пузырь — заливка акцентом, надпись — парой к нему (`AccentTheme.bubble` / `onBubble`). */
-:root {
-  --bubble-own: var(--accent);
-  --on-bubble-own: var(--on-accent);
+:root[data-theme='dark'] {
+  --accent: var(--accent-dark);
+  --on-accent: #15171b;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) {
+    --accent: var(--accent-dark);
+    --on-accent: #15171b;
+  }
+}
+
+/* Синий акцент остаётся на действиях, а переписка по умолчанию нейтральная. */
+:root:not([data-accent]),
+:root[data-accent='blue'] {
+  --bubble-own: var(--color-own-bubble);
 }
 
 /* Образец монохромного — цвет текста. */
@@ -47,8 +47,8 @@
 
 /*
  * «Тонировать интерфейс» — `Theme.Tint` нативной: один прозрачный лист акцента поверх всего, что
- * нарисовано, — фон, пузыри и слова берут цвет разом. Восемь процентов — больше слова начнут
- * сереть; у ч/б — половина: тьма не цвет, она только гасит. Сквозь лист всё нажимается.
+ * нарисовано. В тёмной теме слой слабее, чтобы акцент не высветлял фон.
+ * Для чёрно-белого акцента слой ещё слабее. Сквозь него всё нажимается.
  */
 :root[data-tint] body::after {
   content: '';

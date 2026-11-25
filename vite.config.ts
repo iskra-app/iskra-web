@@ -1,5 +1,7 @@
 /// <reference types="vitest/config" />
 import { execSync } from 'node:child_process';
+import { fileURLToPath } from 'node:url';
+import tailwindcss from '@tailwindcss/vite';
 import { defineConfig, type Plugin } from 'vite';
 import { svelte } from '@sveltejs/vite-plugin-svelte';
 import { VitePWA } from 'vite-plugin-pwa';
@@ -69,6 +71,7 @@ export default defineConfig({
     __ISKRA_DEMO__: JSON.stringify(process.env['ISKRA_DEMO'] === '1'),
   },
   plugins: [
+    tailwindcss(),
     svelte(),
     VitePWA({
       // Новая версия не ставится сама посреди набора сообщения: приложение
@@ -85,7 +88,7 @@ export default defineConfig({
         scope: base,
         display: 'standalone',
         display_override: ['window-controls-overlay', 'standalone'],
-        background_color: '#1c1c1e',
+        background_color: '#0b0b0b',
         theme_color: '#8f9933',
         // Повторный запуск из дока фокусирует открытое окно, а не открывает второе.
         // Поддержку по браузерам — проверить (см. план, «Одна вкладка на аккаунт»).
@@ -126,6 +129,7 @@ export default defineConfig({
   ],
   resolve: {
     alias: [
+      { find: '$design', replacement: fileURLToPath(new URL('./src/design', import.meta.url)) },
       // Поле `browser` пакета ведёт в `browser-index.js`: он кладёт весь SDK в `globalThis.matrixcs`
       // и так держит в сборке всё, что тот экспортирует, — клиент виджетов, звонки, sliding sync.
       // `index.js` — тот же SDK без этого и без хранилища старого крипто (у нас только Rust).

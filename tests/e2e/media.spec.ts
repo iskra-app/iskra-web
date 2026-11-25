@@ -20,6 +20,8 @@ test('фото в ленте: место отведено до загрузки,
   const box = (await photos.first().boundingBox())!;
   expect(box.width / box.height).toBeCloseTo(1.5, 1);
   await expect(photos.first().locator('img')).toHaveAttribute('src', /^blob:/);
+  await expect(photos.first()).toHaveCSS('border-top-left-radius', '20px');
+  await expect(photos.first()).toHaveCSS('border-bottom-left-radius', '12px');
   await expect(page.getByRole('log')).toContainText('Озеро прошлым летом');
 
   // Лента пересобирается (новое сообщение) — картинка та же, а не новый <img>: иначе она
@@ -380,6 +382,9 @@ test('альбом: три фото, отправленные разом, — о
   await expect(album).toHaveCount(1);
   const tiles = album.getByRole('button', { name: 'Фото' });
   await expect(tiles).toHaveCount(3);
+  await expect(album.locator('.album')).toHaveCSS('border-top-left-radius', '20px');
+  await expect(album.locator('.album')).toHaveCSS('border-bottom-left-radius', '12px');
+  await expect(tiles.first()).toHaveCSS('border-radius', '0px');
   // Плитки — внутри одной рамки, без наложений: вторая и третья не там же, где первая.
   const boxes = await Promise.all([0, 1, 2].map(async (i) => (await tiles.nth(i).boundingBox())!));
   expect(new Set(boxes.map((b) => `${Math.round(b.x)},${Math.round(b.y)}`)).size).toBe(3);

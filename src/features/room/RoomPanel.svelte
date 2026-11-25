@@ -183,7 +183,6 @@
   const subtitle = $derived(
     !details ? '' : counterpart ? counterpart.id : details.members.length > 0 ? plural('room.members', details.members.length) : '',
   );
-  const muted = $derived(details?.alerts === 'muted');
   const blocked = $derived(!!counterpart && session.blocked.has(counterpart.id));
 
   /**
@@ -248,15 +247,11 @@
       {/if}
     </header>
 
-    <!-- Круглые кнопки под портретом: поиск, звук, пригласить, поделиться — `ProfileActionTile` нативной. -->
+    <!-- Круглые кнопки под портретом: поиск, пригласить, поделиться — `ProfileActionTile` нативной. -->
     <div class="tiles">
       <button type="button" class="tile" onclick={() => (searching = true)}>
         <Icon name="search" />
         <span>{t('profile.search')}</span>
-      </button>
-      <button type="button" class="tile" onclick={() => details?.setAlerts(muted ? 'all' : 'muted')}>
-        <Icon name={muted ? 'bellOff' : 'bell'} />
-        <span>{t(muted ? 'profile.unmute' : 'profile.mute')}</span>
       </button>
       {#if !details.direct && details.permissions.canInvite}
         <button type="button" class="tile" onclick={() => (inviting = true)}>
@@ -529,7 +524,7 @@
     align-items: center;
     gap: var(--space-tight);
     min-height: var(--tap-target);
-    padding: var(--space-close) var(--space-tight);
+    padding: var(--space-normal) var(--space-close);
     border: none;
     border-radius: var(--radius-card);
     background: var(--color-surface);
@@ -537,6 +532,9 @@
     font: inherit;
     font-size: var(--font-size-caption);
     cursor: pointer;
+  }
+  .tile span {
+    overflow-wrap: anywhere;
   }
   .tile :global(svg) {
     width: var(--size-icon-button);
@@ -584,13 +582,17 @@
     display: flex;
     align-items: center;
     min-height: var(--tap-target);
-    padding: 0 var(--space-normal);
+    gap: var(--space-close);
+    padding: var(--space-normal) var(--space-roomy);
     border: none;
     background: transparent;
     color: inherit;
     font: inherit;
     text-align: start;
     cursor: pointer;
+  }
+  .options button:focus-visible {
+    outline-offset: calc(-1 * var(--border-thick));
   }
   .options button + button {
     border-block-start: var(--border-hairline) solid var(--color-separator);
@@ -750,6 +752,7 @@
   }
   .danger {
     min-height: var(--tap-target);
+    padding: var(--space-normal) var(--space-roomy);
     border: none;
     border-radius: var(--radius-control);
     background: var(--color-surface);

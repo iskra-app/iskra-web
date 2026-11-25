@@ -108,7 +108,7 @@
     cursor: pointer;
   }
   .grid button:focus-visible {
-    outline: var(--border-thick) solid var(--accent);
+    outline: var(--focus-outline);
   }
   .face {
     position: relative;

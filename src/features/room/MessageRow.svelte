@@ -138,6 +138,25 @@
   });
 </script>
 
+{#snippet marks(insideVoice = false)}
+  <span class="marks" class:insideVoice>
+    {#if message.pinned}
+      <Icon name="pin" role="img" aria-label={t('room.pinned')} />
+    {/if}
+    {#if message.edited}<span>{t('message.edited')}</span>{/if}
+    <time>{clock(message.ts, i18n.locale)}</time>
+    {#if message.delivery.state === 'sending'}
+      <Icon name="sending" role="img" aria-label={t('message.delivery.sending')} />
+    {:else if message.own && message.readMark}
+      <Icon name="read" role="img" aria-label={t('message.delivery.read')} />
+    {:else if message.own && !message.read && message.delivery.state === 'sent' && message.eventId}
+      <Icon name="check" role="img" aria-label={t('message.delivery.sent')} />
+    {/if}
+  </span>
+{/snippet}
+
+{#snippet voiceMarks()}{@render marks(true)}{/snippet}
+
 <!-- Список есть и пустым: у первой реакции должно быть, в чём появиться, а у последней — откуда
      уйти (`.reactions:empty`). Под `{#if}` они возникали и пропадали вместе с ним, без масштаба. -->
 {#snippet reactionList()}
@@ -263,7 +282,7 @@
             <MediaPreview kind={kind.type} attachment={kind.attachment} {media} own={message.own} onopen={() => actions.openMedia(message)} />
             {#if kind.attachment.caption}<span class="caption album-caption text"><LinkedText text={kind.attachment.caption} /></span>{/if}
           {:else if kind.type === 'voice'}
-            <VoiceMessage attachment={kind.attachment} {media} />
+            <VoiceMessage attachment={kind.attachment} {media} own={message.own && !compact} marks={compact ? undefined : voiceMarks} />
             {#if kind.attachment.caption}<span class="caption text"><LinkedText text={kind.attachment.caption} /></span>{/if}
           {:else if kind.type === 'file' || kind.type === 'audio'}
             <FileCard kind={kind.type} attachment={kind.attachment} {media} />
@@ -279,22 +298,7 @@
            скринридер доходит до каждого кружка кнопкой, а не слышит всё одной фразой. -->
       {#if !compact}{@render reactionList()}{/if}
       </div>
-      <!-- Время, «изменено», закреп и доставка — рядом с пузырём, а не в его углу, как
-           `MessageMarks` нативной Искры: в углу время дерётся с последней строкой за место. -->
-      <span class="marks">
-        {#if message.pinned}
-          <Icon name="pin" role="img" aria-label={t('room.pinned')} />
-        {/if}
-        {#if message.edited}<span>{t('message.edited')}</span>{/if}
-        <time>{clock(message.ts, i18n.locale)}</time>
-        {#if message.delivery.state === 'sending'}
-          <Icon name="sending" role="img" aria-label={t('message.delivery.sending')} />
-        {:else if message.own && message.readMark}
-          <Icon name="read" role="img" aria-label={t('message.delivery.read')} />
-        {:else if message.own && !message.read && message.delivery.state === 'sent' && message.eventId}
-          <Icon name="check" role="img" aria-label={t('message.delivery.sent')} />
-        {/if}
-      </span>
+      {#if kind.type !== 'voice' || compact}{@render marks()}{/if}
         {#if interactive && viewport.finePointer}
           <!-- Панель по наведению. В порядке табуляции — только «ещё»: остальное есть в меню,
                а три остановки на каждом из сотен сообщений сделали бы Tab бесполезным. -->
@@ -406,7 +410,9 @@
     margin-inline-start: calc(var(--bubble-pad-x) - var(--space-close));
   }
   .bubble {
-    font-size: var(--font-size-text);
+    color: var(--color-text);
+    font-size: var(--font-size-message);
+    line-height: var(--line-height-message);
     max-width: 100%;
     padding: var(--bubble-pad-y) var(--bubble-pad-x);
     border-radius: var(--radius-bubble);
@@ -448,7 +454,7 @@
   /* Радиус пузыря упирается в половину его высоты: у однострочного он ровно такой, а у высокого
      был бы крупнее. Высокому — тот же, что у однострочного. */
   .bubble.roomy:not(.visual):not(.bare) {
-    border-radius: calc((var(--font-size-text) * var(--line-height-body) + 2 * var(--bubble-pad-y)) / 2);
+    border-radius: calc((var(--font-size-message) * var(--line-height-message) + 2 * var(--bubble-pad-y)) / 2);
   }
   .quote {
     display: flex;
@@ -485,11 +491,17 @@
     color: var(--color-text-secondary);
     white-space: nowrap;
   }
+  .marks.insideVoice {
+    padding: 0;
+    color: inherit;
+    font-size: var(--font-size-caption2);
+    font-variant-numeric: tabular-nums;
+  }
   .marks :global(svg) {
     width: var(--font-size-caption);
     height: var(--font-size-caption);
   }
-  :global([data-wallpaper]) .marks {
+  :global([data-wallpaper]) .marks:not(.insideVoice) {
     padding: var(--space-within-run) var(--space-close);
     border-radius: var(--radius-circle);
     background: var(--color-incoming-bubble);
@@ -643,7 +655,7 @@
     padding-block-end: var(--reaction-overhang);
   }
   /* Отметки стоят рядом с пузырём — и над кружками, если те вышли за его край. */
-  .row.hung .marks {
+  .row.hung .marks:not(.insideVoice) {
     margin-block-end: calc(var(--size-reaction-circle) - var(--reaction-overhang));
   }
   /* Удержание на реакции — наш список, а не системное меню и не выделение эмодзи. */
@@ -745,7 +757,7 @@
   }
   /* Текущее сообщение с клавиатуры — обводкой акцента, как пункт меню. */
   .bubble:focus-visible {
-    outline: 2px solid var(--accent);
+    outline: var(--focus-outline);
     outline-offset: 2px;
   }
   /* Фокус — только с клавиатуры: после закрытия меню он возвращается на «ещё» или пузырь,
