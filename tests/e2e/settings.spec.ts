@@ -180,7 +180,7 @@ test('фото профиля — через обрезку: масштаб, «�
   await expect.poll(() => face.evaluate((img: HTMLImageElement) => img.naturalWidth > 0 && img.naturalWidth === img.naturalHeight)).toBe(true);
 });
 
-test('доступность: обводка, анимации и контраст применяются и запоминаются', async ({ page }) => {
+test('доступность: обводка, анимации и контраст применяются и запоминаются', async ({ page }, info) => {
   await signInToDemo(page);
   await page.emulateMedia({ colorScheme: 'light', reducedMotion: 'no-preference' });
   await openSettings(page, 'Внешний вид');
@@ -196,14 +196,29 @@ test('доступность: обводка, анимации и контрас
   await expect(contrast).not.toBeChecked();
   await focus.focus();
   await expect(focus).toHaveCSS('outline-style', 'none');
-  await focus.press('Space');
-  await expect(focus).toHaveCSS('outline-style', 'solid');
+  await focus.check();
+  await expect(root).toHaveAttribute('data-focus-outline', '');
   await motion.check();
   await expect(root).toHaveAttribute('data-no-motion', '');
   await contrast.check();
-  await expect(page.locator('body')).toHaveCSS('color', 'rgb(0, 0, 0)');
-  await page.emulateMedia({ colorScheme: 'dark' });
-  await expect(page.locator('body')).toHaveCSS('color', 'rgb(255, 255, 255)');
+  const body = page.locator('body');
+  for (const colorScheme of ['light', 'dark'] as const) {
+    await page.emulateMedia({ colorScheme });
+    await expect(root).toHaveCSS('color-scheme', colorScheme);
+    // Системные CanvasText и Canvas могут отличаться по RGB в разных браузерах.
+    const systemColors = await body.evaluate((element) => {
+      const probe = document.createElement('span');
+      probe.style.color = 'CanvasText';
+      probe.style.backgroundColor = 'Canvas';
+      element.append(probe);
+      const style = getComputedStyle(probe);
+      const colors = { text: style.color, background: style.backgroundColor };
+      probe.remove();
+      return colors;
+    });
+    await expect(body).toHaveCSS('color', systemColors.text);
+    await expect(body).toHaveCSS('background-color', systemColors.background);
+  }
 
   await page.reload();
   await expect(focus).toBeChecked();
@@ -213,6 +228,12 @@ test('доступность: обводка, анимации и контрас
   await expect(page.getByRole('heading', { name: 'Внешний вид', level: 1 })).toBeVisible();
   await openRoom(page, /^Выходные/);
   await expect(page.locator('.conversation')).toHaveCSS('animation-name', 'none');
+  // В поле поиска браузеры показывают :focus-visible сразу: в нём ожидается ввод с клавиатуры.
+  if (isPhone(info.project.name)) await page.getByRole('button', { name: 'Назад', exact: true }).click();
+  await page.getByRole('button', { name: 'Поиск по сообщениям', exact: true }).click();
+  const search = page.getByRole('combobox', { name: 'Поиск по сообщениям' });
+  await expect(search).toBeFocused();
+  await expect(search).toHaveCSS('outline-style', 'solid');
 });
 
 test('настройки по разделам: имя, язык, тема, шрифт; устройство и хранилище видны', async ({ page }, info) => {
