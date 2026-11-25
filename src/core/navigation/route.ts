@@ -6,7 +6,7 @@
  * Hash, а не путь, — чтобы статическому хостингу не нужны были правила перезаписи.
  */
 /** Разделы настроек — страницы, как в нативной Искре; без раздела — их список. */
-export const settingsSections = ['profile', 'appearance', 'reactions', 'chats', 'folders', 'notifications', 'security', 'devices', 'blocked', 'media', 'storage', 'about', 'licences', 'beta'] as const;
+export const settingsSections = ['profile', 'appearance', 'accessibility', 'reactions', 'chats', 'folders', 'notifications', 'security', 'devices', 'blocked', 'media', 'storage', 'about', 'licences', 'beta'] as const;
 export type SettingsSection = (typeof settingsSections)[number];
 
 export type Route =

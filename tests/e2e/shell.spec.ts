@@ -108,7 +108,7 @@ test('уменьшенное движение и единый текст соо�
   await openRoom(page, /^Выходные/);
   const conversation = page.locator('.conversation');
   await expect(conversation).toHaveCSS('animation-name', 'none');
-  await expect(conversation.locator('.bubble').first()).toHaveCSS('font-size', '14px');
+  await expect(conversation.locator('.bubble').first()).toHaveCSS('font-size', '15px');
   await expect(page.locator('.main-column header h1')).toHaveCSS('font-size', '15px');
 });
 

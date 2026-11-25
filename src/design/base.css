@@ -2,6 +2,8 @@
 @import './accent.css';
 @import './wallpaper.css';
 @import './titlebar.css';
+@import './ui/theme.css';
+@import './accessibility.css';
 
 *,
 *::before,
@@ -45,12 +47,14 @@ body {
   height: var(--app-viewport-height);
 }
 
-button,
-input,
-textarea,
-select {
-  font: inherit;
-  color: inherit;
+@layer base {
+  button,
+  input,
+  textarea,
+  select {
+    font: inherit;
+    color: inherit;
+  }
 }
 
 :focus {
@@ -58,8 +62,8 @@ select {
 }
 
 :focus-visible {
-  outline: 2px solid var(--color-focus);
-  outline-offset: 2px;
+  outline: var(--focus-outline);
+  outline-offset: var(--border-thick);
 }
 
 /*
@@ -236,12 +240,8 @@ dialog[data-motion][open]::backdrop {
   white-space: nowrap;
 }
 
-/*
- * Любой флажок — тумблер, как в нативной Искре: дорожка и кружок, включённое — акцентом.
- * Нарисован поверх настоящего `<input type="checkbox">`, поэтому `bind:checked`, клавиатура,
- * `disabled` и роль для чтеца экрана остаются его, а не самодельные.
- */
-input[type='checkbox'] {
+/* Переключатель на нативном checkbox сохраняет подпись label и клавиатурный ввод. */
+input[role='switch'] {
   appearance: none;
   position: relative;
   flex: none;
@@ -249,11 +249,11 @@ input[type='checkbox'] {
   height: var(--size-switch-height);
   margin: 0;
   border-radius: var(--radius-circle);
-  background: var(--color-separator);
+  background: var(--color-switch-track);
   cursor: pointer;
   transition: background-color var(--timing-chrome) var(--ease-out);
 }
-input[type='checkbox']::before {
+input[role='switch']::before {
   content: '';
   position: absolute;
   inset-block-start: var(--space-tight);
@@ -261,33 +261,34 @@ input[type='checkbox']::before {
   width: var(--size-switch-knob);
   height: var(--size-switch-knob);
   border-radius: var(--radius-circle);
-  background: var(--color-on-switch);
+  background: var(--color-background);
   box-shadow: var(--shadow-switch-knob);
   transition:
     translate var(--timing-chrome) var(--ease-out),
     scale var(--timing-chrome) var(--ease-out);
 }
-input[type='checkbox']:checked {
-  background: var(--accent);
+input[role='switch']:checked {
+  background: var(--ui-primary);
 }
-input[type='checkbox']:checked::before {
+input[role='switch']:checked::before {
+  background: var(--ui-primary-foreground);
   translate: calc(var(--size-switch-width) - var(--size-switch-knob) - 2 * var(--space-tight)) 0;
 }
-input[type='checkbox']:checked:dir(rtl)::before {
+input[role='switch']:checked:dir(rtl)::before {
   translate: calc(-1 * (var(--size-switch-width) - var(--size-switch-knob) - 2 * var(--space-tight))) 0;
 }
 @media (prefers-reduced-motion: no-preference) {
-  input[type='checkbox']:active:not(:disabled)::before {
+  input[role='switch']:active:not(:disabled)::before {
     scale: var(--motion-knob-stretch);
   }
 }
-input[type='checkbox']:disabled {
+input[role='switch']:disabled {
   opacity: 0.4;
   cursor: default;
 }
 @media (prefers-reduced-motion: reduce) {
-  input[type='checkbox'],
-  input[type='checkbox']::before {
+  input[role='switch'],
+  input[role='switch']::before {
     transition: none;
   }
 }

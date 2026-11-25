@@ -1,20 +1,6 @@
-/*
- * Токены — `Theme.swift` нативной Искры (zhuravlevb/iskra, ветка dev), переведённый
- * в CSS custom properties. Числа — оттуда же; здесь они в rem (1rem = 16px), чтобы
- * `Ctrl +` в браузере увеличивал Искру целиком и честно.
- *
- * Всё кратно 4 px (0.25rem). Два исключения — те же, что в Theme.swift, и по той же
- * причине: `--space-within-run` (2 px) и `--size-recording-dot` (10 px). Сетка — для
- * того, что выравнивается друг с другом; эти двое не выравниваются ни с чем.
- *
- * Ни одного голого `padding: 12px` в компонентах — только эти переменные.
- *
- * К числам Theme.swift добавлено то, чего в нативной Искре не было: ширины колонок,
- * максимальная ширина ленты, зоны нажатия для пальца и для мыши. Точки перелома
- * (640 и 1100 px) в custom properties жить не могут — media query их не читает, —
- * поэтому они записаны числами в `breakpoints.ts`.
+/* Веб-токены Искры. Интервалы и размеры интерфейса выражаются в rem.
+ * Типографика, тонкие обводки и оптические поправки используют собственную шкалу.
  */
-
 :root {
   /* Theme.Spacing */
   --space-tight: 0.25rem; /* 4 */
@@ -28,14 +14,18 @@
      читаются как одно в две строки. */
   --space-within-compact-run: 0.5rem; /* 8 */
 
-  /* Theme.Radius */
+  /* Скругления */
   --radius-bubble: 1.5rem; /* 24 */
-  --radius-picture: 1.25rem; /* 20 */
-  --radius-album-bottom: 0.5rem; /* 8 — низ альбома острее верха */
-  --radius-row: 1.25rem; /* 20 — пункты списков и карточки настроек */
-  --radius-card: 1rem; /* 16 */
-  --radius-control: 0.75rem; /* 12 */
-  --radius-menu: 1.75rem; /* 28 */
+  --radius-picture: 1.75rem; /* 28 */
+  /* Край встроенного фото повторяет дугу пузыря с учётом его отступа. */
+  --radius-message-media: calc(var(--radius-bubble) - var(--space-tight));
+  --radius-album-bottom: 0.75rem; /* 12 — низ альбома острее верха */
+  --radius-row: 1rem; /* 16 — строки */
+  --radius-card: 1.5rem; /* 24 */
+  --radius-control: 1rem; /* 16 */
+  /* Внешняя дуга повторяет кнопку, отступ и толщину рамки. */
+  --radius-composer: calc(var(--tap-target) / 2 + var(--space-tight) + var(--border-hairline));
+  --radius-menu: 1.5rem; /* 24 */
   --radius-circle: 9999px;
   --radius-checkbox: 0.25rem; /* 4 — квадратик выбора */
 
@@ -57,12 +47,10 @@
   /* Затемнение за диалогом и листом. В светлой — серый `systemGray`: серит белое. В тёмной —
      чёрный (ниже): серый там высветлял ленту, и окно не отделялось от неё; от чёрного фона
      окно отделяет своя заливка `--color-surface`. */
-  --color-scrim: rgb(120 120 128 / 0.4);
+  --color-scrim: rgb(120 120 120 / 0.4);
   /* Край окна над затемнением: в светлой его видно и так, в тёмной чёрное окно на почти чёрном
      затемнении держится только этой линией. */
   --color-dialog-edge: transparent;
-  /* Кружок тумблера — белый в обеих темах, как у UISwitch, с лёгкой тенью от дорожки. */
-  --color-on-switch: #ffffff;
   --shadow-switch-knob: 0 1px 4px rgb(0 0 0 / 0.2);
   /* QR-код — чёрным по белому в любой теме: камера читает тёмное на светлом (`QRCodeImage` нативной). */
   --color-qr-ground: #ffffff;
@@ -131,6 +119,7 @@
   --size-gallery-tile: 6rem; /* 96 — наименьшая клетка сетки «Фото и видео», как у RoomMediaGrid */
 
   /* Колонки. Список чатов — Theme.Size.sidebarMinimum/Ideal/Maximum. */
+  --column-list-rail: 4rem; /* 64 — список аватарок */
   --column-list-min: 17.5rem; /* 280 */
   --column-list-ideal: 20rem; /* 320 */
   --column-list-max: 25rem; /* 400 */
@@ -204,7 +193,7 @@
   /* Код восстановления: моноширинный, чтобы «0» и «O», «l» и «1» не спорили. */
   --font-code: ui-monospace, 'SF Mono', Menlo, Consolas, 'Liberation Mono', monospace;
   --font-size-body: 0.9375rem; /* 15 — заголовки шапок, имена чатов, пункты меню */
-  --font-size-message: 0.875rem; /* 14 — сообщения в пузырях и в компактной ленте */
+  --font-size-message: var(--font-size-body); /* 15 — сообщения в обоих режимах */
   --font-size-input: 1rem; /* 16 — поле ввода на телефоне */
   --line-height-message: 1.45;
   --font-size-caption: 0.8125rem; /* 13 */
@@ -219,7 +208,9 @@
    * с двумя значениями. По умолчанию — палец (так безопаснее для неизвестного ввода).
    */
   --row-setting: 2.75rem; /* 44 — единая высота пункта настроек: и обычного, и с тумблером */
-  --tap-target: 3rem; /* 48 — палец */
+  --tap-target-touch: 3rem; /* 48 */
+  --tap-target-mouse: 2.25rem; /* 36 */
+  --tap-target: var(--tap-target-touch);
   --size-watermark: 8rem; /* 128 — искра на пустом месте чата */
   --row-room: 4.5rem; /* 72 = лицо 56 + 2 × 8 */
   --timeline-gutter: var(--space-roomy);
@@ -234,7 +225,7 @@
 @media (hover: hover) and (pointer: fine) {
   :root {
     --font-size-input: var(--font-size-body);
-    --tap-target: 2.25rem; /* 36 — мышь */
+    --tap-target: var(--tap-target-mouse);
     --row-room: 3.5rem; /* 56 = лицо 40 + 2 × 8 */
     --size-room-avatar: 2.5rem; /* 40 — под мышью строка ниже, лицо тоже */
     --timeline-gutter: var(--space-normal);
@@ -245,34 +236,38 @@
 
 /*
  * Цвета. Светлая и тёмная тема — от `prefers-color-scheme`, с ручным выбором через
- * `data-theme` на <html>. Системные цвета Apple, потому что их берёт SwiftUI.
+ * `data-theme` на <html>.
  */
 :root {
   color-scheme: light;
-  --color-background: #ffffff;
-  /* Вуаль на обоях: обои уводят к странице — в светлой к белому, в тёмной к чёрному. */
-  --wallpaper-veil: white;
-  --color-surface: #f2f2f7;
-  --color-text: #000000;
-  --color-text-secondary: rgb(60 60 67 / 0.76);
-  --color-separator: rgb(60 60 67 / 0.29);
-  --color-glass: rgb(255 255 255 / 0.72);
-  --color-glass-opaque: #f9f9f9;
+  --color-background: #fff;
+  --wallpaper-veil: var(--color-background);
+  --color-surface: #f5f5f5;
+  --color-sidebar: #f2f2f2;
+  --color-composer-edge: #ccc;
+  --color-text: #202020;
+  --color-text-secondary: #595959;
+  --color-separator: #dadada;
+  --color-glass: rgb(255 255 255 / 0.82);
+  --color-glass-opaque: var(--color-surface);
+  --color-switch-track: #757575;
+  --own-bubble-tint: 12%;
+  --shadow-composer: 0 var(--space-within-run) var(--space-close) rgb(0 0 0 / 0.08);
+  --shadow-popover: 0 var(--space-close) var(--space-generous) rgb(0 0 0 / 0.25);
   /* Нарисованная «фотография» в примере мордочек — оранжевый в розовый, как в нативной. */
   --color-photo-from: #ff9500;
   --color-photo-to: #ff2d55;
-  /* Color.primary.opacity(0.08) — incomingBubble */
-  --color-incoming-bubble: rgb(0 0 0 / 0.08);
-  /* На обоях пузыри непрозрачные: восемь процентов чёрного поверх чужого отпуска — это отпуск
-     со словами поверх (`incomingBubbleOnWallpaper` / `ownBubbleOnWallpaper` нативной Искры). */
-  --color-incoming-bubble-on-wallpaper: #fcfcfc;
+  --color-incoming-bubble: var(--color-incoming-bubble-on-wallpaper);
+  /* Непрозрачная подложка для текста поверх любых обоев. */
+  --color-incoming-bubble-on-wallpaper: #ededed;
+  --color-own-bubble: #ddd;
   --color-mono-bubble-on-wallpaper: #dedede;
   --color-own-reaction: rgb(0 0 0 / 0.16);
   --color-own-reaction-glass: rgb(0 0 0 / 0.22); /* Theme.Reaction.mineTint */
-  --color-danger: #ff3b30;
+  --color-danger: #b82236;
   /* Предупреждение, а не ошибка: «Из России может быть недоступен» — systemOrange. */
   --color-warning: #ff9500;
-  --color-on-danger: #ffffff;
+  --color-on-danger: #fff;
   /* Камера «кружочка» — одна и та же в обеих темах: под ней всегда тёмное размытие комнаты
      (`Theme.Backdrop.dim` и `.plate` нативной). */
   --color-camera-scrim: rgb(0 0 0 / 0.45);
@@ -280,60 +275,78 @@
   --color-on-camera: #ffffff;
   /* Значок беззвучного чата — сплошной серый, не полупрозрачность: точка в десять пикселей
      из девяти процентов цвета текста — это пятно. */
-  --color-muted-badge: #8e8e93;
-  --color-on-muted-badge: #ffffff;
+  --color-muted-badge: #656565;
+  --color-on-muted-badge: #fff;
   --color-selected: rgb(0 0 0 / 0.06);
-  --color-room-selection: color-mix(in srgb, var(--accent) 17%, var(--color-surface));
-  --color-focus: color-mix(in srgb, var(--color-text) 40%, var(--accent));
+  --color-room-selection: #ddd;
+  --color-focus: #555;
   /* Искра на пустом месте, где чата ещё не выбрали: видна, но ничего не говорит. */
   --color-watermark: rgb(0 0 0 / 0.06);
 }
 
 :root[data-theme='dark'] {
   color-scheme: dark;
-  --color-background: #000000;
-  --wallpaper-veil: black;
-  --color-surface: #1c1c1e;
-  --color-text: #ffffff;
-  --color-text-secondary: rgb(235 235 245 / 0.6);
-  --color-separator: rgb(84 84 88 / 0.6);
-  --color-glass: rgb(28 28 30 / 0.72);
-  --color-glass-opaque: #1c1c1e;
-  --color-incoming-bubble: rgb(255 255 255 / 0.08);
+  --tint-interface: 4%;
+  --tint-mono: 2%;
+  --color-background: #0b0b0b;
+  --color-surface: #161616;
+  --color-sidebar: #141414;
+  --color-composer-edge: #3d3d3d;
+  --color-text: #f0f0f0;
+  --color-text-secondary: #b3b3b3;
+  --color-separator: #2b2b2b;
+  --color-glass: rgb(22 22 22 / 0.84);
+  --color-switch-track: #808080;
+  --color-incoming-bubble-on-wallpaper: #202020;
+  --color-own-bubble: #2d2d2d;
+  --color-room-selection: #2c2c2c;
+  --color-focus: #bbb;
+  --color-danger: #ff8b99;
+  --color-on-danger: #19171b;
+  --color-muted-badge: #ababab;
+  --color-on-muted-badge: #0b0b0b;
+  --own-bubble-tint: 19%;
   --color-own-reaction: rgb(255 255 255 / 0.16);
   --color-own-reaction-glass: rgb(255 255 255 / 0.22);
-  --color-danger: #ff453a;
   --color-warning: #ff9f0a;
   --color-selected: rgb(255 255 255 / 0.1);
   --color-watermark: rgb(255 255 255 / 0.07);
-  --color-incoming-bubble-on-wallpaper: #2b2b2b;
-  --color-mono-bubble-on-wallpaper: #4d4d4d;
+  --color-mono-bubble-on-wallpaper: #414141;
   --color-scrim: rgb(0 0 0 / 0.6);
-  --color-dialog-edge: rgb(84 84 88 / 0.6);
+  --color-dialog-edge: rgb(72 72 72 / 0.6);
 }
 
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme='light']) {
     color-scheme: dark;
-    --color-background: #000000;
-    --wallpaper-veil: black;
-    --color-surface: #1c1c1e;
-    --color-text: #ffffff;
-    --color-text-secondary: rgb(235 235 245 / 0.6);
-    --color-separator: rgb(84 84 88 / 0.6);
-    --color-glass: rgb(28 28 30 / 0.72);
-    --color-glass-opaque: #1c1c1e;
-    --color-incoming-bubble: rgb(255 255 255 / 0.08);
+    --tint-interface: 4%;
+    --tint-mono: 2%;
+    --color-background: #0b0b0b;
+    --color-surface: #161616;
+    --color-sidebar: #141414;
+    --color-composer-edge: #3d3d3d;
+    --color-text: #f0f0f0;
+    --color-text-secondary: #b3b3b3;
+    --color-separator: #2b2b2b;
+    --color-glass: rgb(22 22 22 / 0.84);
+    --color-switch-track: #808080;
+    --color-incoming-bubble-on-wallpaper: #202020;
+    --color-own-bubble: #2d2d2d;
+    --color-room-selection: #2c2c2c;
+    --color-focus: #bbb;
+    --color-danger: #ff8b99;
+    --color-on-danger: #19171b;
+    --color-muted-badge: #ababab;
+    --color-on-muted-badge: #0b0b0b;
+    --own-bubble-tint: 19%;
     --color-own-reaction: rgb(255 255 255 / 0.16);
     --color-own-reaction-glass: rgb(255 255 255 / 0.22);
-    --color-danger: #ff453a;
-  --color-warning: #ff9f0a;
+    --color-warning: #ff9f0a;
     --color-selected: rgb(255 255 255 / 0.1);
     --color-watermark: rgb(255 255 255 / 0.07);
-    --color-incoming-bubble-on-wallpaper: #2b2b2b;
-    --color-mono-bubble-on-wallpaper: #4d4d4d;
+    --color-mono-bubble-on-wallpaper: #414141;
     --color-scrim: rgb(0 0 0 / 0.6);
-    --color-dialog-edge: rgb(84 84 88 / 0.6);
+    --color-dialog-edge: rgb(72 72 72 / 0.6);
   }
 }
 

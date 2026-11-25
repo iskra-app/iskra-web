@@ -69,7 +69,7 @@
     width: var(--size-media-max-width);
     max-width: 100%;
     aspect-ratio: 1 / var(--album-height, 1);
-    border-radius: var(--radius-picture);
+    border-radius: var(--radius-message-media);
     overflow: hidden;
   }
   /* Под альбомом подпись: нижние углы — меньше, они уже не край пузыря, а граница с текстом. */

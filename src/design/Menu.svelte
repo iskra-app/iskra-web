@@ -129,9 +129,9 @@
     max-width: calc(100vw - 2 * var(--space-close));
     border: var(--border-hairline) solid var(--color-separator);
     border-radius: var(--radius-row);
-    background: var(--color-glass-opaque);
+    background: var(--ui-background);
     color: var(--color-text);
-    box-shadow: 0 var(--space-close) var(--space-generous) rgb(0 0 0 / 0.2);
+    box-shadow: var(--shadow-popover);
   }
   dialog::backdrop {
     background: transparent;
@@ -161,7 +161,7 @@
     min-height: var(--tap-target);
     padding: 0 var(--space-normal);
     border: none;
-    border-radius: var(--radius-card);
+    border-radius: var(--radius-control);
     background: transparent;
     color: inherit;
     font: inherit;
@@ -180,7 +180,7 @@
     color: inherit;
   }
   .menu :global([role^='menuitem']:focus-visible) {
-    outline: 2px solid var(--accent);
+    outline: var(--focus-outline);
     outline-offset: -2px;
   }
   @media (hover: hover) {

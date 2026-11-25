@@ -540,7 +540,7 @@
     cursor: pointer;
   }
   .selectable:focus-visible {
-    outline: var(--border-thick) solid var(--accent);
+    outline: var(--focus-outline);
   }
   .chosen-row {
     flex: 1;

@@ -55,7 +55,7 @@
     color: var(--color-text-secondary);
   }
   .field:focus-within {
-    outline: var(--border-thick) solid var(--color-focus);
+    outline: var(--focus-outline);
   }
   input {
     flex: 1;

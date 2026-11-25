@@ -25,6 +25,7 @@
     listWidth?: number;
     /** Открыт ли чат — на стеке решает, какая колонка на экране. */
     showMain: boolean;
+    hideList?: boolean;
     panelOpen?: boolean;
     backLayer?: boolean;
     panelLabel?: string;
@@ -39,6 +40,7 @@
     panel,
     listWidth = $bindable(LIST_IDEAL),
     showMain,
+    hideList = false,
     panelOpen = false,
     backLayer = false,
     panelLabel,
@@ -103,15 +105,16 @@
   class="columns"
   data-layout={layout}
   data-show-main={showMain}
+  data-hide-list={hideList}
   data-panel-open={panelOpen && !!panel}
   class:dragging
-  style:--list-width="{listWidth}rem"
+  style:--expanded-list-width="{listWidth}rem"
 >
   <section class="list" inert={sheetOpen}>
     {@render list()}
   </section>
 
-  {#if layout !== 'stack'}
+  {#if layout !== 'stack' && !hideList}
     <!-- Фокусируемый separator со значением — виджет по ARIA; Svelte этого не различает. -->
     <!-- svelte-ignore a11y_no_noninteractive_tabindex, a11y_no_noninteractive_element_interactions -->
     <div
@@ -160,8 +163,10 @@
 <style>
   .columns {
     position: relative;
+    --list-width: var(--expanded-list-width);
     display: grid;
     height: 100%;
+    background: var(--color-background);
     overflow: hidden;
   }
 
@@ -193,11 +198,24 @@
     grid-template-columns: var(--list-width) 0 minmax(0, 1fr) var(--column-panel);
   }
 
+  .columns[data-hide-list='true'][data-layout='two'],
+  .columns[data-hide-list='true'][data-layout='three'] {
+    --list-width: max(var(--column-list-rail), calc(var(--titlebar-start) + var(--tap-target) + 2 * var(--space-close)));
+  }
+  .main {
+    grid-column: 3;
+    grid-row: 1;
+  }
+  .columns[data-layout='stack'] > .main {
+    grid-column: 1;
+  }
   .list {
-    background: var(--color-surface);
+    --bar-surface: var(--color-sidebar);
+    background: var(--color-sidebar);
   }
   /* На телефоне список — отдельный экран, а не боковая панель рядом с чатом: фон — тот же, что у чата. */
   .columns[data-layout='stack'] .list {
+    --bar-surface: var(--color-background);
     background: var(--color-background);
   }
 

@@ -8,6 +8,7 @@
   import Columns from '../../design/Columns.svelte';
   import { Lazy } from '../../design/lazy.svelte.ts';
   import Bar from '../../design/Bar.svelte';
+  import Button from '../../design/ui/Button.svelte';
   import SparkGlyph from '../../design/SparkGlyph.svelte';
   import IconButton from '../../design/IconButton.svelte';
   import Icon from '../../design/Icon.svelte';
@@ -49,6 +50,7 @@
   let roomList: RoomList | undefined = $state();
   let infoButton: HTMLButtonElement | undefined = $state();
   let searchButton: HTMLButtonElement | undefined = $state();
+  let listToggle: HTMLButtonElement | undefined = $state();
   let searchTrigger: HTMLElement | undefined;
   let threadTrigger: HTMLElement | undefined;
   // Меняется при уходе из ленты. Данные нужны только следующему экземпляру ленты.
@@ -91,6 +93,8 @@
     panelOpen = true;
   });
   const roomId = $derived(router.route.name === 'room' ? router.route.roomId : null);
+  const desktopChat = $derived(viewport.layout !== 'stack' && viewport.finePointer);
+  const hideList = $derived(desktopChat && preferences.listCollapsed);
   const Settings = $derived(settingsScreen.when(router.route.name === 'settings'));
   const RoomPanel = $derived(roomPanel.when(panelOpen && roomId !== null));
   const MessageSearchDialog = $derived(messageSearch.when(searching));
@@ -276,6 +280,7 @@
     await tick();
     if (document.querySelector('dialog[open]')) return;
     if (target?.isConnected && target.getClientRects().length && !target.closest('[inert]')) target.focus({ preventScroll: true });
+    else if (hideList) listToggle?.focus({ preventScroll: true });
     else roomList?.focusRoom(fallbackRoom);
   }
 
@@ -327,6 +332,22 @@
   «О чате»), но кнопка для этого одна — ⓘ справа: лицо и имя скринридеру не показываем, чтобы
   «О чате» не было тремя одинаковыми кнопками подряд, и в Tab их нет.
 -->
+{#snippet searchAction()}
+  <IconButton bind:element={searchButton} label={t('roomList.searchPrompt')} shortcut={describeHotkey('search')} onclick={() => openSearch(searchButton)}>
+    <Icon name="search" />
+  </IconButton>
+{/snippet}
+
+{#snippet composeAction()}
+  <IconButton label={t('roomList.newConversation')} onclick={() => (creating = true)}><Icon name="compose" /></IconButton>
+{/snippet}
+
+{#snippet settingsAction()}
+  <IconButton label={t('account.settings')} shortcut={describeHotkey('settings')} onclick={() => router.go({ name: 'settings' })}>
+    <Icon name="settings" />
+  </IconButton>
+{/snippet}
+
 {#snippet face()}
   {#if room}
     <button type="button" class="room-face" aria-hidden="true" tabindex="-1" onclick={toggleInfo}>
@@ -337,6 +358,7 @@
 
 <Columns
   bind:listWidth={preferences.listWidth}
+  {hideList}
   showMain={roomId !== null || router.route.name === 'settings'}
   panelOpen={(panelOpen || !!threadId) && roomId !== null}
   backLayer={panelOpen && !threadId}
@@ -345,31 +367,57 @@
   resizeLabel={t('layout.resizeList')}
 >
   {#snippet list()}
-    <div class="list-column">
-      <Bar title={status ?? t('roomList.title')}>
+    <div class="list-column" class:desktop={desktopChat}>
+      <Bar title={status ?? t('roomList.title')} seam={!desktopChat} leadingOnly={hideList}>
+        {#snippet leading()}
+          {#if desktopChat}
+            <IconButton
+              bind:element={listToggle}
+              label={t(hideList ? 'layout.showList' : 'layout.hideList')}
+              expanded={!hideList}
+              onclick={() => (preferences.listCollapsed = !preferences.listCollapsed)}
+            >
+              <span class="sidebar-spark"><SparkGlyph /></span>
+              <span class="sidebar-toggle"><Icon name={hideList ? 'sidebarOpen' : 'sidebarClose'} /></span>
+            </IconButton>
+          {/if}
+        {/snippet}
         {#snippet trailing()}
-          <IconButton bind:element={searchButton} label={t('roomList.searchPrompt')} shortcut={describeHotkey('search')} onclick={() => openSearch(searchButton)}>
-            <Icon name="search" />
-          </IconButton>
-          <IconButton label={t('roomList.newConversation')} onclick={() => (creating = true)}>
-            <Icon name="compose" />
-          </IconButton>
-          <IconButton label={t('account.settings')} shortcut={describeHotkey('settings')} onclick={() => router.go({ name: 'settings' })}>
-            <Icon name="settings" />
-          </IconButton>
+          {#if !desktopChat}{@render searchAction()}{/if}
+          {@render composeAction()}
+          {@render settingsAction()}
         {/snippet}
       </Bar>
-      <OfflineStrip {session} />
-      <StorageNotice />
-      <LockedHistoryStrip recovery={session.recovery} onopen={() => app.openRecovery()} />
-      <RoomList bind:this={roomList} {session} />
+      <div class="list-content">
+        {#if hideList}
+          <div class="rail-actions">
+            {@render composeAction()}
+            {@render settingsAction()}
+            {@render searchAction()}
+          </div>
+        {:else}
+          {#if desktopChat}
+            <div class="search-launcher">
+              <Button variant="ghost" size="wide" bind:element={searchButton} onclick={() => openSearch(searchButton)}>
+                <Icon name="search" />
+                <span class="search-label">{t('roomList.searchPrompt')}</span>
+                <kbd aria-hidden="true">{describeHotkey('search')}</kbd>
+              </Button>
+            </div>
+          {/if}
+          <OfflineStrip {session} />
+          <StorageNotice />
+          <LockedHistoryStrip recovery={session.recovery} onopen={() => app.openRecovery()} />
+        {/if}
+        <RoomList bind:this={roomList} {session} avatarOnly={hideList} onexpand={() => (preferences.listCollapsed = false)} />
+      </div>
     </div>
   {/snippet}
 
   {#snippet main()}
     {#if roomId}
       <div class="main-column">
-      <Bar {title} {subtitle} ontitle={toggleInfo}>
+      <Bar {title} {subtitle} seam={!desktopChat} ontitle={toggleInfo}>
         {#snippet leading()}
           {#if viewport.layout === 'stack'}
             <IconButton label={t('room.back')} onclick={closeRoom}><Icon name="back" /></IconButton>
@@ -384,7 +432,7 @@
       </Bar>
       {#key roomId}
         {@const id = roomId}
-        <div class="conversation" class:stack={viewport.layout === 'stack'}>
+        <div class="conversation" class:stack={viewport.layout === 'stack'} class:desktop-chat={desktopChat}>
           <RoomView bind:this={roomView} bind:store={roomTimeline} {session} roomId={id} position={readingPositions.get(id)} onposition={(position) => readingPositions.set(id, position)}
             onthreadopen={() => (threadTrigger = document.activeElement instanceof HTMLElement ? document.activeElement : undefined)} />
         </div>
@@ -543,6 +591,73 @@
     display: flex;
     flex-direction: column;
     height: 100%;
+  }
+  .list-content {
+    display: flex;
+    flex: 1;
+    min-height: 0;
+    flex-direction: column;
+  }
+  .rail-actions {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: var(--space-tight);
+    padding-block-start: var(--space-tight);
+  }
+  .sidebar-spark {
+    display: flex;
+    color: var(--ui-link);
+  }
+  .sidebar-spark :global(svg),
+  .sidebar-toggle :global(svg) {
+    width: var(--size-icon);
+    height: var(--size-icon);
+  }
+  .sidebar-toggle,
+  :global(button:is(:hover, :focus-visible)) .sidebar-spark {
+    display: none;
+  }
+  :global(button:is(:hover, :focus-visible)) .sidebar-toggle {
+    display: flex;
+  }
+  .list-column.desktop :global(header) {
+    padding-inline-start: max(var(--space-close), var(--bar-inset-start));
+  }
+  .search-launcher {
+    padding: var(--space-tight) var(--space-normal) var(--space-close);
+  }
+  .search-launcher :global(button) {
+    justify-content: flex-start;
+    min-height: var(--tap-target);
+    padding-inline: var(--space-close);
+    border: var(--border-hairline) solid var(--color-separator);
+    background: var(--color-background);
+    text-align: start;
+    color: var(--color-text-secondary);
+    font-size: var(--font-size-caption);
+    font-weight: 500;
+  }
+  .search-launcher :global(svg) {
+    width: var(--size-icon);
+    height: var(--size-icon);
+    flex: none;
+  }
+  .search-label {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  kbd {
+    margin-inline-start: auto;
+    font: inherit;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+  }
+  .desktop-chat {
+    --column-timeline-max: 45rem;
+    --timeline-gutter: var(--space-generous);
   }
   .watermark {
     display: grid;

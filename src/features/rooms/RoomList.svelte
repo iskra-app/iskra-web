@@ -12,6 +12,7 @@
   «Поиск по сообщениям» — не здесь: окном по лупе в шапке (`MessageSearchDialog`).
 -->
 <script lang="ts">
+  import { tick } from 'svelte';
   import EmptyState from '../../design/EmptyState.svelte';
   import ConfirmDialog from '../../design/ConfirmDialog.svelte';
   import NewSignInBanner from './NewSignInBanner.svelte';
@@ -24,6 +25,7 @@
   import { t, type TextKey } from '../../i18n/index.svelte.ts';
   import InviteRow from './InviteRow.svelte';
   import RoomRow from './RoomRow.svelte';
+  import RoomFace from './RoomFace.svelte';
   import FolderTabs from './FolderTabs.svelte';
   import { folderSelection } from './folderSelection.svelte.ts';
   import { roomsOf } from '../../core/rooms/folders';
@@ -34,7 +36,11 @@
   import ChatPeek, { type PeekAction } from './ChatPeek.svelte';
   import { hasUnread } from '../../core/rooms/types';
 
-  let { session }: { session: UserSession } = $props();
+  let { session, avatarOnly = false, onexpand }: {
+    session: UserSession;
+    avatarOnly?: boolean;
+    onexpand?: () => void;
+  } = $props();
   let list: HTMLDivElement | undefined = $state();
 
   type View = { kind: 'all' } | { kind: 'archive' } | { kind: 'space'; id: string };
@@ -97,6 +103,12 @@
       return;
     }
     router.go({ name: 'room', roomId: room.id });
+  }
+
+  async function showInvite(id: string) {
+    onexpand?.();
+    await tick();
+    list?.querySelector<HTMLElement>(`[data-invite-id="${CSS.escape(id)}"]`)?.focus();
   }
 
   // ————— Меню строки — то, что в нативной под «подглядыванием» —————
@@ -185,7 +197,7 @@
   }
 </script>
 
-{#if view.kind === 'all' && signIns.sessions[0]}
+{#if !avatarOnly && view.kind === 'all' && signIns.sessions[0]}
   {@const device = signIns.sessions[0]}
   <NewSignInBanner
     {device}
@@ -195,25 +207,33 @@
   />
 {/if}
 
-{#if view.kind === 'all' && folders.length > 0}
+{#if !avatarOnly && view.kind === 'all' && folders.length > 0}
   <FolderTabs {folders} list={organized.list} archived={organized.archived} selected={folder?.id ?? ''} onselect={(id) => (folderSelection.id = id)} />
 {/if}
 
-{#if view.kind !== 'all'}
-  <div class="subheader">
+{#if avatarOnly}
+  <div class="rail-archive">
+    <IconButton label={t('roomList.archive.title')} pressed={view.kind === 'archive'} onclick={() => (view = { kind: view.kind === 'archive' ? 'all' : 'archive' })}>
+      <Icon name="archive" />
+    </IconButton>
+  </div>
+{/if}
+
+{#if view.kind === 'space' || (!avatarOnly && view.kind === 'archive')}
+  <div class="subheader" class:rail={avatarOnly}>
     <IconButton label={t('room.back')} onclick={() => (view = { kind: 'all' })}><Icon name="back" /></IconButton>
-    <h2>{viewTitle}</h2>
+    <h2 class:visually-hidden={avatarOnly}>{viewTitle}</h2>
   </div>
 {/if}
 
 {#if failure}
-  <div class="failure">
+  <div class="failure" class:visually-hidden={avatarOnly}>
     <ProblemPanel title={t('problem.title')} message={t(failure)} />
   </div>
 {/if}
 
 <!-- svelte-ignore a11y_no_static_element_interactions -->
-<div class="list" bind:this={list} {onkeydown}>
+<div class="list" class:avatar-only={avatarOnly} bind:this={list} {onkeydown}>
   {#if !session.ready && session.rooms.rooms.length === 0}
     <EmptyState title={t('roomList.loading')} />
   {:else if nothingAtAll}
@@ -225,7 +245,7 @@
   {:else if folder && shown.length === 0}
     <EmptyState title={t('folders.emptyTitle')} message={t('folders.emptyMessage')} />
   {:else}
-    {#if view.kind === 'all' && !folder && organized.archived.length > 0}
+    {#if !avatarOnly && view.kind === 'all' && !folder && organized.archived.length > 0}
       <button type="button" class="archive" onclick={() => (view = { kind: 'archive' })}>
         <Icon name="archive" />
         <span>{t('roomList.archive.title')}</span>
@@ -233,12 +253,19 @@
     {/if}
     {#each shown as room (room.id)}
       {#if room.membership === 'invite'}
-        <InviteRow {room} {session} onfailure={(key) => (failure = key)} />
+        {#if avatarOnly}
+          <button type="button" class="invite-avatar" title={roomName(room)} aria-label={`${roomName(room)}, ${t('roomList.invite.unattributed')}`} onclick={() => void showInvite(room.id)}>
+            <RoomFace {room} {session} />
+          </button>
+        {:else}
+          <InviteRow {room} {session} onfailure={(key) => (failure = key)} />
+        {/if}
       {:else}
         <RoomRow
           {room}
           {session}
           {now}
+          {avatarOnly}
           selected={room.id === selectedId}
           onopen={() => open(room)}
           onmenu={(at, sheet) => (menu = { room, at, sheet })}
@@ -288,6 +315,46 @@
     overflow-y: auto;
     overscroll-behavior: contain;
     padding-block-end: max(var(--space-close), env(safe-area-inset-bottom));
+  }
+  .rail-archive {
+    display: grid;
+    justify-items: center;
+    padding-block: var(--space-tight);
+  }
+  .list.avatar-only {
+    min-height: 0;
+    overflow-x: hidden;
+    scrollbar-width: none;
+    padding-block-start: var(--space-tight);
+  }
+  .list.avatar-only > :global(.empty) {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    overflow: hidden;
+    clip-path: inset(50%);
+  }
+  .subheader.rail {
+    justify-content: center;
+    padding-inline: 0;
+  }
+  .invite-avatar {
+    display: grid;
+    place-items: center;
+    width: calc(100% - 2 * var(--space-tight));
+    min-height: var(--row-room);
+    margin-inline: var(--space-tight);
+    padding: var(--space-close) var(--space-tight);
+    border: none;
+    border-radius: var(--radius-row);
+    background: transparent;
+    cursor: pointer;
+  }
+  @media (hover: hover) {
+    .invite-avatar:hover {
+      background: var(--color-incoming-bubble);
+    }
   }
   .subheader {
     display: flex;

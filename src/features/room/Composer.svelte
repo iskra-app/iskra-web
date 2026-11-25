@@ -14,11 +14,12 @@
   поля — полоса записи. Кнопка та же самая, пока палец её держит: убрать её из-под пальца —
   значит потерять отпускание. Браузер не пишет AAC — микрофона нет (см. `media/voice.ts`).
 
-  «Стекло» — навигационный слой: полупрозрачность и размытие, где браузер их тянет.
 -->
 <script lang="ts">
   
   import { tick } from 'svelte';
+  import Button from '../../design/ui/Button.svelte';
+  import Textarea from '../../design/ui/Textarea.svelte';
   import Icon from '../../design/Icon.svelte';
   import Menu from '../../design/Menu.svelte';
   import { viewport } from '../../design/viewport.svelte.ts';
@@ -491,7 +492,7 @@
 </script>
 
 <!-- svelte-ignore a11y_no_static_element_interactions -->
-<div class="composer glass" onkeydown={recordingKey}>
+<div class="composer" onkeydown={recordingKey}>
 {#if context}
   <div class="context">
     <Icon name={context.kind === 'reply' ? 'reply' : 'edit'} />
@@ -515,6 +516,7 @@
 {/if}
 <form
   class="row"
+  class:writing={!recording}
   onsubmit={(event) => {
     event.preventDefault();
     send();
@@ -526,58 +528,57 @@
       void tick().then(() => buttons.voice?.focus());
     }} />
   {:else}
-  {#if onfiles}
-    <button type="button" class="attach" disabled={!canAttach} aria-label={t('room.attach')} title={t('room.attach')} aria-haspopup="menu" onclick={openAttachMenu}>
-      <Icon name="attach" />
-    </button>
-    <input bind:this={picker} type="file" multiple hidden onchange={picked} />
-  {/if}
-  <span class="field">
-  <textarea
-    bind:this={field}
-    class:with-stickers={offersStickers}
-    bind:value={text}
-    rows="1"
-    placeholder={t('room.composerPlaceholder')}
-    aria-label={t('room.composerPlaceholder')}
-    enterkeyhint={viewport.finePointer ? 'send' : 'enter'}
-    {disabled}
-    {onkeydown}
-    {onpaste}
-    aria-autocomplete={mentionCandidates ? 'list' : undefined}
-    aria-controls={matches.length ? pickerId : undefined}
-    aria-activedescendant={matches.length ? `${pickerId}-${active}` : undefined}
-    oninput={() => {
-      dismissed = false;
-      trackCursor();
-      oninput?.(text);
-    }}
-    onkeyup={trackCursor}
-    onclick={trackCursor}
-    onselect={trackCursor}
-    onblur={() => (cursor = null)}
-  ></textarea>
-  {#if offersStickers}
-    <!-- В поле, у его конца, как в нативной: часть поля, а не кнопка рядом с ним. -->
-    <button
-      type="button"
-      class="stickers"
-      aria-label={t('stickers.open')}
-      title={t('stickers.open')}
-      aria-haspopup="menu"
+    {#if onfiles}
+      <Button variant="ghost" size="icon" class="composer-action" disabled={!canAttach} aria-label={t('room.attach')} title={t('room.attach')} aria-haspopup="menu" onclick={openAttachMenu}>
+        <Icon name="attach" />
+      </Button>
+      <input bind:this={picker} type="file" multiple hidden onchange={picked} />
+    {/if}
+    <Textarea
+      bind:element={field}
+      class="composer-input"
+      bind:value={text}
+      rows={1}
+      placeholder={t('room.composerPlaceholder')}
+      aria-label={t('room.composerPlaceholder')}
+      enterkeyhint={viewport.finePointer ? 'send' : 'enter'}
       {disabled}
-      onclick={(event) => {
-        const rect = event.currentTarget.getBoundingClientRect();
-        onstickers?.({ x: rect.left, y: rect.top });
+      {onkeydown}
+      {onpaste}
+      aria-autocomplete={mentionCandidates ? 'list' : undefined}
+      aria-controls={matches.length ? pickerId : undefined}
+      aria-activedescendant={matches.length ? `${pickerId}-${active}` : undefined}
+      oninput={(event) => {
+        dismissed = false;
+        trackCursor();
+        oninput?.(event.currentTarget.value);
       }}
-    >
-      <Icon name="emojiSmileys" />
-    </button>
+      onkeyup={trackCursor}
+      onclick={trackCursor}
+      onselect={trackCursor}
+      onblur={() => (cursor = null)}
+    />
+    {#if offersStickers}
+      <Button
+        variant="ghost"
+        size="icon"
+        class="composer-action"
+        aria-label={t('stickers.open')}
+        title={t('stickers.open')}
+        aria-haspopup="menu"
+        {disabled}
+        onclick={(event) => {
+          const rect = event.currentTarget.getBoundingClientRect();
+          onstickers?.({ x: rect.left, y: rect.top });
+        }}
+      >
+        <Icon name="emojiSmileys" />
+      </Button>
+    {/if}
   {/if}
-  </span>
-  {/if}
+  <div class="controls">
   {#if recorder.state === 'recording' && !press}
-    <button type="button" class="stop" aria-label={t('voice.stop')} title={t('voice.stop')} onclick={stopRecording}>
+    <button type="button" class="composer-action stop" aria-label={t('voice.stop')} title={t('voice.stop')} onclick={stopRecording}>
       <Icon name="stop" />
     </button>
   {/if}
@@ -593,7 +594,8 @@
         <button
           bind:this={buttons[kind]}
           type="button"
-          class="send voice"
+          class="composer-action voice"
+          class:idle={!recording}
           class:held={press?.kind === kind && press.started}
           aria-label={recordLabel(kind)}
           title={recording ? recordLabel(kind) : t(viewport.finePointer ? 'recording.hintPointer' : 'recording.hint')}
@@ -609,10 +611,11 @@
       </span>
     {/each}
   {:else}
-    <button type="submit" class="send press" disabled={empty || disabled} aria-label={t('room.send')} title={t('room.send')}>
+    <Button type="submit" size="icon" class="composer-action" disabled={empty || disabled} aria-label={t('room.send')} title={t('room.send')}>
       <Icon name="send" class="icon-swap" />
-    </button>
+    </Button>
   {/if}
+  </div>
 </form>
 
 <Menu open={!!attachMenu} x={attachMenu?.x ?? 0} y={attachMenu?.y ?? 0} sheet={!viewport.finePointer} label={t('room.attach')} onclose={() => (attachMenu = null)}>
@@ -644,6 +647,8 @@
 <style>
   .composer {
     width: 100%;
+    background: var(--color-background);
+    border-block-start: var(--border-hairline) solid var(--color-separator);
     padding: var(--space-close) var(--timeline-gutter);
     padding-block-end: max(var(--space-close), env(safe-area-inset-bottom));
   }
@@ -712,108 +717,77 @@
     color: var(--color-text-secondary);
     cursor: pointer;
   }
-  .glass {
-    background: var(--color-glass-opaque);
-  }
-  @supports (backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px)) {
-    .glass {
-      background: var(--color-glass);
-      -webkit-backdrop-filter: saturate(180%) blur(var(--backdrop-blur));
-      backdrop-filter: saturate(180%) blur(var(--backdrop-blur));
-    }
-  }
-  .field {
-    position: relative;
+  .controls {
     display: flex;
+    align-items: center;
+    gap: var(--space-tight);
+  }
+  .row.writing {
+    gap: var(--space-tight);
+    padding: var(--space-tight);
+    border: var(--border-hairline) solid var(--color-composer-edge);
+    border-radius: var(--radius-composer);
+    background: var(--color-background);
+  }
+  :global([data-focus-outline]) .row.writing:focus-within {
+    border-color: var(--ui-ring);
+  }
+  .row :global(.composer-input) {
     flex: 1;
     min-width: 0;
-  }
-  textarea {
-    flex: 1;
-    min-height: var(--size-navigation-bar);
+    min-height: var(--tap-target);
     max-height: 40vh;
-    padding: calc((var(--size-navigation-bar) - 1lh) / 2 - var(--border-hairline)) var(--space-roomy);
-    border: var(--border-hairline) solid var(--color-separator);
-    border-radius: var(--radius-bubble);
-    background: var(--color-background);
+    padding: calc((var(--tap-target) - 1lh) / 2) var(--space-close);
+    border: none;
+    background: transparent;
     resize: none;
     font-size: var(--font-size-input);
     line-height: var(--line-height-body);
     overflow-y: hidden;
   }
-  textarea.with-stickers {
-    padding-inline-end: var(--size-navigation-bar);
+  .row :global(.composer-input:focus-visible) {
+    outline: none;
   }
-  :global([data-keyboard-viewport]) textarea {
+  :global([data-keyboard-viewport]) .row :global(.composer-input) {
     max-height: calc(var(--app-viewport-height) * 0.4);
   }
-  .stickers {
-    position: absolute;
-    inset-block-end: 0;
-    inset-inline-end: 0;
-    display: grid;
+  .row :global(.composer-action) {
+    display: inline-grid;
     place-items: center;
-    width: var(--size-navigation-bar);
-    height: var(--size-navigation-bar);
+    flex: none;
+    inline-size: var(--tap-target);
+    block-size: var(--tap-target);
     padding: 0;
     border: none;
     border-radius: var(--radius-circle);
-    background: transparent;
-    color: var(--color-text-secondary);
-    cursor: pointer;
   }
-  .stickers :global(svg) {
-    width: var(--size-icon);
-    height: var(--size-icon);
+  .row :global(.composer-action svg) {
+    inline-size: var(--size-icon);
+    block-size: var(--size-icon);
   }
-  textarea:focus-visible {
-    outline: 2px solid var(--accent);
-    outline-offset: 0;
-    border-color: transparent;
-  }
-  .attach {
-    display: grid;
-    place-items: center;
-    flex: none;
-    width: var(--size-navigation-bar);
-    height: var(--size-navigation-bar);
-    border: none;
-    border-radius: var(--radius-circle);
-    background: transparent;
-    color: var(--color-text-secondary);
-    cursor: pointer;
-  }
-  .attach:disabled {
-    opacity: 0.4;
-    cursor: default;
-  }
-  .attach :global(svg) {
-    width: var(--size-icon-button);
-    height: var(--size-icon-button);
-  }
-  .send {
-    display: grid;
-    place-items: center;
-    flex: none;
-    width: var(--size-navigation-bar);
-    height: var(--size-navigation-bar);
-    border: none;
-    border-radius: var(--radius-circle);
+  .voice {
     background: var(--accent);
     color: var(--on-accent);
     cursor: pointer;
-  }
-  .voice-slot {
-    position: relative;
-    flex: none;
-  }
-  /* Палец не должен прокручивать ленту, выделять текст или звать меню, пока держит запись. */
-  .voice {
+    /* Во время записи палец управляет кнопкой. */
     touch-action: none;
     -webkit-user-select: none;
     user-select: none;
     -webkit-touch-callout: none;
     transition: transform var(--timing-chrome) var(--ease-out);
+  }
+  .voice.idle {
+    background: var(--ui-secondary);
+    color: var(--color-text);
+  }
+  @media (hover: hover) {
+    .voice.idle:hover {
+      background: var(--ui-hover);
+    }
+  }
+  .voice-slot {
+    position: relative;
+    flex: none;
   }
   .voice.held {
     transform: scale(var(--motion-held-scale));
@@ -850,27 +824,16 @@
     height: var(--size-icon);
   }
   .stop {
-    display: grid;
-    place-items: center;
-    flex: none;
-    width: var(--size-navigation-bar);
-    height: var(--size-navigation-bar);
-    border: none;
-    border-radius: var(--radius-circle);
     background: transparent;
     color: var(--color-danger);
     cursor: pointer;
   }
-  .stop :global(svg) {
-    width: var(--size-icon);
-    height: var(--size-icon);
+  :global(.desktop-chat) .composer {
+    background: transparent;
+    border-block-start: none;
+    padding-block: var(--space-tight) var(--space-roomy);
   }
-  .send:disabled {
-    opacity: 0.4;
-    cursor: default;
-  }
-  .send :global(svg) {
-    width: var(--size-icon);
-    height: var(--size-icon);
+  :global(.desktop-chat) .row.writing {
+    box-shadow: var(--shadow-composer);
   }
 </style>

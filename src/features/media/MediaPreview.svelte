@@ -85,7 +85,7 @@
 {#if kind === 'sticker'}
   <span class="media sticker" use:aspect={shape}>{@render picture()}</span>
 {:else if !allowed}
-  <button type="button" class="media waiting" class:round class:tile use:aspect={shape} aria-label={`${label}: ${t('media.download')}`} title={t('media.download')} onclick={() => (requested = true)}>
+  <button type="button" class="media waiting" class:round class:tile class:captioned={!!attachment.caption} use:aspect={shape} aria-label={`${label}: ${t('media.download')}`} title={t('media.download')} onclick={() => (requested = true)}>
     <span class="download" aria-hidden="true"><Icon name="download" /></span>
     {#if video && attachment.duration}<span class="duration">{duration(attachment.duration)}</span>{/if}
   </button>
@@ -110,7 +110,7 @@
     aspect-ratio: var(--ratio, 1);
     padding: 0;
     border: none;
-    border-radius: var(--radius-picture);
+    border-radius: var(--radius-message-media);
     background: var(--color-incoming-bubble);
     overflow: hidden;
     cursor: zoom-in;
@@ -123,6 +123,7 @@
   }
   .sticker {
     width: var(--size-sticker);
+    border-radius: var(--radius-picture);
     background: transparent;
     cursor: default;
   }

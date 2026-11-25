@@ -44,7 +44,11 @@ const keys = {
   accent: 'appearance.accent',
   tintsInterface: 'appearance.tintsInterface',
   appearance: 'appearance.mode',
+  focusOutline: 'accessibility.focusOutline',
+  noMotion: 'accessibility.noMotion',
+  highContrast: 'accessibility.highContrast',
   listWidth: 'layout.listWidth',
+  listCollapsed: 'layout.listCollapsed',
   faces: 'appearance.faces',
   font: 'appearance.font',
   language: 'language',
@@ -114,6 +118,10 @@ class Preferences {
    */
   tintsInterface = $state<boolean>(read(keys.tintsInterface) === 'true');
   appearance = $state<Appearance>(oneOf(read(keys.appearance), ['system', 'light', 'dark'], 'system'));
+  focusOutline = $state(read(keys.focusOutline) === 'true');
+  noMotion = $state(read(keys.noMotion) === 'true');
+  highContrast = $state(read(keys.highContrast) === 'true');
+  listCollapsed = $state(read(keys.listCollapsed) === 'true');
   listWidth = $state<number>(clampListWidth(Number(read(keys.listWidth) ?? LIST_IDEAL)));
   faces = $state<FaceMode>(oneOf(read(keys.faces), faceModes, 'initials'));
   font = $state<Font>(oneOf(read(keys.font), fonts, 'inter'));
@@ -158,7 +166,11 @@ class Preferences {
       $effect(() => write(keys.accent, this.accent));
       $effect(() => write(keys.tintsInterface, String(this.tintsInterface)));
       $effect(() => write(keys.appearance, this.appearance));
+      $effect(() => write(keys.focusOutline, String(this.focusOutline)));
+      $effect(() => write(keys.noMotion, String(this.noMotion)));
+      $effect(() => write(keys.highContrast, String(this.highContrast)));
       $effect(() => write(keys.listWidth, String(this.listWidth)));
+      $effect(() => write(keys.listCollapsed, String(this.listCollapsed)));
       $effect(() => write(keys.faces, this.faces));
       $effect(() => write(keys.font, this.font));
       $effect(() => write(keys.layout, this.layout));
@@ -189,6 +201,9 @@ class Preferences {
       $effect(() => {
         const root = document.documentElement;
         root.dataset.accent = this.accent;
+        root.toggleAttribute('data-focus-outline', this.focusOutline);
+        root.toggleAttribute('data-no-motion', this.noMotion);
+        root.toggleAttribute('data-high-contrast', this.highContrast);
         if (this.tintsInterface) root.dataset.tint = '';
         else delete root.dataset.tint;
         if (this.font === 'inter') delete root.dataset.font;

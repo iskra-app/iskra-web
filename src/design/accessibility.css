@@ -1,0 +1,54 @@
+:root {
+  --focus-outline: none;
+}
+
+:root[data-focus-outline] {
+  --focus-outline: var(--border-thick) solid var(--color-focus);
+}
+
+/* При навигации клавиатурой заливка отмечает фокус без рамки. */
+:where(:root:not([data-focus-outline])) :where(a, button, input, select, textarea, [tabindex='0']):focus-visible {
+  background-image: linear-gradient(var(--color-selected), var(--color-selected));
+}
+
+:root[data-no-motion] {
+  --motion-press-scale: 1;
+  --motion-knob-stretch: 1;
+}
+
+:root[data-no-motion] *,
+:root[data-no-motion] *::before,
+:root[data-no-motion] *::after,
+:root[data-no-motion] dialog::backdrop {
+  animation: none !important;
+  transition: none !important;
+}
+
+:root[data-high-contrast] {
+  --color-background: Canvas;
+  --color-text: CanvasText;
+  --color-text-secondary: var(--color-text);
+  --color-focus: var(--color-text);
+  --color-surface: color-mix(in srgb, CanvasText 7%, Canvas);
+  --color-sidebar: var(--color-surface);
+  --color-glass: var(--color-surface);
+  --color-separator: color-mix(in srgb, CanvasText 64%, Canvas);
+  --color-dialog-edge: var(--color-separator);
+  --color-composer-edge: var(--color-separator);
+  --color-switch-track: var(--color-separator);
+  --color-selected: color-mix(in srgb, CanvasText 18%, transparent);
+  --color-room-selection: color-mix(in srgb, CanvasText 20%, Canvas);
+  --color-incoming-bubble-on-wallpaper: color-mix(in srgb, CanvasText 12%, Canvas);
+  --color-mono-bubble-on-wallpaper: color-mix(in srgb, CanvasText 22%, Canvas);
+  --color-muted-badge: var(--color-text);
+  --color-on-muted-badge: var(--color-background);
+  --color-danger: light-dark(#8f1428, #ffadb7);
+  --color-on-danger: light-dark(#fff, #000);
+  --color-warning: light-dark(#784400, #ffd08a);
+  --accent: var(--color-text);
+  --on-accent: var(--color-background);
+  --bubble-own: var(--color-mono-bubble-on-wallpaper);
+  --on-bubble-own: var(--color-text);
+  --tint-interface: 0%;
+  --tint-mono: 0%;
+}

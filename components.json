@@ -1,0 +1,16 @@
+{
+  "$schema": "https://shadcn-svelte.com/schema.json",
+  "style": "new-york",
+  "tailwind": {
+    "css": "src/design/ui/theme.css",
+    "baseColor": "neutral"
+  },
+  "aliases": {
+    "components": "$design",
+    "ui": "$design/ui",
+    "lib": "$design",
+    "utils": "$design/ui/utils",
+    "hooks": "$design/ui/hooks"
+  },
+  "typescript": true
+}

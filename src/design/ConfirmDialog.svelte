@@ -3,6 +3,7 @@
   возвращает его, когда закрыт, и закрывается по `Esc`.
 -->
 <script lang="ts">
+  import Button from './ui/Button.svelte';
   import { closingGhost } from './closingGhost.svelte.ts';
   import DialogClose from './DialogClose.svelte';
   import { backdropClose } from './backdropClose';
@@ -47,8 +48,8 @@
     {/if}
     <div class="actions">
       <!-- Ни одна из двух не выделена как «правильная»: фокус — на отмене. -->
-      <button type="button" class="cancel press" onclick={onclose}>{cancelLabel}</button>
-      <button type="button" class="confirm press" class:destructive onclick={onconfirm}>{confirmLabel}</button>
+      <Button variant="secondary" onclick={onclose}>{cancelLabel}</Button>
+      <Button variant={destructive ? 'destructive' : 'default'} onclick={onconfirm}>{confirmLabel}</Button>
     </div>
   </div>
   <div class="live" aria-hidden="true" inert hidden bind:this={ghost}></div>
@@ -63,7 +64,7 @@
     border-radius: var(--radius-menu);
     background: var(--color-background);
     color: var(--color-text);
-    box-shadow: 0 var(--space-close) var(--space-generous) rgb(0 0 0 / 0.25);
+    box-shadow: var(--shadow-popover);
   }
   .live {
     display: contents;
@@ -92,24 +93,5 @@
     display: flex;
     justify-content: flex-end;
     gap: var(--space-close);
-  }
-  button {
-    min-height: var(--tap-target);
-    padding: 0 var(--space-roomy);
-    border: none;
-    border-radius: var(--radius-circle);
-    font-weight: 600;
-    cursor: pointer;
-  }
-  .cancel {
-    background: var(--color-incoming-bubble);
-  }
-  .confirm {
-    background: var(--accent);
-    color: var(--on-accent);
-  }
-  .confirm.destructive {
-    background: var(--color-danger);
-    color: var(--color-on-danger);
   }
 </style>

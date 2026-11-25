@@ -21,12 +21,13 @@
     room: RoomSummary;
     session: UserSession;
     selected: boolean;
+    avatarOnly?: boolean;
     now: number;
     onopen?: (roomId: string) => void;
     /** Меню строки: у точки — мышью и с клавиатуры, листом (`sheet`) — пальцем. */
     onmenu?: (at: { x: number; y: number }, sheet: boolean) => void;
   }
-  let { room, session, selected, now, onopen, onmenu }: Props = $props();
+  let { room, session, selected, now, onopen, onmenu, avatarOnly = false }: Props = $props();
 
   /**
    * Правый щелчок — у указателя. С клавиатуры у события нет точки — тогда под строкой.
@@ -58,8 +59,24 @@
   const sender = $derived(room.kind === 'group' ? room.lastSender : undefined);
 </script>
 
+{#snippet unread()}
+  {#if hasUnread(room) || room.mentionCount > 0 || room.unreadReactions > 0}
+    <UnreadBadge
+      compact={avatarOnly}
+      count={room.unreadCount}
+      unread={hasUnread(room)}
+      reacted={room.unreadReactions > 0}
+      mentioned={room.mentionCount > 0}
+      muted={emphasisOf(room) === 'muted'}
+      format={(n) => number.format(n)}
+    />
+  {/if}
+{/snippet}
+
 <a
   class="row"
+  class:avatar-only={avatarOnly}
+  title={avatarOnly ? roomName(room) : undefined}
   href={formatRoute({ name: 'room', roomId: room.id })}
   aria-current={selected ? 'page' : undefined}
   aria-label={rowLabel(room, draft)}
@@ -73,56 +90,52 @@
     onopen(room.id);
   }}
 >
-  <RoomFace {room} {session} />
-  <span class="body">
-    <span class="line">
-      <span class="name">{roomName(room)}</span>
-      {#if room.encrypted}
-        <Icon name="lock" class="row-lock" />
-      {/if}
-      <span class="spacer"></span>
-      {#if room.isFavourite}
-        <Icon name="pin" class="row-pin" />
-      {/if}
-      {#if room.lastMark && !room.typing}
-        <span class="mark" data-mark={room.lastMark}>
-          {#if room.lastMark === 'sending'}
-            <Icon name="sending" role="img" aria-label={t('message.delivery.sending')} />
-          {:else if room.lastMark === 'read'}
-            <Icon name="read" role="img" aria-label={t('message.delivery.read')} />
-          {:else if room.lastMark === 'sent'}
-            <Icon name="check" role="img" aria-label={t('message.delivery.sent')} />
-          {:else}
-            <Icon name="failed" role="img" aria-label={t('message.delivery.failed')} />
-          {/if}
-        </span>
-      {/if}
-      {#if room.lastActivity}
-        <time class="time">{roomTimestamp(room.lastActivity, now, i18n.locale, t('room.yesterday'))}</time>
-      {/if}
-    </span>
-    <span class="line top">
-      {#if room.typing}
-        <span class="preview typing">{t('room.typing')}</span>
-      {:else if draft}
-        <span class="preview draft">{t('roomList.draft', { text: draft })}</span>
-      {:else}
-        <span class="preview"
-          >{#if sender}<span class="sender">{sender}</span><span class="colon">:</span><br class="break" />{/if}{previewText(room.preview)}</span
-        >
-      {/if}
-      {#if hasUnread(room) || room.mentionCount > 0 || room.unreadReactions > 0}
-        <UnreadBadge
-          count={room.unreadCount}
-          unread={hasUnread(room)}
-          reacted={room.unreadReactions > 0}
-          mentioned={room.mentionCount > 0}
-          muted={emphasisOf(room) === 'muted'}
-          format={(n) => number.format(n)}
-        />
-      {/if}
-    </span>
+  <span class="avatar">
+    <RoomFace {room} {session} />
+    {#if avatarOnly}<span class="avatar-badge">{@render unread()}</span>{/if}
   </span>
+  {#if !avatarOnly}
+    <span class="body">
+      <span class="line">
+        <span class="name">{roomName(room)}</span>
+        {#if room.encrypted}
+          <Icon name="lock" class="row-lock" />
+        {/if}
+        <span class="spacer"></span>
+        {#if room.isFavourite}
+          <Icon name="pin" class="row-pin" />
+        {/if}
+        {#if room.lastMark && !room.typing}
+          <span class="mark" data-mark={room.lastMark}>
+            {#if room.lastMark === 'sending'}
+              <Icon name="sending" role="img" aria-label={t('message.delivery.sending')} />
+            {:else if room.lastMark === 'read'}
+              <Icon name="read" role="img" aria-label={t('message.delivery.read')} />
+            {:else if room.lastMark === 'sent'}
+              <Icon name="check" role="img" aria-label={t('message.delivery.sent')} />
+            {:else}
+              <Icon name="failed" role="img" aria-label={t('message.delivery.failed')} />
+            {/if}
+          </span>
+        {/if}
+        {#if room.lastActivity}
+          <time class="time">{roomTimestamp(room.lastActivity, now, i18n.locale, t('room.yesterday'))}</time>
+        {/if}
+      </span>
+      <span class="line top">
+        {#if room.typing}
+          <span class="preview typing">{t('room.typing')}</span>
+        {:else if draft}
+          <span class="preview draft">{t('roomList.draft', { text: draft })}</span>
+        {:else}
+          <span class="preview"
+            >{#if sender}<span class="sender">{sender}</span><span class="colon">:</span><br class="break" />{/if}{previewText(room.preview)}</span
+          >
+        {/if}
+        {@render unread()}
+      </span>
+    </span>
+  {/if}
 </a>
 
 <style>
@@ -135,7 +148,7 @@
     margin-inline: var(--space-tight);
     border-radius: var(--radius-row);
     font-size: var(--font-size-body);
-    color: inherit;
+    color: var(--color-text);
     text-decoration: none;
     /* Пятьсот комнат — не беда: строки вне экрана не раскладываются и не рисуются. */
     content-visibility: auto;
@@ -166,6 +179,21 @@
   .row[aria-current='page'] {
     background: var(--color-room-selection);
   }
+  .row.avatar-only {
+    justify-content: center;
+    padding-inline: var(--space-tight);
+  }
+  .avatar {
+    position: relative;
+    display: flex;
+    flex: none;
+  }
+  .avatar-badge {
+    position: absolute;
+    inset-inline-end: calc(-1 * var(--space-tight));
+    inset-block-end: calc(-1 * var(--space-tight));
+    pointer-events: none;
+  }
   .body {
     display: flex;
     flex-direction: column;
@@ -174,6 +202,7 @@
     min-width: 0;
   }
   .line {
+    font-variant-numeric: tabular-nums;
     display: flex;
     align-items: center;
     gap: var(--space-tight);

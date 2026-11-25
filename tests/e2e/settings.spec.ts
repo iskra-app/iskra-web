@@ -180,6 +180,41 @@ test('фото профиля — через обрезку: масштаб, «�
   await expect.poll(() => face.evaluate((img: HTMLImageElement) => img.naturalWidth > 0 && img.naturalWidth === img.naturalHeight)).toBe(true);
 });
 
+test('доступность: обводка, анимации и контраст применяются и запоминаются', async ({ page }) => {
+  await signInToDemo(page);
+  await page.emulateMedia({ colorScheme: 'light', reducedMotion: 'no-preference' });
+  await openSettings(page, 'Внешний вид');
+  await page.getByRole('link', { name: 'Доступность' }).click();
+  await expect(page.getByRole('heading', { name: 'Доступность', level: 1 })).toBeVisible();
+  const root = page.locator('html');
+  const focus = page.getByRole('switch', { name: 'Обводка при фокусе' });
+  const motion = page.getByRole('switch', { name: 'Отключить анимации' });
+  const contrast = page.getByRole('switch', { name: 'Увеличенный контраст' });
+
+  await expect(focus).not.toBeChecked();
+  await expect(motion).not.toBeChecked();
+  await expect(contrast).not.toBeChecked();
+  await focus.focus();
+  await expect(focus).toHaveCSS('outline-style', 'none');
+  await focus.press('Space');
+  await expect(focus).toHaveCSS('outline-style', 'solid');
+  await motion.check();
+  await expect(root).toHaveAttribute('data-no-motion', '');
+  await contrast.check();
+  await expect(page.locator('body')).toHaveCSS('color', 'rgb(0, 0, 0)');
+  await page.emulateMedia({ colorScheme: 'dark' });
+  await expect(page.locator('body')).toHaveCSS('color', 'rgb(255, 255, 255)');
+
+  await page.reload();
+  await expect(focus).toBeChecked();
+  await expect(motion).toBeChecked();
+  await expect(contrast).toBeChecked();
+  await page.getByRole('button', { name: 'Назад', exact: true }).click();
+  await expect(page.getByRole('heading', { name: 'Внешний вид', level: 1 })).toBeVisible();
+  await openRoom(page, /^Выходные/);
+  await expect(page.locator('.conversation')).toHaveCSS('animation-name', 'none');
+});
+
 test('настройки по разделам: имя, язык, тема, шрифт; устройство и хранилище видны', async ({ page }, info) => {
   await signInToDemo(page);
   await openSettings(page);
@@ -219,6 +254,7 @@ test('настройки по разделам: имя, язык, тема, шр
   await expect(tint).not.toBeChecked();
   await tint.check();
   await expect(page.locator('html')).toHaveAttribute('data-tint', '');
+  await expect(page.locator('html')).toHaveCSS('--tint-interface', '4%');
   await tint.uncheck();
   await expect(page.locator('html')).not.toHaveAttribute('data-tint');
   // Inter — по умолчанию и из своих файлов под боевой CSP: кириллица и латиница загрузились.
@@ -374,9 +410,17 @@ test('локальное имя личного чата: видно везде, 
 test('обои: градиент за перепиской и непрозрачные пузыри; своё фото — до выхода из аккаунта', async ({ page }) => {
   const problems = watchForProblems(page);
   await signInToDemo(page);
+  await page.emulateMedia({ colorScheme: 'light' });
   await openSettings(page, 'Внешний вид');
   const tiles = page.getByRole('radiogroup', { name: 'Обои' });
-  await expect(tiles.getByRole('radio', { name: 'Без обоев' })).toHaveAttribute('aria-checked', 'true');
+  const withoutWallpaper = tiles.getByRole('radio', { name: 'Без обоев' });
+  await expect(withoutWallpaper).toHaveAttribute('aria-checked', 'true');
+  await expect.poll(() => withoutWallpaper.evaluate((tile) => {
+    const style = getComputedStyle(tile);
+    const outset = Number.parseFloat(style.outlineWidth) + Number.parseFloat(style.outlineOffset);
+    const { left } = tile.getBoundingClientRect();
+    return left - tile.parentElement!.getBoundingClientRect().left >= outset;
+  })).toBe(true);
   await expect(page.getByRole('slider')).toHaveCount(0);
   await tiles.getByRole('radio', { name: 'Море' }).click();
   await expect(page.getByRole('slider')).toBeVisible();
@@ -386,7 +430,7 @@ test('обои: градиент за перепиской и непрозрач
   await expect(room).toHaveAttribute('data-wallpaper', '');
   // На обоях входящий пузырь — непрозрачный, а не восемь процентов чёрного.
   const bubble = page.getByRole('log').getByRole('article').filter({ hasText: 'Возьми плед' });
-  await expect.poll(() => bubble.evaluate((e) => getComputedStyle(e).backgroundColor)).toBe('rgb(252, 252, 252)');
+  await expect.poll(() => bubble.evaluate((e) => getComputedStyle(e).backgroundColor)).toBe('rgb(237, 237, 237)');
 
   // Своё фото: выбрать — и оно за перепиской, и переживает перезагрузку.
   const back = page.getByRole('button', { name: 'Назад' });

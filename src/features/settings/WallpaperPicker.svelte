@@ -82,7 +82,9 @@
   .tiles {
     display: flex;
     gap: var(--space-close);
-    padding-block: var(--space-tight);
+    /* Оставляем место для обводки внутри области прокрутки, в том числе у первых и последних обоев. */
+    padding: calc(2 * var(--border-thick));
+    scroll-padding-inline: calc(2 * var(--border-thick));
     overflow-x: auto;
   }
   .tile {
@@ -104,8 +106,8 @@
     background: linear-gradient(to bottom, var(--wallpaper-top), var(--wallpaper-bottom));
   }
   .tile[aria-checked='true'] {
-    outline: 2px solid var(--accent);
-    outline-offset: 2px;
+    outline: var(--border-thick) solid var(--accent);
+    outline-offset: var(--border-thick);
   }
   .tile img {
     width: 100%;

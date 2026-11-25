@@ -49,6 +49,16 @@
     border-block-end: var(--border-hairline) solid var(--color-separator);
     background: var(--color-glass-opaque);
   }
+  :global(.desktop-chat) .pinned {
+    width: min(calc(100% - 2 * var(--timeline-gutter)), calc(var(--column-timeline-max) - 2 * var(--timeline-gutter)));
+    margin: var(--space-tight) auto;
+    border: var(--border-hairline) solid var(--color-separator);
+    border-radius: var(--radius-control);
+    background: var(--color-background);
+  }
+  :global(.desktop-chat) .jump {
+    padding-inline: var(--space-normal);
+  }
   .jump {
     display: flex;
     align-items: center;

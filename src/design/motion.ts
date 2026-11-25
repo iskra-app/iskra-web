@@ -6,7 +6,8 @@ import { flip } from 'svelte/animate';
 
 /** Человек попросил меньше движения — появляться сразу. */
 export function reducedMotion(): boolean {
-  return typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches;
+  return (typeof document !== 'undefined' && document.documentElement.hasAttribute('data-no-motion'))
+    || (typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches);
 }
 
 /**

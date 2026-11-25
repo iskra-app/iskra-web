@@ -12,6 +12,7 @@
   которую открыть.
 -->
 <script lang="ts">
+  import Switch from '../../design/ui/Switch.svelte';
   import Dialog from '../../design/Dialog.svelte';
   import Icon from '../../design/Icon.svelte';
   import type { IconName } from '../../design/icons.ts';
@@ -317,7 +318,6 @@
       {/if}
     </div>
     {#if failure}<p class="problem" role="alert">{t(failure)}</p>{/if}
-    <PlainButton onclick={onclose}>{t('room.manage.cancel')}</PlainButton>
   {:else if page === 'newRoom'}
     <form onsubmit={create}>
       <TextField bind:value={name} label={t('room.manage.nameHeader')} showLabel placeholder={t('room.manage.namePlaceholder')} autofocus />
@@ -330,7 +330,7 @@
           <strong>{t('room.manage.openToAnyone')}</strong>
           <span class="help">{t('room.manage.openToAnyoneHelp')}</span>
         </span>
-        <input type="checkbox" role="switch" bind:checked={isOpen} />
+        <Switch bind:checked={isOpen} />
       </label>
       <!-- Чем комната будет — тем же замком, что в «О чате», и сразу, как щёлкнул тумблер. -->
       <p class="privacy" class:open={isOpen}>
@@ -460,9 +460,8 @@
     resize: vertical;
   }
   textarea:focus-visible {
-    outline: 2px solid var(--accent);
+    outline: var(--focus-outline);
     outline-offset: 0;
-    border-color: transparent;
   }
   .toggle {
     display: flex;

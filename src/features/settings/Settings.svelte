@@ -6,6 +6,7 @@
   Здесь только то, что работает: чего ещё нет (пуши, звонки), того и в настройках нет.
 -->
 <script lang="ts">
+  import Switch from '../../design/ui/Switch.svelte';
   import { build, channel, version, website } from '../app/channel';
   import { onMount, tick } from 'svelte';
   import Avatar from '../../design/Avatar.svelte';
@@ -421,14 +422,14 @@
       {#each mentionSwitches as { name, label } (name)}
         <label class="switch">
           <span>{t(label)}</span>
-          <input type="checkbox" role="switch" checked={current[name]} disabled={offline} onchange={(event) => void rules.setSwitch(name, event.currentTarget.checked)} />
+          <Switch checked={current[name]} disabled={offline} onchange={(event) => void rules.setSwitch(name, event.currentTarget.checked)} />
         </label>
       {/each}
       <h3>{t('notifications.other')}</h3>
       {#each otherSwitches as { name, label } (name)}
         <label class="switch">
           <span>{t(label)}</span>
-          <input type="checkbox" role="switch" checked={current[name]} disabled={offline} onchange={(event) => void rules.setSwitch(name, event.currentTarget.checked)} />
+          <Switch checked={current[name]} disabled={offline} onchange={(event) => void rules.setSwitch(name, event.currentTarget.checked)} />
         </label>
       {/each}
       <p class="secondary">{t('notifications.otherFooter')}</p>
@@ -487,12 +488,12 @@
       <h3 id="privacy-title">{t('privacy.title')}</h3>
       <label class="switch">
         <span>{t('privacy.hidePresence')}</span>
-        <input type="checkbox" role="switch" bind:checked={preferences.hidePresence} />
+        <Switch bind:checked={preferences.hidePresence} />
       </label>
       <p class="secondary">{t('privacy.hidePresenceHelp')}</p>
       <label class="switch">
         <span>{t('privacy.hideTyping')}</span>
-        <input type="checkbox" role="switch" bind:checked={preferences.hideTyping} />
+        <Switch bind:checked={preferences.hideTyping} />
       </label>
       <p class="secondary">{t('privacy.hideTypingHelp')}</p>
     </section>
@@ -512,12 +513,9 @@
     <AppearancePreview />
     <label class="switch">
       <span>{t('appearance.compact')}</span>
-      <input
-        type="checkbox"
-        role="switch"
+      <Switch
         checked={preferences.layout === 'compact'}
-        onchange={(event) => (preferences.layout = event.currentTarget.checked ? 'compact' : 'bubbles')}
-      />
+        onchange={(event) => (preferences.layout = event.currentTarget.checked ? 'compact' : 'bubbles')} />
     </label>
     <!-- Одна карточка на три ответа «в чём окрашено приложение»: светлая или тёмная, цвет и подкраска
          (`appearance.themeAndColors` нативной). Названия строк — скринридеру. -->
@@ -534,7 +532,7 @@
     <AccentSwatches labelledby="accent-title" />
     <label class="switch">
       <span>{t('appearance.tintInterface')}</span>
-      <input type="checkbox" role="switch" bind:checked={preferences.tintsInterface} />
+      <Switch bind:checked={preferences.tintsInterface} />
     </label>
     <h3 id="wallpaper-title">{t('appearance.wallpaper')}</h3>
     <WallpaperPicker labelledby="wallpaper-title" />
@@ -547,6 +545,15 @@
         </button>
       {/each}
     </div>
+    <ul class="rows">
+      <li>
+        <a href={hrefOf('accessibility')}>
+          <span class="row-icon"><Icon name="accessibility" /></span>
+          <span class="row-label">{t('settings.accessibility')}</span>
+          <span class="chevron"><Icon name="forward" /></span>
+        </a>
+      </li>
+    </ul>
     <h3 id="language-title">{t('settings.language')}</h3>
     <div class="options" role="radiogroup" aria-labelledby="language-title">
       {#each languages as language (language.value)}
@@ -555,6 +562,19 @@
         </button>
       {/each}
     </div>
+  {:else if section === 'accessibility'}
+    <label class="switch">
+      <span>{t('accessibility.focusOutline')}</span>
+      <Switch bind:checked={preferences.focusOutline} />
+    </label>
+    <label class="switch">
+      <span>{t('accessibility.noMotion')}</span>
+      <Switch bind:checked={preferences.noMotion} />
+    </label>
+    <label class="switch">
+      <span>{t('accessibility.highContrast')}</span>
+      <Switch bind:checked={preferences.highContrast} />
+    </label>
   {:else if section === 'reactions'}
     <h3 id="quick-reaction-title">{t('reactions.quick')}</h3>
     <QuickReactionPicker labelledby="quick-reaction-title" />
@@ -574,17 +594,17 @@
     </div>
     <label class="switch">
       <span>{t('chats.threadsHideReplies')}</span>
-      <input type="checkbox" role="switch" bind:checked={preferences.threadsHideReplies} disabled={preferences.threadsShown === 'never'} />
+      <Switch bind:checked={preferences.threadsHideReplies} disabled={preferences.threadsShown === 'never'} />
     </label>
     <p class="secondary">{t('chats.threadsHelpWeb')}</p>
     <h3>{t('chats.serviceSection')}</h3>
     <label class="switch">
       <span>{t('chats.hideNameChanges')}</span>
-      <input type="checkbox" role="switch" bind:checked={preferences.hideNameChanges} />
+      <Switch bind:checked={preferences.hideNameChanges} />
     </label>
     <label class="switch">
       <span>{t('chats.hideMembershipChanges')}</span>
-      <input type="checkbox" role="switch" bind:checked={preferences.hideMembershipChanges} />
+      <Switch bind:checked={preferences.hideMembershipChanges} />
     </label>
     <p class="secondary">{t('chats.serviceHelp')}</p>
     <!-- Только с клавиатурой: на сенсорном Enter и так переносит строку, а отправляет кнопка. -->
@@ -592,7 +612,7 @@
       <h3>{t('chats.keyboardSection')}</h3>
       <label class="switch">
         <span>{t('chats.modReturnWeb', { mod })}</span>
-        <input type="checkbox" role="switch" bind:checked={preferences.sendWithModEnter} />
+        <Switch bind:checked={preferences.sendWithModEnter} />
       </label>
       <p class="secondary">{preferences.sendWithModEnter ? t('chats.modReturnOnHelpWeb', { mod }) : t('chats.enterSendsHelpWeb')}</p>
     {/if}
@@ -629,11 +649,11 @@
     <p class="secondary">{t(autoDownloadHelp[preferences.autoDownload])}</p>
     <label class="switch">
       <span>{t('media.stripMetadata')}</span>
-      <input type="checkbox" role="switch" bind:checked={preferences.stripMetadata} />
+      <Switch bind:checked={preferences.stripMetadata} />
     </label>
     <label class="switch">
       <span>{t('media.compress')}</span>
-      <input type="checkbox" role="switch" bind:checked={preferences.compress} />
+      <Switch bind:checked={preferences.compress} />
     </label>
     <!-- Появляется вместе с переключателем, от которого зависит, — а не стоит серым. -->
     {#if preferences.compress}
@@ -732,11 +752,11 @@
     <p class="secondary">{t('beta.homeserverHelp')}</p>
     <label class="switch">
       <span>{t('beta.showsSource')}</span>
-      <input type="checkbox" role="switch" bind:checked={preferences.showsEventSource} />
+      <Switch bind:checked={preferences.showsEventSource} />
     </label>
     <label class="switch">
       <span>{t('beta.showsAllEvents')}</span>
-      <input type="checkbox" role="switch" bind:checked={preferences.showsAllEvents} />
+      <Switch bind:checked={preferences.showsAllEvents} />
     </label>
     <p class="secondary">{t('beta.showsSourceHelp')}</p>
     <p class="secondary">{t('beta.showsAllEventsHelp')}</p>

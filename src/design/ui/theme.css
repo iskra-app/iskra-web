@@ -1,0 +1,124 @@
+/* shadcn-svelte roles mapped to the app's single set of theme preferences. */
+@layer theme, base, components, utilities;
+@import 'tailwindcss/theme.css' layer(theme);
+@import 'tailwindcss/utilities.css' layer(utilities) source(none);
+@source './';
+
+@theme inline {
+  --color-background: var(--ui-background);
+  --color-foreground: var(--ui-foreground);
+  --color-primary: var(--ui-primary);
+  --color-primary-foreground: var(--ui-primary-foreground);
+  --color-secondary: var(--ui-secondary);
+  --color-accent: var(--ui-hover);
+  --color-accent-foreground: var(--ui-foreground);
+  --color-destructive: var(--ui-destructive);
+  --color-destructive-foreground: var(--ui-destructive-foreground);
+  --color-border: var(--ui-border);
+  --color-ring: var(--ui-ring);
+  --color-link: var(--ui-link);
+}
+
+:root {
+  --ui-background: var(--color-background);
+  --ui-foreground: var(--color-text);
+  --ui-primary: var(--accent);
+  --ui-primary-foreground: var(--on-accent);
+  --ui-secondary: var(--color-selected);
+  --ui-hover: var(--color-incoming-bubble);
+  --ui-destructive: var(--color-danger);
+  --ui-destructive-foreground: var(--color-on-danger);
+  --ui-border: var(--color-separator);
+  --ui-ring: var(--color-focus);
+  --ui-link: color-mix(in srgb, var(--accent) 52%, var(--color-text));
+}
+
+@layer components {
+  .ui-button {
+    min-block-size: var(--tap-target);
+    border: 0;
+    font-weight: 600;
+    line-height: var(--line-height-bar);
+    cursor: pointer;
+    transition:
+      background-color var(--timing-chrome) var(--ease-out),
+      opacity var(--timing-chrome) var(--ease-out),
+      scale var(--timing-chrome) var(--ease-out);
+  }
+
+  .ui-button-wide {
+    min-block-size: max(var(--tap-target), var(--size-navigation-bar));
+  }
+
+  .ui-button-icon,
+  .ui-button-icon-lg {
+    inline-size: var(--tap-target);
+    padding: 0;
+  }
+
+  .ui-button-icon-lg {
+    inline-size: max(var(--tap-target), var(--size-navigation-bar));
+    min-block-size: max(var(--tap-target), var(--size-navigation-bar));
+  }
+
+  .ui-button-icon svg,
+  .ui-button-icon-lg svg {
+    inline-size: var(--size-icon-button);
+    block-size: var(--size-icon-button);
+  }
+
+  .ui-button-ghost {
+    background: transparent;
+  }
+
+  .ui-button[aria-pressed='true'] {
+    background: var(--ui-secondary);
+  }
+
+  @media (hover: hover) {
+    .ui-button-ghost:hover:not(:disabled),
+    .ui-button-secondary:hover:not(:disabled) {
+      background: var(--ui-hover);
+    }
+  }
+
+  .ui-button:disabled {
+    opacity: 0.5;
+    cursor: default;
+  }
+
+  .ui-button[aria-busy='true'] {
+    opacity: 0.8;
+  }
+
+  .ui-field {
+    min-inline-size: 0;
+    min-block-size: max(var(--tap-target), var(--size-navigation-bar));
+    padding-inline: var(--space-roomy);
+    border: var(--border-hairline) solid var(--ui-border);
+    border-radius: var(--radius-control);
+    background: var(--ui-background);
+    color: var(--ui-foreground);
+    font-size: var(--font-size-input);
+  }
+
+  .ui-field:focus-visible {
+    outline: var(--focus-outline);
+    outline-offset: 0;
+  }
+
+  .ui-field[aria-invalid='true'] {
+    border-color: var(--ui-destructive);
+  }
+
+  .ui-field:disabled {
+    opacity: 0.55;
+  }
+
+  input[data-slot='checkbox'] {
+    inline-size: var(--size-icon);
+    block-size: var(--size-icon);
+    margin: 0;
+    accent-color: var(--ui-primary);
+  }
+}

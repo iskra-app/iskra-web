@@ -524,7 +524,7 @@
     align-items: center;
     gap: var(--space-tight);
     min-height: var(--tap-target);
-    padding: var(--space-close) var(--space-tight);
+    padding: var(--space-normal) var(--space-close);
     border: none;
     border-radius: var(--radius-card);
     background: var(--color-surface);
@@ -532,6 +532,9 @@
     font: inherit;
     font-size: var(--font-size-caption);
     cursor: pointer;
+  }
+  .tile span {
+    overflow-wrap: anywhere;
   }
   .tile :global(svg) {
     width: var(--size-icon-button);
@@ -579,13 +582,17 @@
     display: flex;
     align-items: center;
     min-height: var(--tap-target);
-    padding: 0 var(--space-normal);
+    gap: var(--space-close);
+    padding: var(--space-normal) var(--space-roomy);
     border: none;
     background: transparent;
     color: inherit;
     font: inherit;
     text-align: start;
     cursor: pointer;
+  }
+  .options button:focus-visible {
+    outline-offset: calc(-1 * var(--border-thick));
   }
   .options button + button {
     border-block-start: var(--border-hairline) solid var(--color-separator);
@@ -745,6 +752,7 @@
   }
   .danger {
     min-height: var(--tap-target);
+    padding: var(--space-normal) var(--space-roomy);
     border: none;
     border-radius: var(--radius-control);
     background: var(--color-surface);

@@ -39,7 +39,7 @@
     display: flex;
     align-items: center;
     gap: var(--space-normal);
-    padding: var(--space-close) var(--space-normal);
+    padding: var(--space-normal) var(--space-roomy);
     border-radius: var(--radius-card);
     background: var(--color-surface);
   }

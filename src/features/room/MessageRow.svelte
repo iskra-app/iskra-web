@@ -410,6 +410,7 @@
     margin-inline-start: calc(var(--bubble-pad-x) - var(--space-close));
   }
   .bubble {
+    color: var(--color-text);
     font-size: var(--font-size-message);
     line-height: var(--line-height-message);
     max-width: 100%;
@@ -756,7 +757,7 @@
   }
   /* Текущее сообщение с клавиатуры — обводкой акцента, как пункт меню. */
   .bubble:focus-visible {
-    outline: 2px solid var(--accent);
+    outline: var(--focus-outline);
     outline-offset: 2px;
   }
   /* Фокус — только с клавиатуры: после закрытия меню он возвращается на «ещё» или пузырь,

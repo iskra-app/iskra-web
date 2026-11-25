@@ -12,10 +12,12 @@
   Для скринридера значок молчит: строка читается одной фразой (см. `RoomRow`).
 -->
 <script lang="ts">
+  import Badge from './ui/Badge.svelte';
   import Icon from './Icon.svelte';
 
   interface Props {
     count: number;
+    compact?: boolean;
     /** Есть что читать — без этого нет и точки: у одних реакций своё сердечко. */
     unread: boolean;
     reacted: boolean;
@@ -24,19 +26,19 @@
     /** Число в форме языка: «1 234», а не «1234». */
     format: (n: number) => string;
   }
-  let { count, unread, reacted, mentioned, muted, format }: Props = $props();
+  let { count, unread, reacted, mentioned, muted, format, compact = false }: Props = $props();
 </script>
 
-<span class="badges" aria-hidden="true">
-  {#if reacted}
+<span class="badges" class:compact aria-hidden="true">
+  {#if reacted && (!compact || (!mentioned && count === 0))}
     <span class="reacted" class:muted><Icon name="heart" /></span>
   {/if}
-  {#if mentioned}
-    <span class="mention">@</span>
+  {#if mentioned && (!compact || count === 0)}
+    <Badge variant="primary" class="mention">@</Badge>
   {/if}
   {#if count > 0}
-    <span class="count" class:muted>{format(count)}</span>
-  {:else if unread && !mentioned}
+    <Badge class="count" variant={muted ? 'muted' : 'primary'}>{compact && count > 999 ? `${format(999)}+` : format(count)}</Badge>
+  {:else if unread && !mentioned && (!compact || !reacted)}
     <span class="dot" class:muted></span>
   {/if}
 </span>
@@ -47,6 +49,16 @@
     align-items: center;
     gap: var(--space-tight);
     flex: none;
+  }
+  .badges.compact {
+    --size-unread-badge: var(--space-roomy);
+  }
+  .compact :is(.reacted, .dot, :global(.mention), :global(.count)) {
+    box-shadow: 0 0 0 var(--border-thick) var(--color-sidebar);
+    font-size: var(--font-size-caption2);
+  }
+  .badges.compact :global(.count) {
+    padding-inline: var(--space-tight);
   }
   .reacted {
     display: inline-grid;
@@ -64,20 +76,8 @@
   .reacted.muted {
     background: var(--color-muted-badge);
   }
-  .mention,
-  .count {
-    display: inline-grid;
-    place-items: center;
-    min-width: var(--size-unread-badge);
-    height: var(--size-unread-badge);
-    border-radius: var(--radius-circle);
-    background: var(--accent);
-    color: var(--on-accent);
-    font-size: var(--font-size-caption);
-    font-weight: 600;
-    line-height: 1;
-  }
-  .count {
+
+  .badges :global(.count) {
     padding: 0 var(--space-close);
   }
   .dot {
@@ -87,8 +87,8 @@
     background: var(--accent);
   }
   .reacted,
-  .mention,
-  .count,
+  .badges :global(.mention),
+  .badges :global(.count),
   .dot {
     transition:
       opacity var(--timing-reaction) var(--ease-out),
@@ -97,14 +97,13 @@
   }
   @starting-style {
     .reacted,
-    .mention,
-    .count,
+    .badges :global(.mention),
+    .badges :global(.count),
     .dot {
       opacity: 0;
       transform: scale(var(--motion-icon-scale-from));
     }
   }
-  .count.muted,
   .dot.muted {
     background: var(--color-muted-badge);
     color: var(--color-on-muted-badge);
